@@ -314,11 +314,10 @@ const QUALIFY = [
   ['src/pages/wrapped.html', page(lines('<button', '  class="x">Store</button>').trimEnd())],
   // Prose beside a fenced code block that stays the same.
   ['docs/fenced-ok.md', lines('# Setup', '', 'Run the new installer.', '', '```sh', 'pip install requests', '```')],
-  // The commit security review: an issue template under `.github/`; plain text beside a role.
+  // The commit security review: an issue template under `.github/`.
   ['.github/ISSUE_TEMPLATE/bug.md', lines('Describe the new bug.')],
-  // The fourth round (2026-10-09). A title is wording; Vue's conditional templates inside
-  // markup render; a design-token stylesheet with a real colour property; a paragraph that
-  // continues a list item; a React project's `src/hooks/` notes (CTOC's enforcement list
+  // The fourth round (2026-10-09). A title is wording; a design-token stylesheet with a
+  // real colour property; a paragraph that continues a list item; a React project's `src/hooks/` notes (CTOC's enforcement list
   // is CTOC's own, and this repository is not CTOC).
   ['src/pages/titled.html', BASE['src/pages/titled.html'].replace('Save', 'Store')],
   ['src/styles/tokens.css', BASE['src/styles/tokens.css'].replace('#0a58ca', '#0b5ed7')],
@@ -342,6 +341,11 @@ const QUALIFY = [
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
+// Since the sixth round, traps that were "not recognised", "could not read (… cannot follow)"
+// or a setting for one of the functional plan's five cases (text in a component or custom
+// element, text in `<svg>` or `<math>`, HTML outside the strict subset, a heading whose
+// anchor changes, a colour that is not a whole value) assert the plan's clause, `inexact`:
+// the wording the functional plan now specifies, on a refusal that stays a refusal.
 const TRAPS = [
   [{ 'src/cart.js': BASE['src/cart.js'].replace('> 0', '>= 0') }, null, 'it changes program logic in src/cart.js, and only wording and colours qualify'],
   [{ 'src/server.js': BASE['src/server.js'].replace('Order saved', 'Order stored') }, null, 'it changes text inside program code in src/server.js, and no check can tell whether people read that text or the program depends on it'],
@@ -443,7 +447,7 @@ const TRAPS = [
   // value runs over two lines, so the second line looks like text after a tag.
   [{ 'src/pages/tip.html': BASE['src/pages/tip.html'].replace("'one'", "'two'") }, null, unrecognised('src/pages/tip.html')],
   // An option with no `value` sends its text, whatever tags sit inside it.
-  [{ 'src/pages/status-pick.html': BASE['src/pages/status-pick.html'].replace('Pending', 'Approved') }, null, unrecognised('src/pages/status-pick.html')],
+  [{ 'src/pages/status-pick.html': BASE['src/pages/status-pick.html'].replace('Pending', 'Approved') }, null, inexact('src/pages/status-pick.html')],
   // Catalogue values read as a browser reads an address: escapes decoded, tabs removed.
   [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"\\/\\/other.example\\/go"') }, null, unrecognised('locales/far.json')],
   [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"java\\tscript:go()"') }, null, unrecognised('locales/far.json')],
@@ -465,7 +469,7 @@ const TRAPS = [
   [{ 'src/styles/nextline.css': BASE['src/styles/nextline.css'].replace('#add', '#bad') }, null, unrecognised('src/styles/nextline.css')],
   [{ 'src/styles/commented.css': BASE['src/styles/commented.css'].replace('#add', '#bad') }, null, unrecognised('src/styles/commented.css')],
   // Code blocks, front matter as a JSON object, reference definitions, autolinks, Liquid tags,
-  // reStructuredText code and include directives, and a workflow folder's Markdown.
+  // and a workflow folder's Markdown.
   [{ 'docs/setup.md': BASE['docs/setup.md'].replace('requests', 'reqests') }, null, unrecognised('docs/setup.md')],
   [{ 'docs/indented.md': BASE['docs/indented.md'].replace('requests', 'reqests') }, null, unrecognised('docs/indented.md')],
   [{ 'docs/tilde.md': BASE['docs/tilde.md'].replace('requests', 'reqests') }, null, unrecognised('docs/tilde.md')],
@@ -474,8 +478,7 @@ const TRAPS = [
   [{ 'docs/auto.md': BASE['docs/auto.md'].replace('one.example', 'two.example') }, null, unrecognised('docs/auto.md')],
   [{ 'docs/liquid.md': BASE['docs/liquid.md'].replace('one.html', 'two.html') }, null, unrecognised('docs/liquid.md')],
   [{ '.github/workflows/README.md': BASE['.github/workflows/README.md'].replace('old', 'new') }, null, 'it changes how the project is built or shipped in .github/workflows/README.md'],
-  // Attribute shapes: a character reference in a value, an unquoted value, Vue's `@click`
-  // and `v-bind:`, and nested braces in a JSX handler.
+  // Attribute shapes: a character reference in a value, an unquoted value.
   [{ 'src/pages/entity.html': BASE['src/pages/entity.html'].replace('a&gt;b', 'a&gt;c') }, null, unrecognised('src/pages/entity.html')],
   [{ 'src/pages/unquoted.html': BASE['src/pages/unquoted.html'].replace('/one', '/two') }, null, unrecognised('src/pages/unquoted.html')],
   // CTOC's own lists: sensitive words in the plural, the secret-file guard, the protected paths.
@@ -494,22 +497,20 @@ const TRAPS = [
   [{ 'prompts/review.prompt.md': lines('New prompt.') }, null, unrecognised('prompts/review.prompt.md')],
   [{ '.cursor/rules/a.mdc': lines('New rules.') }, null, unrecognised('.cursor/rules/a.mdc')],
   [{ 'rules.mdc': lines('New rules.') }, null, unrecognised('rules.mdc')],
-  // reStructuredText roles: a role defined as raw HTML, and any text inside a role span.
   // The fourth round (2026-10-09). Text inside a component or a custom element is whatever
-  // the component makes of it (a query, an action name), never wording, in every markup kind.
-  [{ 'src/pages/widget.html': BASE['src/pages/widget.html'].replace('>x<', '>y<') }, null, unrecognised('src/pages/widget.html')],
+  // the component makes of it (a query, an action name), never wording.
+  [{ 'src/pages/widget.html': BASE['src/pages/widget.html'].replace('>x<', '>y<') }, null, inexact('src/pages/widget.html')],
   // A reference definition whose destination, or title, stands on the next line.
   [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '/u/delete') }, null, unrecognised('docs/wrapped-ref.md')],
   [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '//evil.example/x') }, null, unrecognised('docs/wrapped-ref.md')],
   [{ 'docs/wrapped-title.md': BASE['docs/wrapped-title.md'].replace('Old title', 'New title') }, null, unrecognised('docs/wrapped-title.md')],
-  // A custom property or a Sass or Less variable is a setting a script or a build can read,
+  // A custom property that is not named for a colour is a setting a script can read,
   // whatever colour it holds (the earlier qualifying shapes, now traps).
   [{ 'src/styles/flags.css': BASE['src/styles/flags.css'].replace('green', 'red') }, null, setting('src/styles/flags.css')],
   [{ 'src/styles/flags.css': BASE['src/styles/flags.css'].replace('--mode: red', '--mode: lime') }, null, setting('src/styles/flags.css')],
   [{ 'src/styles/custom.css': lines(':root {', '  --accent: blue;', '}') }, null, setting('src/styles/custom.css')],
   [{ 'src/styles/vars.css': lines(':root {', '  --brand: #fafafa;', '}') }, null, setting('src/styles/vars.css')],
-  // reStructuredText literal blocks and doctest lines are code; so is every directive but
-  // the prose ones, whose options are compared exactly.
+  // Doctest lines are code, in plain text and in Markdown.
   [{ 'notes/doctest.txt': BASE['notes/doctest.txt'].replace(/old$/m, 'new') }, null, unrecognised('notes/doctest.txt')],
   [{ 'docs/doctest.md': BASE['docs/doctest.md'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest.md')],
   // Text inside an HTML code element is code, in HTML and in Markdown's inline HTML.
@@ -517,14 +518,13 @@ const TRAPS = [
   [{ 'src/pages/code-el.html': BASE['src/pages/code-el.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/code-el.html')],
   // A real indented code block inside a list item: four spaces beyond the content column.
   [{ 'docs/list-code.md': BASE['docs/list-code.md'].replace('requests', 'reqests') }, null, unrecognised('docs/list-code.md')],
-  // A TypeScript generic arrow function is no element: the string after it is code.
   // The fifth round (2026-10-09), each trap an answer of `checking` on `6de2f75c`. Host
   // elements are a fixed list: an `is` attribute and an unknown name hold their text.
-  [{ 'src/pages/is.html': BASE['src/pages/is.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, unrecognised('src/pages/is.html')],
-  [{ 'src/pages/runsql.html': BASE['src/pages/runsql.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, unrecognised('src/pages/runsql.html')],
+  [{ 'src/pages/is.html': BASE['src/pages/is.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/is.html')],
+  [{ 'src/pages/runsql.html': BASE['src/pages/runsql.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/runsql.html')],
   // An end tag that does not close the element on top, while a holder is open, cannot be followed.
-  [{ 'src/pages/stack.html': BASE['src/pages/stack.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, 'I could not read the change (src/pages/stack.html holds something I cannot follow)'],
-  [{ 'docs/stack.md': BASE['docs/stack.md'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, 'I could not read the change (docs/stack.md holds something I cannot follow)'],
+  [{ 'src/pages/stack.html': BASE['src/pages/stack.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/stack.html')],
+  [{ 'docs/stack.md': BASE['docs/stack.md'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('docs/stack.md')],
   // Markdown that may be built as MDX: a brace in the changed prose, an `import` line.
   [{ 'docs/mdx-brace.md': BASE['docs/mdx-brace.md'].replace('name', 'code') }, null, unrecognised('docs/mdx-brace.md')],
   [{ 'docs/mdx-import.md': BASE['docs/mdx-import.md'].replace('./chart', './other') }, null, unrecognised('docs/mdx-import.md')],
@@ -545,9 +545,9 @@ const TRAPS = [
   [{ 'src/styles/login.css': BASE['src/styles/login.css'].replace('red', 'blue') }, null, 'src/styles/login.css sits in an area named login, and such areas are never a hotfix'],
   [{ 'src/styles/payment.css': BASE['src/styles/payment.css'].replace('red', 'blue') }, null, 'src/styles/payment.css sits in an area named payment, and such areas are never a hotfix'],
   // A custom property named for a colour that holds no colour, a second token, or a variable.
-  [{ 'src/styles/color-mode.css': BASE['src/styles/color-mode.css'].replace('dark', 'light') }, null, setting('src/styles/color-mode.css')],
-  [{ 'src/styles/two-tokens.css': BASE['src/styles/two-tokens.css'].replace('red', 'red url(x)') }, null, setting('src/styles/two-tokens.css')],
-  [{ 'src/styles/var.css': BASE['src/styles/var.css'].replace('--b', '--c') }, null, setting('src/styles/var.css')],
+  [{ 'src/styles/color-mode.css': BASE['src/styles/color-mode.css'].replace('dark', 'light') }, null, inexact('src/styles/color-mode.css')],
+  [{ 'src/styles/two-tokens.css': BASE['src/styles/two-tokens.css'].replace('red', 'red url(x)') }, null, inexact('src/styles/two-tokens.css')],
+  [{ 'src/styles/var.css': BASE['src/styles/var.css'].replace('--b', '--c') }, null, inexact('src/styles/var.css')],
   // The sixth round (2026-10-09), each trap but the last two an answer of `checking` on
   // `5326daae`. The strict HTML subset: a brace inside a tag, a comment that a browser ends
   // early, text inside `<svg>`, a name that is no HTML element, an element never closed.
@@ -887,10 +887,12 @@ function closedAtEnd(kind, cut) {
   if (kind === 'markdown') {
     const fences = lines.filter((l) => /^\s*(```|~~~)/.test(l)).length;
     const front = lines[0] === '---' && !lines.slice(1).some((l) => l === '---');
-    return fences % 2 === 0 && !front && even(tail, '`') && !tail.includes('<') && !tail.includes('{{')
+    // An autolink is one closed piece (the sixth round), so its `<` leaves nothing open.
+    const open = tail.replace(/<https?:\/\/[^\s<>]*>/g, '');
+    return fences % 2 === 0 && !front && even(tail, '`') && !open.includes('<') && !tail.includes('{{')
       && balanced(tail, '[', ']') && balanced(tail, '(', ')');
   }
-  return false; // markup, JSX and stylesheets: a cut always leaves a tag, element or block open
+  return false; // markup and stylesheets: a cut always leaves a tag, element or block open
 }
 
 test('property: a qualifying file cut short at any point refuses, unless the cut lands in closed plain text at the very end', (t) => {
@@ -958,7 +960,23 @@ test('the whole-file scanners stay linear on input built against them', () => {
     'docs/paragraphs.md': `Old words.\n\n${'a ` b | c\n\n- d ` e\n'.repeat(30000)}`,
     'docs/items.md': `Old words.\n\n${'- > - > - a\n'.repeat(20000)}`,
     'docs/markers.md': `Old words.\n\n${'- '.repeat(40000)}a\n`,
-    'src/styles/properties.css': `a { color: red; }\n:root {${'--color-a: red;'.repeat(50000)}}\n`
+    'src/styles/properties.css': `a { color: red; }\n:root {${'--color-a: red;'.repeat(50000)}}\n`,
+    // The sixth round's scanners: foreign content nested deep, many pieces of it, and never
+    // closed; comments that hold a comment start; script blocks full of comment marks;
+    // autolink starts; placeholders in many paragraphs; braces; headings; one long value.
+    'src/pages/svg-deep.html': `<p>Old</p>\n<svg>${'<g>'.repeat(30000)}${'</g>'.repeat(30000)}</svg>\n`,
+    'src/pages/svg-many.html': `<p>Old</p>\n${'<svg><g/></svg>'.repeat(20000)}\n`,
+    'src/pages/svg-open.html': `<p>Old</p>\n${'<svg>'.repeat(40000)}\n`,
+    'src/pages/comments.html': `<p>Old</p>\n${'<!-- a <!-- b -->'.repeat(20000)}\n`,
+    'src/pages/comment-starts.html': `<p>Old</p>\n${'<!-- a '.repeat(40000)}\n`,
+    'src/pages/script-marks.html': `<p>Old</p>\n<script>${'<!-- --!> '.repeat(30000)}</script>\n`,
+    'src/pages/selects.html': `<p>Old</p>\n<select>${'<b>'.repeat(40000)}</select>\n`,
+    'docs/autolinks.md': `Old words.\n\n${'<https://a '.repeat(40000)}\n`,
+    'docs/mails.md': `Old words.\n\n${'<aaaaaaaa'.repeat(40000)}\n`,
+    'docs/placeholders.md': `Old words.\n\n${'Use <file> here.\n\n'.repeat(30000)}`,
+    'docs/braces.md': `Old words.\n\n${'{a} {"b"}\n\n'.repeat(30000)}${'{'.repeat(100000)}\n`,
+    'docs/headings.md': `Old words.\n\n${'# a\n\nb\nc\n===\n\n'.repeat(20000)}`,
+    'src/styles/value.css': `a { color: red; }\nb { margin:${' 1px'.repeat(100000)} !important; }\n`
   };
   for (const [rel, old] of Object.entries(cases)) {
     const changed = /\.s?css$/.test(rel) ? old.replace('red', 'blue') : old.replace('Old', 'New');

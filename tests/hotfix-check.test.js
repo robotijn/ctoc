@@ -41,6 +41,14 @@ const unreadable = (why) => refusal(`I could not read the change (${why})`);
 // ones where a hand-written reader disagrees with the real compiler. Every case of a
 // removed format is kept, grouped at the end of its table, and asserts this clause.
 const gone = (f) => `I do not recognise ${f} as wording or a colour`;
+// The functional plan's clause (amended 2026-10-09) for a file whose format the check reads
+// but whose change it cannot vouch for: text inside a component or custom element or inside
+// `<svg>` or `<math>`, HTML outside the strict subset, a Markdown heading whose anchor
+// changes, a colour that is not the whole value of a colour property. Rows that asserted
+// "not recognised", "could not read (… cannot follow / … open)" or the settings clause for
+// one of these cases assert this clause since the sixth round: the wording the functional
+// plan now specifies, on a refusal that stays a refusal.
+const inexact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
 
 const HOME = '<!doctype html>\n<html>\n<body>\n<button>Save</button>\n</body>\n</html>\n';
 const HOME_STORE = HOME.replace('<button>Save</button>', '<button>Store</button>');
@@ -1251,9 +1259,9 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['src/pages/lead.html', 'Welcome <b>home</b>\n', 'Hello <b>home</b>\n', un('src/pages/lead.html')],
     ['src/pages/gt.html', '>Save</b>\n', '>Store</b>\n', un('src/pages/gt.html')],
     ['src/pages/comment.html', '<!-- c -->Save</p>\n', '<!-- c -->Store</p>\n', un('src/pages/comment.html')],
-    ['src/pages/odd.html', '</1>Save</p>\n', '</1>Store</p>\n', un('src/pages/odd.html')],
-    ['src/pages/open.html', '<p>Save\n', '<p>Store\n', un('src/pages/open.html')],
-    ['src/pages/tail.html', '<p>Save<\n', '<p>Store<\n', un('src/pages/tail.html')],
+    ['src/pages/odd.html', '</1>Save</p>\n', '</1>Store</p>\n', inexact('src/pages/odd.html')],
+    ['src/pages/open.html', '<p>Save\n', '<p>Store\n', inexact('src/pages/open.html')],
+    ['src/pages/tail.html', '<p>Save<\n', '<p>Store<\n', inexact('src/pages/tail.html')],
     ['src/pages/heart.html', '<p>Save <3</p>\n', '<p>Store <3</p>\n', un('src/pages/heart.html')],
     ['src/pages/grow.html', '<p>a</p>\n', '<p>a</p>\n<p>b</p>\n', un('src/pages/grow.html')],
     ['locales/num.json', '{\n  "count": 1,\n  "x": "y"\n}\n', '{\n  "count": 2,\n  "x": "y"\n}\n', un('locales/num.json')],
@@ -1283,11 +1291,12 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['docs/CLAUDE.md', 'Old rule.\n', 'New rule.\n', un('docs/CLAUDE.md')],
     ['skills/x/helper.js', 'f(1);\n', 'f(2);\n', 'it changes program logic in skills/x/helper.js, and only wording and colours qualify'],
     ['docs/endings.md', 'One.\nTwo.\n', 'One.\r\nTwo.\r\n', null],
-    // The security check's second round: a `>` inside braces does not end a tag, a stray `}`
-    // is harmless, a first line `---` that is never closed is no front matter, front matter
-    // after a byte-order mark is still settings, an escaped scheme is still an address, and
-    // a `value` inside another attribute's value is no `value` attribute.
-    ['src/pages/stray.html', '<p data-x=}>Save</p>\n', '<p data-x=}>Store</p>\n', NO_TEST],
+    // The security check's second round: front matter after a byte-order mark is still
+    // settings, an escaped scheme is still an address, and a `value` inside another
+    // attribute's value is no `value` attribute. A stray `}` in a tag was harmless; since the
+    // sixth round (the session's decision of 2026-10-09: the strict HTML subset) a brace
+    // anywhere inside a tag puts the file outside the subset, so this former pass refuses.
+    ['src/pages/stray.html', '<p data-x=}>Save</p>\n', '<p data-x=}>Store</p>\n', inexact('src/pages/stray.html')],
     // An unclosed first-line `---` was no front matter; since every scanner fails closed
     // (2026-10-09) it is a front matter left open, and the change is unreadable.
     ['docs/rule.md', '---\nOld text.\n', '---\nNew text.\n', 'I could not read the change (docs/rule.md leaves a tag, quote, comment, block, fence or span open)'],
@@ -1472,7 +1481,11 @@ test('finding 2c: a colour change in a 300 KB one-line stylesheet is judged in l
       return check(root, `src/styles/${file}`);
     };
     const { extra, big } = await extraCpuMs(judgeFile('small.css', '.a { color: blue; }\n'), judgeFile('site.css', `${changed}\n`));
-    assertChecking(big, ['src/styles/site.css']);
+    // Since the sixth round a colour passes only as the whole value of its property (the
+    // functional plan, amended 2026-10-09), so the long `box-shadow` list is refused; the
+    // time it takes to say so is what this case measures.
+    if (label.startsWith('one long')) assert.equal(big.text, refusal(inexact('src/styles/site.css')));
+    else assertChecking(big, ['src/styles/site.css']);
     t.diagnostic(`${label}: ${extra.toFixed(1)} ms more processor time`);
     assert.ok(extra < 100, `${label}: 300 KB cost ${extra.toFixed(1)} ms more`);
   }
@@ -1701,8 +1714,6 @@ test('round 2, finding 9: a pass names each judged file with its staged id, whic
   assert.ok(committed !== blob || names.length > 1, `the hook changed the commit: ${committed} ${names.join(' ')}`);
 });
 
-// The third round (2026-10-09): the whole-file scanners' own branches, each through the
-// first call. [path, base content, new content, the clause, or null for `checking`]
 // The fourth round (2026-10-09): the security attack and the code review, each through
 // the first call. [path, base content, new content, the clause, or null for `checking`]
 test('round 4: components, code elements, conditional templates, variables, literal blocks, directives, lists and generics', async () => {
@@ -1710,27 +1721,24 @@ test('round 4: components, code elements, conditional templates, variables, lite
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
   const shapes = [
-    // Only HTML host elements carry wording: a lowercase name with no hyphen, in every
-    // markup kind, and nothing anywhere inside a component.
+    // Only HTML host elements carry wording, and nothing anywhere inside a component.
     // The fifth round (2026-10-09): element names are matched in any letter case, as HTML reads
     // them, so `<DIV>` is the host element `div` and its text is wording (it was refused).
     ['src/pages/upper.html', '<DIV>Save</DIV>\n', '<DIV>Store</DIV>\n', null],
-    ['src/pages/inside.html', '<MyAction><b>charge</b></MyAction>\n', '<MyAction><b>refund</b></MyAction>\n', un('src/pages/inside.html')],
+    ['src/pages/inside.html', '<MyAction><b>charge</b></MyAction>\n', '<MyAction><b>refund</b></MyAction>\n', inexact('src/pages/inside.html')],
     ['src/pages/after.html', '<my-widget>x</my-widget>\n<p>Save</p>\n', '<my-widget>x</my-widget>\n<p>Store</p>\n', null],
-    // Code elements: in JSX too, and an end tag of another element does not leave one.
+    // Code elements: an end tag of another element does not leave one.
     // The fifth round (2026-10-09): an end tag that does not close the element on top while a
-    // code element is open cannot be followed; the refusal is now the "could not read" one.
-    ['src/pages/pre.html', '<pre></code>pip install requests</pre>\n', '<pre></code>pip install reqests</pre>\n', 'I could not read the change (src/pages/pre.html holds something I cannot follow)'],
+    // code element is open cannot be followed; since the sixth round that is HTML outside the
+    // strict subset, with the functional plan's sentence for it.
+    ['src/pages/pre.html', '<pre></code>pip install requests</pre>\n', '<pre></code>pip install reqests</pre>\n', inexact('src/pages/pre.html')],
     ['src/pages/after-code.html', '<p><code>x</code> Save</p>\n', '<p><code>x</code> Store</p>\n', null],
     ['src/pages/after-code-tag.html', '<p><code>x</code><b>Save</b></p>\n', '<p><code>x</code><b>Store</b></p>\n', null],
-    // Vue's conditional templates render; a loop or a slot template does not count as one.
-    // Variables and custom properties: any change to their values, colour or not.
+    // Custom properties: a change to a value that is no colour; colours in real colour properties.
     ['src/styles/font.css', ':root { --font: "Old"; }\n', ':root { --font: "New"; }\n', setting('src/styles/font.css')],
     ['src/styles/width.css', 'a { width: #fff; }\n', 'a { width: #000; }\n', un('src/styles/width.css')],
     ['src/styles/fill.css', 'path { fill: red; stroke: blue; outline-color: red; }\n', 'path { fill: blue; stroke: red; outline-color: blue; }\n', null],
     ['src/styles/design-tokens.css', '.a { border-color: red; }\n', '.a { border-color: blue; }\n', null],
-    // reStructuredText: a quoted literal block, a nested code directive inside a prose one,
-    // a prose directive's own text, and a paragraph that only mentions `::` mid-line.
     // Markdown lists: a fence inside an item whose content starts at column 4, a thematic
     // break that is no list item, and code after a list that has ended.
     ['docs/list-fence.md', '1.  Step:\n\n    ```\n    pip install requests\n    ```\n', '1.  Step:\n\n    ```\n    pip install reqests\n    ```\n', un('docs/list-fence.md')],
@@ -1743,7 +1751,7 @@ test('round 4: components, code elements, conditional templates, variables, lite
     ['docs/item-fence.md', '- ```\n  pip install requests\n  ```\n', '- ```\n  pip install reqests\n  ```\n', un('docs/item-fence.md')],
     ['docs/item-doctest.md', '- >>> print("old")\n  old\n', '- >>> print("old")\n  new\n', un('docs/item-doctest.md')],
     ['docs/two-defs.md', 'See [it][b].\n\n[a]:\n[b]: /one\n', 'See [it][b].\n\n[a]:\n[b]: /two\n', un('docs/two-defs.md')],
-    // TypeScript generics with `extends`, and a reference definition with an inline title.
+    // A reference definition with an inline title.
     ['docs/inline-title.md', 'See [it][a].\n\n[a]: /u\n"Old title"\n', 'See [it][a].\n\n[a]: /u\n"New title"\n', un('docs/inline-title.md')],
     ['docs/after-def.md', 'See [it][a].\n\n[a]: /u\nOld words.\n', 'See [it][a].\n\n[a]: /u\nNew words.\n', null],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
@@ -1796,31 +1804,29 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const shapes = [
     // An attribute name where none can start: an unclosed `<div` swallowing the next tag.
-    ['src/pages/div.html', '<div class="a"\n<p>Save</p>\n', '<div class="a"\n<p>Store</p>\n', lost('src/pages/div.html')],
-    // An unclosed quote, comment, raw-text element, tag and template brace after the change.
-    ['src/pages/quote.html', '<p>Save</p>\n<a title="x>Go</a>\n', '<p>Store</p>\n<a title="x>Go</a>\n', open('src/pages/quote.html')],
-    ['src/pages/note.html', '<p>Save</p>\n<!-- note\n', '<p>Store</p>\n<!-- note\n', open('src/pages/note.html')],
-    ['src/pages/script.html', '<p>Save</p>\n<script>\nrun();\n', '<p>Store</p>\n<script>\nrun();\n', open('src/pages/script.html')],
-    ['src/pages/tag.html', '<p>Save</p>\n<a href="/x"\n', '<p>Store</p>\n<a href="/x"\n', open('src/pages/tag.html')],
-    ['src/pages/cdata-open.html', '<p>Save</p>\n<svg><![CDATA[ x\n', '<p>Store</p>\n<svg><![CDATA[ x\n', open('src/pages/cdata-open.html')],
-    // JSX and JavaScript: an unclosed brace, comment, element, string, template and
-    // regular expression; a closing brace with nothing open.
-    // The `.tsx` generic arrow function (item B9), a regression guard.
+    ['src/pages/div.html', '<div class="a"\n<p>Save</p>\n', '<div class="a"\n<p>Store</p>\n', inexact('src/pages/div.html')],
+    // An unclosed quote, comment, raw-text element and tag after the change.
+    ['src/pages/quote.html', '<p>Save</p>\n<a title="x>Go</a>\n', '<p>Store</p>\n<a title="x>Go</a>\n', inexact('src/pages/quote.html')],
+    ['src/pages/note.html', '<p>Save</p>\n<!-- note\n', '<p>Store</p>\n<!-- note\n', inexact('src/pages/note.html')],
+    ['src/pages/script.html', '<p>Save</p>\n<script>\nrun();\n', '<p>Store</p>\n<script>\nrun();\n', inexact('src/pages/script.html')],
+    ['src/pages/tag.html', '<p>Save</p>\n<a href="/x"\n', '<p>Store</p>\n<a href="/x"\n', inexact('src/pages/tag.html')],
+    ['src/pages/cdata-open.html', '<p>Save</p>\n<svg><![CDATA[ x\n', '<p>Store</p>\n<svg><![CDATA[ x\n', inexact('src/pages/cdata-open.html')],
     // Stylesheets: an unclosed comment, block and string; a closing brace with nothing open.
     ['src/styles/note.css', 'a { color: red; }\n/* note\n', 'a { color: blue; }\n/* note\n', open('src/styles/note.css')],
     ['src/styles/block.css', 'a { color: red; }\nb {\n', 'a { color: blue; }\nb {\n', open('src/styles/block.css')],
     ['src/styles/string.css', 'a { color: red; }\nb { content: "x }\n', 'a { color: blue; }\nb { content: "x }\n', lost('src/styles/string.css')],
     ['src/styles/extra.css', 'a { color: red; }\n}\n', 'a { color: blue; }\n}\n', lost('src/styles/extra.css')],
     // Markdown: a change above an unclosed fence, under one (a guard), an unclosed front
-    // matter, an unclosed template brace and HTML comment in the prose.
+    // matter, a brace beside the change and an unclosed HTML comment in the prose.
     ['docs/fence-below.md', 'Old words.\n\n```\ncode\n', 'New words.\n\n```\ncode\n', open('docs/fence-below.md')],
     ['docs/fence-above.md', '```\ncode\nOld words.\n', '```\ncode\nNew words.\n', open('docs/fence-above.md')],
     ['docs/front-open.md', '---\nOld text.\n', '---\nNew text.\n', open('docs/front-open.md')],
-    ['docs/brace-open.md', 'Old words {{ x\n', 'New words {{ x\n', open('docs/brace-open.md')],
-    ['docs/comment-open.md', 'Old words.\n\n<!-- note\n', 'New words.\n\n<!-- note\n', open('docs/comment-open.md')],
-    // reStructuredText: a role span or inline literal left open.
+    // Since the sixth round a brace is a plain character to the HTML reader; in Markdown it
+    // reaches its own paragraph, so this change beside one is "not recognised", no longer "open".
+    ['docs/brace-open.md', 'Old words {{ x\n', 'New words {{ x\n', un('docs/brace-open.md')],
+    ['docs/comment-open.md', 'Old words.\n\n<!-- note\n', 'New words.\n\n<!-- note\n', inexact('docs/comment-open.md')],
     // One side well-formed and the other not.
-    ['src/pages/one-side.html', '<p>Save</p>\n<!-- c -->\n', '<p>Store</p>\n<!-- c --\n', open('src/pages/one-side.html')],
+    ['src/pages/one-side.html', '<p>Save</p>\n<!-- c -->\n', '<p>Store</p>\n<!-- c --\n', inexact('src/pages/one-side.html')],
     ['docs/one-side.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n``\n', open('docs/one-side.md')],
     // Well-formed files still qualify.
     ['src/pages/closed.html', '<p>Save</p>\n<!-- note -->\n<script>run();</script>\n', '<p>Store</p>\n<!-- note -->\n<script>run();</script>\n', null],
@@ -1887,20 +1893,17 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
   // template literal, regular expression, script, front matter or fence is unreadable.
   const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
   const shapes = [
-    // JavaScript around JSX: a template literal with a substitution, a regular expression
-    // with a class and flags, a self-closing element, an unclosed string and regular
-    // expression at the end of the file.
     // A script block's escape states: `</script>` inside `<!--<script>` does not end it.
     ['src/pages/escaped.html', '<script><!--<script></script><b>Save</b></script>\n<p>Hi</p>\n', '<script><!--<script></script><b>Store</b></script>\n<p>Hi</p>\n', un('src/pages/escaped.html')],
     ['src/pages/escaped-after.html', '<script><!--<script></script>--></script>\n<p>Save</p>\n', '<script><!--<script></script>--></script>\n<p>Store</p>\n', null],
-    ['src/pages/unclosed.html', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Save</b>\n', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Store</b>\n', open('src/pages/unclosed.html')],
+    ['src/pages/unclosed.html', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Save</b>\n', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Store</b>\n', inexact('src/pages/unclosed.html')],
     // A title is wording (the code review, 2026-10-09: it was wrongly refused).
     ['src/pages/title.html', '<title>Save</title>\n', '<title>Store</title>\n', null],
     ['src/pages/tpl.html', '<template><p>Save</p></template>\n', '<template><p>Store</p></template>\n', un('src/pages/tpl.html')],
-    // A conditional template inside the component's markup renders, so its text is wording.
-    ['src/pages/cdata.html', '<svg><![CDATA[ a > <b>Save</b> ]]></svg>\n', '<svg><![CDATA[ a > <b>Store</b> ]]></svg>\n', un('src/pages/cdata.html')],
-    // Catalogue escapes: Gettext's hexadecimal and octal, YAML's \x and \u; an unknown or
-    // short escape is not wording.
+    // A CDATA section inside `<svg>`: outside the strict subset.
+    ['src/pages/cdata.html', '<svg><![CDATA[ a > <b>Save</b> ]]></svg>\n', '<svg><![CDATA[ a > <b>Store</b> ]]></svg>\n', inexact('src/pages/cdata.html')],
+    // Catalogue escapes: YAML's \x and \u, a properties file's \u; an unknown or short
+    // escape is not wording.
     ['i18n/esc.yaml', 'title: "Save"\n', 'title: "Sto\\x72e"\n', null],
     ['i18n/at.yaml', 'title: "Save"\n', 'title: "Mail \\u0040x"\n', risk('i18n/at.yaml')],
     ['i18n/short.yaml', 'title: "Save"\n', 'title: "Sto\\x7"\n', un('i18n/short.yaml')],
@@ -1909,13 +1912,13 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     ['lang/uni.properties', 'title=Save\n', 'title=Sto\\u0072e\n', null],
     ['lang/badu.properties', 'title=Save\n', 'title=Sto\\u00zz\n', un('lang/badu.properties')],
     ['locales/ctl.json', '{\n  "title": "Save"\n}\n', '{\n  "title": "Sto\tre"\n}\n', un('locales/ctl.json')],
-    // Stylesheets: SCSS line comments, Sass's indented blocks, a colour function in its
-    // space form.
-    // A Sass variable is a setting, whatever colour it holds (the security attack, 2026-10-09).
+    // Stylesheets: a colour function in its space form, a string, a colour beside a `url(…)`.
     ['src/styles/space.css', 'a { color: rgb(1 2 3 / 50%); }\n', 'a { color: rgb(1 2 4 / 50%); }\n', null],
     ['src/styles/badfn.css', 'a { color: rgb(1 2 3); }\n', 'a { color: rgb(1 2 3 / 4 / 5); }\n', un('src/styles/badfn.css')],
     ['src/styles/str.css', 'a { color: red; content: "x"; }\n', 'a { color: red; content: "y"; }\n', un('src/styles/str.css')],
-    ['src/styles/quoted.css', 'a { background: url("one.png") red; }\n', 'a { background: url("one.png") blue; }\n', null],
+    // A pass until the sixth round: the colour is not the whole value of its property, which
+    // the functional plan (amended 2026-10-09) refuses as a change the check cannot read exactly.
+    ['src/styles/quoted.css', 'a { background: url("one.png") red; }\n', 'a { background: url("one.png") blue; }\n', inexact('src/styles/quoted.css')],
     // Markdown: code spans, unmatched backticks, a JSON front matter never closed, a link
     // target in angle brackets, a full reference, a heading after an indented block.
     ['docs/span.md', 'Run `pip install requests` first.\n', 'Run `pip install reqests` first.\n', un('docs/span.md')],
@@ -1926,9 +1929,6 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     ['docs/escaped.md', 'See [x](a\\)b) old.\n', 'See [x](a\\)b) new.\n', null],
     ['docs/after-code.md', 'Text.\n\n    code here\n\nOld words.\n', 'Text.\n\n    code here\n\nNew words.\n', null],
     ['docs/unfence.md', '```\ncode\n```\nOld words.\n', '```\ncode\n\nOld words.\n', open('docs/unfence.md')],
-    // reStructuredText spans that are never wording (the commit security review, 2026-10-09):
-    // a link target, a hyperlink reference's target, a named reference, an inline literal,
-    // interpreted text without a role, a default role; plain text beside them is wording.
     // Instruction files by class, and documentation in any other dot-folder.
     ['docs/GEMINI.local.md', 'Old rule.\n', 'New rule.\n', un('docs/GEMINI.local.md')],
     ['src/copilot-instructions.md', 'Old rule.\n', 'New rule.\n', un('src/copilot-instructions.md')],
@@ -1995,21 +1995,25 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
   const shapes = [
     // 1. Host elements are a fixed list (HTML, SVG, MathML), matched in any letter case; an
     // element with an `is` attribute, a custom element and an unknown name hold their text.
-    row(1, 'src/pages/is.html', '<button is="run-sql">@</button>\n', sql, un('src/pages/is.html')),
-    row(1, 'src/pages/is-upper.html', '<P IS="x">@</P>\n', ['Save', 'Store'], un('src/pages/is-upper.html')),
-    row(1, 'src/pages/runsql.html', '<runsql>@</runsql>\n', sql, un('src/pages/runsql.html')),
+    row(1, 'src/pages/is.html', '<button is="run-sql">@</button>\n', sql, inexact('src/pages/is.html')),
+    row(1, 'src/pages/is-upper.html', '<P IS="x">@</P>\n', ['Save', 'Store'], inexact('src/pages/is-upper.html')),
+    row(1, 'src/pages/runsql.html', '<runsql>@</runsql>\n', sql, inexact('src/pages/runsql.html')),
     row(1, 'src/pages/mixed.html', '<DIV>@</div>\n', ['Save', 'Store'], null),
-    row(1, 'src/pages/svg-text.html', '<svg><text>@</text><foreignObject><p>x</p></foreignObject></svg>\n', ['Save', 'Store'], null),
-    row(1, 'src/pages/math.html', '<math><mtext>@</mtext></math>\n', ['Save', 'Store'], null),
+    // Passes until the sixth round: `<svg>` and `<math>` are opaque pieces now, so text
+    // inside them no longer qualifies (the session's decision of 2026-10-09, item 3).
+    row(1, 'src/pages/svg-text.html', '<svg><text>@</text><foreignObject><p>x</p></foreignObject></svg>\n', ['Save', 'Store'], inexact('src/pages/svg-text.html')),
+    row(1, 'src/pages/math.html', '<math><mtext>@</mtext></math>\n', ['Save', 'Store'], inexact('src/pages/math.html')),
     // 2. A stack of open elements: an end tag that does not close the top of the stack while
     // an element that holds text is open cannot be followed.
-    row(2, 'src/pages/stack.html', '<run-sql><div></run-sql>@</div></run-sql>\n', sql, lost('src/pages/stack.html')),
-    row(2, 'docs/stack.md', 'Text.\n\n<run-sql><div></run-sql>@</div></run-sql>\n', sql, lost('docs/stack.md')),
+    row(2, 'src/pages/stack.html', '<run-sql><div></run-sql>@</div></run-sql>\n', sql, inexact('src/pages/stack.html')),
+    row(2, 'docs/stack.md', 'Text.\n\n<run-sql><div></run-sql>@</div></run-sql>\n', sql, inexact('docs/stack.md')),
     row(2, 'src/pages/implied.html', '<ul><li>One<li>@</ul>\n<p>a<br>b</p>\n', ['Save', 'Store'], null),
     row(2, 'src/pages/stray.html', '<p>@</p></b></p>\n', ['Save', 'Store'], null),
-    row(2, 'src/pages/held-implied.html', '<my-card><p>one<p>two</my-card>\n<p>@</p>\n', ['Save', 'Store'], lost('src/pages/held-implied.html')),
-    row(2, 'src/pages/self-closed.html', '<my-widget/>\n<p>@</p>\n', ['Save', 'Store'], un('src/pages/self-closed.html')),
-    row(2, 'src/pages/braced.html', '<p data-x={a} data-y={`b`}>@</p>\n', ['Save', 'Store'], null),
+    row(2, 'src/pages/held-implied.html', '<my-card><p>one<p>two</my-card>\n<p>@</p>\n', ['Save', 'Store'], inexact('src/pages/held-implied.html')),
+    row(2, 'src/pages/self-closed.html', '<my-widget/>\n<p>@</p>\n', ['Save', 'Store'], inexact('src/pages/self-closed.html')),
+    // A pass until the sixth round: a brace inside a tag is outside the strict HTML subset
+    // (the session's decision of 2026-10-09, item 1; a browser knows no braces).
+    row(2, 'src/pages/braced.html', '<p data-x={a} data-y={`b`}>@</p>\n', ['Save', 'Store'], inexact('src/pages/braced.html')),
     row(2, 'src/pages/after-held.html', '<my-card><p>one</p></my-card>\n<p>@</p>\n', ['Save', 'Store'], null),
     // 3. Markdown that may be built as MDX: a brace in the changed prose and an `import` or
     // `export` block are code.
@@ -2032,7 +2036,7 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(4, 'docs/tick-quote.md', 'A lone ` here\n> Run `@` now.\n', rm, un('docs/tick-quote.md')),
     row(4, 'docs/tick-cell.md', '| ` | `@` |\n', rm, un('docs/tick-cell.md')),
     row(4, 'docs/tick-escape.md', 'A \\` then `@` now.\n', rm, un('docs/tick-escape.md')),
-    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, 'I could not read the change (docs/tick-tag.md leaves a tag, quote, comment, block, fence or span open)'),
+    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, inexact('docs/tick-tag.md')),
     row(4, 'docs/tick-lazy.md', '> a `@\nc` d\n', ['b', 'x'], un('docs/tick-lazy.md')),
     // An ordered item not numbered 1 after a bullet item starts no item: the span runs on.
     // After another ordered item it does, and each item's lone backtick pairs with nothing.
@@ -2073,17 +2077,19 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(8, 'src/styles/tokens.css', 'a { color: @; }\n', ['red', 'blue'], null),
     row(8, 'src/tokens/base.css', 'a { color: @; }\n', ['red', 'blue'], area('src/tokens/base.css', 'token')),
     // 9. A custom property named for a colour, holding exactly one colour before and after,
-    // is a colour; every other custom-property change is a setting.
+    // is a colour; one whose value is not exactly one colour cannot be read exactly (the
+    // functional plan's sentence since the sixth round); every other custom-property change
+    // is a setting.
     row(9, 'src/styles/enabled.css', ':root { --enabled: @; }\n', ['green', 'red'], setting('src/styles/enabled.css')),
     row(9, 'src/styles/mode.css', ':root { --mode: @; }\n', ['red', 'lime'], setting('src/styles/mode.css')),
-    row(9, 'src/styles/color-mode.css', ':root { --color-mode: @; }\n', ['dark', 'light'], setting('src/styles/color-mode.css')),
-    row(9, 'src/styles/two-tokens.css', ':root { --brand-color: @; }\n', ['red', 'red url(x)'], setting('src/styles/two-tokens.css')),
-    row(9, 'src/styles/var.css', ':root { --color-a: var(--@); }\n', ['b', 'c'], setting('src/styles/var.css')),
-    row(9, 'src/styles/important.css', ':root { --color-a: @ !important; }\n', ['red', 'blue'], setting('src/styles/important.css')),
-    row(9, 'src/styles/important-added.css', ':root { --color-a: @; }\n', ['red', 'blue !important'], setting('src/styles/important-added.css')),
-    row(9, 'src/styles/commented.css', ':root { --color-a: @ /* x */; }\n', ['red', 'blue'], setting('src/styles/commented.css')),
+    row(9, 'src/styles/color-mode.css', ':root { --color-mode: @; }\n', ['dark', 'light'], inexact('src/styles/color-mode.css')),
+    row(9, 'src/styles/two-tokens.css', ':root { --brand-color: @; }\n', ['red', 'red url(x)'], inexact('src/styles/two-tokens.css')),
+    row(9, 'src/styles/var.css', ':root { --color-a: var(--@); }\n', ['b', 'c'], inexact('src/styles/var.css')),
+    row(9, 'src/styles/important.css', ':root { --color-a: @ !important; }\n', ['red', 'blue'], inexact('src/styles/important.css')),
+    row(9, 'src/styles/important-added.css', ':root { --color-a: @; }\n', ['red', 'blue !important'], inexact('src/styles/important-added.css')),
+    row(9, 'src/styles/commented.css', ':root { --color-a: @ /* x */; }\n', ['red', 'blue'], inexact('src/styles/commented.css')),
     row(9, 'src/styles/renamed.css', ':root { --color-@: red; }\n', ['a', 'b'], setting('src/styles/renamed.css')),
-    row(9, 'src/styles/bad-function.css', ':root { --color-a: @; }\n', ['red', 'oklch(60% 0.2)'], setting('src/styles/bad-function.css')),
+    row(9, 'src/styles/bad-function.css', ':root { --color-a: @; }\n', ['red', 'oklch(60% 0.2)'], inexact('src/styles/bad-function.css')),
     row(9, 'src/styles/and-more.css', ':root { --color-a: @; }\na { width: 1px; }\n', ['red', 'blue; }\na { width: 2px; }\nb { --x: y'], setting('src/styles/and-more.css')),
     row(9, 'src/styles/string-open.css', 'a { color: @; }\nb { content: "x', ['red', 'blue'], 'I could not read the change (src/styles/string-open.css leaves a tag, quote, comment, block, fence or span open)'),
     row(9, 'src/styles/ruleset.css', ':root { --color-a: { color: @ } }\n', ['red', 'blue'], lost('src/styles/ruleset.css')),
@@ -2186,9 +2192,12 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
     // holds the rest of its own paragraph only; one that starts a line holds the rest of the file.
     row(6, 'docs/autolink.md', 'See <https://example.org/guide> first.\n\n@ words.\n', words, null),
     row(6, 'docs/autolink-same.md', 'See <http://example.org/guide> and the @ words.\n', ['old', 'new'], null),
-    row(6, 'docs/autolink-mail.md', 'Write to <mailto:team@example.org> or <team@example.org>.\n\n@ words.\n', words, null),
+    [6, 'docs/autolink-mail.md', 'Write to <mailto:team@example.org> or <team@example.org>.\n\nOld words.\n', 'Write to <mailto:team@example.org> or <team@example.org>.\n\nNew words.\n', null],
     row(6, 'docs/autolink-own.md', 'See <https://example.org/@> first.\n', ['guide', 'other'], un('docs/autolink-own.md')),
-    row(6, 'docs/autolink-space.md', 'See <https://example.org/a b> first.\n\n@ words.\n', words, exact('docs/autolink-space.md')),
+    // No autolink (a space inside), and no tag a Markdown reader passes on: read as a
+    // placeholder, which its paragraph's end closes.
+    row(6, 'docs/autolink-space.md', 'See <https://example.org/a b> first.\n\n@ words.\n', words, null),
+    row(6, 'docs/autolink-space-same.md', 'See <https://example.org/a b> @.\n', ['first', 'now'], exact('docs/autolink-space-same.md')),
     row(6, 'docs/placeholder.md', 'Edit <file> and <your-name> then save.\n\n@ words.\n', words, null),
     row(6, 'docs/placeholder-closed.md', 'Edit <file>x</file> and <name> then save.\n\n@ words.\n', words, null),
     row(6, 'docs/placeholder-same.md', 'Edit <file> then @.\n', ['save', 'store'], exact('docs/placeholder-same.md')),

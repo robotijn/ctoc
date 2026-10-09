@@ -60,31 +60,40 @@
  *                                          its kind are settings; a `.txt` named like
  *                                          `requirements` is a dependency list.
  *                                          EACH KIND IS JUDGED WHOLE, one scanner per side:
- *                                          HTML by a token stream after the HTML tokenizer (tags
- *                                          with every attribute, raw text, comments and braces are
- *                                          compared exactly; only text between two tags may change,
- *                                          on one line, never inside raw text, an `<option>` with
- *                                          no `value`, or an element that holds its text: a code
- *                                          element, a `<template>`, an element with an `is`
- *                                          attribute, a custom element and every name outside the
- *                                          fixed list of HTML, SVG and MathML elements; the open
- *                                          elements are kept on a stack, and an end tag that does
- *                                          not close its top while such an element is open cannot be
- *                                          followed; a `<title>` is text); stylesheets by
- *                                          statements across the whole file (strings, comments and
- *                                          `url(…)` blanked), a colour only in the value of a real
+ *                                          HTML by a token stream after the HTML tokenizer, in a
+ *                                          STRICT SUBSET in which the reader agrees with a browser's
+ *                                          parser by construction (the session's decision of
+ *                                          2026-10-09); a file that holds anything outside it is
+ *                                          refused whole: a brace inside a tag, a `<!…` that is no
+ *                                          `<!DOCTYPE html>` and no standard comment, `<?`, a tag
+ *                                          inside `<select>` that is no option, an end tag that does
+ *                                          not close the top of the stack while an element that
+ *                                          holds its text is open, an element never closed. Tags
+ *                                          with every attribute, raw text and comments are compared
+ *                                          exactly, `<svg>` and `<math>` each as one opaque piece;
+ *                                          only text between two tags may change, on one line, never
+ *                                          inside raw text, an `<option>` with no `value`, or an
+ *                                          element that holds its text: a code element, a
+ *                                          `<template>`, an element with an `is` attribute, a custom
+ *                                          element and every name outside the fixed list of 111 HTML
+ *                                          elements; a `<title>` is text); stylesheets by statements
+ *                                          across the whole file (strings, comments and `url(…)`
+ *                                          blanked), a colour only as the whole value of a real
  *                                          colour property on its line, and a change to a custom
  *                                          property a setting unless the property is named for a
  *                                          colour and holds exactly one colour before and after;
  *                                          Markdown by lines (front matter in three forms is
  *                                          settings; fenced and indented code, read inside list
- *                                          items and block quotes, doctests and `import` / `export`
- *                                          blocks are code) and by the HTML scanner for the prose,
- *                                          with code spans (paired inside one paragraph, heading or
- *                                          list item) and link targets (a reference definition's
- *                                          next lines too, labels matched as CommonMark folds them)
- *                                          compared exactly, and no brace in changed prose (the file
- *                                          may be built as MDX); doctests in plain text are code; a
+ *                                          items and block quotes, doctests, `import` / `export`
+ *                                          blocks and any changed line that starts so are code; the
+ *                                          headings' generated anchors must stay the same) and by
+ *                                          the HTML scanner for the prose, with code spans (paired
+ *                                          inside one paragraph, heading or list item), autolinks
+ *                                          and link targets (a reference definition's next lines
+ *                                          too, labels matched as CommonMark folds them) compared
+ *                                          exactly, and no brace in the changed paragraph or left
+ *                                          open above it (the file may be built as MDX); doctests in
+ *                                          plain text are code; a
  *                                          catalogue value is decoded as its format reads it and
  *                                          read as a browser reads an address, each line only where
  *                                          it starts an entry.
@@ -93,7 +102,10 @@
  *                                          follow, makes the change unreadable
  *   5  not in a sensitive area           — 33 whole words, also in the plural, in the path from
  *                                          the repository top (auth, login, ...; in a stylesheet's
- *                                          own file name not in the plural), CTOC's own secret-file guard,
+ *                                          own file name not in the plural), the path folded first
+ *                                          (Unicode NFKC, lower case), split at every character that
+ *                                          is no letter, and each camel-case sub-word read too
+ *                                          (`AuthPanel` is `auth`, `Author` is not); CTOC's own secret-file guard,
  *                                          and in CTOC's own repository its protected paths; the test,
  *                                          governing, build and database folders are read from
  *                                          the top too
@@ -170,6 +182,15 @@
  *   stored-data          it changes stored data in <file>
  *   build                it changes how the project is built or shipped in <file>
  *   unrecognised         I do not recognise <file> as wording or a colour
+ *   (three causes)       it changes <file> in a way the check cannot read exactly, and only what it can read exactly qualifies
+ *                        — the functional plan's clause for a file whose format the check reads
+ *                        but whose change it cannot vouch for, each case under the cause word it
+ *                        had before: `unrecognised` for text inside a component or custom element
+ *                        or inside `<svg>` or `<math>`, a Markdown heading whose generated anchor
+ *                        changes, and a colour that is not the whole value of a colour property;
+ *                        `unreadable` for HTML, or inline HTML in Markdown, outside the strict
+ *                        subset; `setting` for a custom property named for a colour whose value
+ *                        is not exactly one colour
  *   sensitive-area       <file> sits in an area named <word>, and such areas are never a hotfix
  *   risk-marker          the wording in <file> contains a number, a price, a web address or an e-mail address
  *   test-edited          it changes a test (<file>)
@@ -206,9 +227,6 @@
  * is readable on its background (not computed); whether something outside the folder
  * depends on the old text or colour (only the project's own tests speak to it); whether
  * this is the right fix (not a safety question).
- *
- * Known gap, kept to the letter of the functional plan: the sensitive-word rule splits a
- * path only at characters that are not letters, so `AuthPanel.html` is not `auth`.
  */
 
 const fs = require('fs'); // the native real path, the open-flag constants and descriptor calls; every path call goes through safe-fs
@@ -755,35 +773,57 @@ function commonEnds(o, n) {
 }
 
 /*
- * THE MARKUP SCANNER (rule 4: HTML, and Markdown's inline HTML). One pass over a whole
- * file, a state machine after the HTML tokenization model, simplified: data; a tag (its
- * name, attribute names, unquoted, single- and double-quoted values, `/>`); comments,
- * `<!…>`, `<?…>` and `</` not followed by a letter, each to its end; raw text after
- * `<script>` (with the script-data escape states), `<style>`, `<textarea>`, `<title>`,
- * `<xmp>`, `<iframe>`, `<noembed>`, `<noframes>`, `<noscript>` and `<plaintext>`; and
- * braces `{…}` / `{{…}}`, in data and inside a tag, as one opaque expression. Character
- * references stay part of their token.
+ * THE MARKUP SCANNER (rule 4: HTML, and Markdown's inline HTML). THE STRICT SUBSET (the
+ * session's design decision of 2026-10-09, after the owner's decision that the check keeps
+ * only what it can read exactly): the scanner reads only the part of HTML in which it agrees
+ * with a browser's parser by construction, and refuses the whole file for anything outside
+ * it; it never copies the browser's recovery rules. One pass, after the HTML tokenizer:
+ * data; a tag (its name, attribute names, unquoted, single- and double-quoted values,
+ * `/>`); `<!DOCTYPE html>` and a standard comment; raw text after `<script>` (with the
+ * script-data escape states), `<style>`, `<textarea>`, `<title>`, `<xmp>`, `<iframe>`,
+ * `<noembed>`, `<noframes>`, `<noscript>` and `<plaintext>`; `<svg>` and `<math>` from their
+ * start tag to their matching end tag as one opaque piece. Character references stay part
+ * of their token. A browser knows no braces: in text they are plain characters.
+ * OUTSIDE THE SUBSET, each refusing the whole file ({@link outside}):
+ *   - a `{` or `}` anywhere inside a tag;
+ *   - anything that starts `<!` but `<!DOCTYPE html>` (any letter case) and a standard
+ *     comment (`<!--`, not followed at once by `>` or `->`, holding no `<!--` and no `--!>`,
+ *     not ending in `<!-`, closed by the first `-->`); `<![CDATA[`, `<?` and `</` before
+ *     anything but a letter; the same comment rule inside a script block;
+ *   - an unfinished tag, attribute quote, comment or raw-text element; an attribute name
+ *     that starts with `<`, `"`, `'` or `=`;
+ *   - inside `<svg>` or `<math>`: an end tag that does not close the element on top, any
+ *     tag inside an element where a browser reads HTML again (`foreignObject`, `desc`,
+ *     `title`, `mi`, `mo`, `mn`, `ms`, `mtext`, `annotation-xml`), an HTML element's name
+ *     other than `a`, `script`, `style` and `title` (a browser leaves the foreign content at
+ *     many of them), and an `<svg>` or `<math>` that is never closed;
+ *   - inside `<select>`: any tag but `<option>`, `<optgroup>`, `<hr>` and their end tags
+ *     (older parsers ignore every other tag there, a `<style>` among them, newer ones do not);
+ *   - an end tag that does not close the element on top of the stack while an element that
+ *     holds its text is open;
+ *   - in an HTML file, an element that is never closed.
  * Every token is a slice of the text, and the slices cover it, so two token sequences that
  * are identical are two identical texts. No pattern backtracks: each scanner moves forward.
  */
 
-/** @typedef {{k: string, v: string, name?: string, end?: boolean, attrs?: string[], quiet?: boolean}} Tok */
+/** @typedef {{k: string, v: string, name?: string, end?: boolean, attrs?: string[], self?: boolean, quiet?: boolean, inexact?: boolean}} Tok */
 
 /*
- * EVERY SCANNER FAILS CLOSED. A scanner that ends inside an unfinished construct (a tag, an
- * attribute quote, a comment, a raw-text element, a `<template>`, a brace, a string, a
- * stylesheet block, a fence, a front matter) reports `open`; one that meets a construct it
- * cannot follow where it expects structure (an attribute name starting with `<`, `"`, `'`
- * or `=`; a string running into a line break; a `}` with nothing open; an end tag that does
- * not close the element on top while an element that holds text is open; a custom property
- * whose value opens a block) reports `lost`. Rule 4 resets the report
- * before it judges a file and refuses the change as unreadable when either side reported
- * one: a scanner that lost its place never falls through to text.
+ * EVERY SCANNER FAILS CLOSED. A scanner that ends inside an unfinished construct (a string,
+ * a stylesheet comment or block, a fence, a front matter) reports `open`; one that meets a
+ * construct it cannot follow where it expects structure (a string running into a line
+ * break; a `}` with nothing open; a custom property whose value opens a block; a catalogue
+ * line that starts no entry) reports `lost`; the markup scanner reports `subset` for
+ * anything outside its strict subset. Rule 4 resets the report before it judges a file and
+ * refuses the change when either side reported one: a scanner that lost its place never
+ * falls through to text.
  */
-/** @type {('open'|'lost'|null)} the first fault the scanners met since rule 4 last reset it */
+/** @type {('open'|'lost'|'subset'|null)} the first fault the scanners met since rule 4 last reset it */
 let scanFault = null;
 /** @param {'open'|'lost'} kind */
 const fault = (kind) => { if (scanFault === null) scanFault = kind; };
+/** The markup holds something outside the strict subset: the whole file is refused. */
+const outside = () => { if (scanFault === null) scanFault = 'subset'; };
 
 /** Elements whose content a browser reads as raw text, never as markup (`plaintext` runs to the end). */
 const RAW_TEXT = new Set(['script', 'style', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext']);
@@ -791,58 +831,60 @@ const RAW_TEXT = new Set(['script', 'style', 'textarea', 'xmp', 'iframe', 'noemb
 const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param',
   'source', 'track', 'wbr']);
 /**
- * The host elements: the HTML, SVG and MathML element names, a fixed list. The names are
- * those of Vue's `isHTMLTag`, `isSVGTag` and `isMathMLTag` lists (`HTML_TAGS`, `SVG_TAGS`
- * and `MATH_TAGS` in `packages/shared/src/domTagConfig.ts` of vuejs/core), copied in and
- * matched in lower case, as HTML reads element names. An element of any other name is
- * unknown to the browser: a component or a custom element, whose text is whatever its
- * script makes of it.
+ * The host elements: the HTML element names, a fixed list of 111. The names are those of
+ * Vue's `isHTMLTag` list (`HTML_TAGS` in `packages/shared/src/domTagConfig.ts` of
+ * vuejs/core; the session compared the copy with that file on 2026-10-09), matched in lower
+ * case, as HTML reads element names. An element of any other name is unknown to the browser
+ * as HTML: a component or a custom element, whose text is whatever its script makes of it.
+ * The SVG and MathML names are not in it: `<svg>` and `<math>` are opaque pieces
+ * ({@link foreignEnd}), and outside them such a name is no host element.
  */
 const HOST_ELEMENTS = new Set((
-  // HTML_TAGS
   'html,body,base,head,link,meta,style,title,address,article,aside,footer,header,hgroup,h1,h2,h3,h4,h5,h6,'
   + 'nav,section,div,dd,dl,dt,figcaption,figure,picture,hr,img,li,main,ol,p,pre,ul,a,b,abbr,bdi,bdo,br,cite,'
   + 'code,data,dfn,em,i,kbd,mark,q,rp,rt,ruby,s,samp,small,span,strong,sub,sup,time,u,var,wbr,area,audio,map,'
   + 'track,video,embed,object,param,source,canvas,script,noscript,del,ins,caption,col,colgroup,table,thead,'
   + 'tbody,td,th,tr,button,datalist,fieldset,form,input,label,legend,meter,optgroup,option,output,progress,'
-  + 'select,textarea,details,dialog,menu,summary,template,blockquote,iframe,tfoot,'
-  // SVG_TAGS
-  + 'svg,animate,animateMotion,animateTransform,circle,clipPath,color-profile,defs,desc,discard,ellipse,'
-  + 'feBlend,feColorMatrix,feComponentTransfer,feComposite,feConvolveMatrix,feDiffuseLighting,'
-  + 'feDisplacementMap,feDistantLight,feDropShadow,feFlood,feFuncA,feFuncB,feFuncG,feFuncR,feGaussianBlur,'
-  + 'feImage,feMerge,feMergeNode,feMorphology,feOffset,fePointLight,feSpecularLighting,feSpotLight,feTile,'
-  + 'feTurbulence,filter,foreignObject,g,hatch,hatchpath,image,line,linearGradient,marker,mask,mesh,'
-  + 'meshgradient,meshpatch,meshrow,metadata,mpath,path,pattern,polygon,polyline,radialGradient,rect,set,'
-  + 'solidcolor,stop,switch,symbol,text,textPath,title,tspan,unknown,use,view,'
-  // MATH_TAGS
-  + 'annotation,annotation-xml,maction,maligngroup,malignmark,math,menclose,merror,mfenced,mfrac,mfraction,'
-  + 'mglyph,mi,mlabeledtr,mlongdiv,mmultiscripts,mn,mo,mover,mpadded,mphantom,mprescripts,mroot,mrow,ms,'
-  + 'mscarries,mscarry,msgroup,msline,mspace,msqrt,msrow,mstack,mstyle,msub,msubsup,msup,mtable,mtd,mtext,'
-  + 'mtr,munder,munderover,none,semantics').toLowerCase().split(','));
+  + 'select,textarea,details,dialog,menu,summary,template,blockquote,iframe,tfoot').split(','));
 /** HTML's code elements: their text is code, compared exactly. */
 const CODE_ELEMENTS = new Set(['code', 'pre', 'kbd', 'samp', 'var', 'listing', 'tt']);
 /**
  * @param {string} name the element's name, lower case @param {string[]} attrs its attribute names, lower case
- * @returns {boolean} the element's text, and all inside it, is never wording: a code
- * element, a `<template>` (inert content), an element with an `is` attribute (a customised
- * built-in element), a custom element (a hyphen in its name, whatever the lists hold) and
- * every name that is no host element
+ * @returns {boolean} a component or custom element: an `is` attribute (a customised built-in
+ * element), a hyphen in its name, or a name that is no host element
  */
-const holdsText = (name, attrs) => CODE_ELEMENTS.has(name) || name === 'template' || attrs.includes('is')
-  || name.includes('-') || !HOST_ELEMENTS.has(name);
+const isComponent = (name, attrs) => attrs.includes('is') || name.includes('-') || !HOST_ELEMENTS.has(name);
+/**
+ * Inside `<svg>` or `<math>`, the elements in which a browser reads HTML again: SVG's
+ * `foreignObject`, `desc` and `title`, MathML's token elements and `annotation-xml`. Only
+ * text may stand in one.
+ */
+const FOREIGN_TEXT_ONLY = new Set(['foreignobject', 'desc', 'title', 'mi', 'mo', 'mn', 'ms', 'mtext', 'annotation-xml']);
+/** The HTML element names that SVG has too; every other HTML name inside `<svg>` or `<math>` is outside the subset. */
+const FOREIGN_SHARED = new Set(['a', 'script', 'style', 'title']);
+/**
+ * Names outside {@link HOST_ELEMENTS} that the HTML standard's parser still treats in a way
+ * of its own (obsolete elements, mostly). Written from the executor's memory of the
+ * standard's tree-construction rules, not compared with it (the round ran without network).
+ * A browser leaves `<svg>` and `<math>` at some of them, and none of them is a placeholder
+ * that a paragraph's end is known to close ({@link scanMarkup}).
+ */
+const PARSER_KNOWN = new Set(['acronym', 'applet', 'basefont', 'bgsound', 'big', 'center', 'dir', 'font', 'frame',
+  'frameset', 'image', 'isindex', 'keygen', 'listing', 'marquee', 'menuitem', 'nobr', 'noembed', 'noframes',
+  'plaintext', 'rb', 'rtc', 'search', 'selectedcontent', 'strike', 'tt', 'xmp']);
 /** The end of each raw-text element but `<script>` and `<plaintext>`, and of `<title>`: its closing tag, letter case ignored. */
 const RAW_CLOSE = {
-  style: /<\/style(?=[\s/>]|$)/gi,
-  textarea: /<\/textarea(?=[\s/>]|$)/gi,
-  title: /<\/title(?=[\s/>]|$)/gi,
-  xmp: /<\/xmp(?=[\s/>]|$)/gi,
-  iframe: /<\/iframe(?=[\s/>]|$)/gi,
-  noembed: /<\/noembed(?=[\s/>]|$)/gi,
-  noframes: /<\/noframes(?=[\s/>]|$)/gi,
-  noscript: /<\/noscript(?=[\s/>]|$)/gi
+  style: /<\/style(?=[\t\n\f\r />]|$)/gi,
+  textarea: /<\/textarea(?=[\t\n\f\r />]|$)/gi,
+  title: /<\/title(?=[\t\n\f\r />]|$)/gi,
+  xmp: /<\/xmp(?=[\t\n\f\r />]|$)/gi,
+  iframe: /<\/iframe(?=[\t\n\f\r />]|$)/gi,
+  noembed: /<\/noembed(?=[\t\n\f\r />]|$)/gi,
+  noframes: /<\/noframes(?=[\t\n\f\r />]|$)/gi,
+  noscript: /<\/noscript(?=[\t\n\f\r />]|$)/gi
 };
-/** The marks that move a script block between the script-data states. */
-const SCRIPT_MARKS = /<!--|-->|<(\/?)script(?=[\s/>]|$)/gi;
+/** The marks that move a script block between the script-data states (a tag name ends at HTML's white space, `/` or `>`). */
+const SCRIPT_MARKS = /<!--|--!?>|<(\/?)script(?=[\t\n\f\r />]|$)/gi;
 
 /** @param {string} c @returns {boolean} */
 const isLetter = (c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
@@ -869,31 +911,13 @@ function skipString(s, i) {
 }
 
 /**
- * Skip a template expression from its `{`: braces counted, quoted strings skipped (a
- * backtick string too, on one line). A page may be a template of some engine (`{{ … }}`),
- * so an expression is one opaque token, compared exactly.
- * @param {string} s @param {number} i @returns {number} the index after the matching `}`, or the text's end
- */
-function skipBraces(s, i) {
-  let depth = 0;
-  let j = i;
-  while (j < s.length) {
-    const c = s[j];
-    if (c === '"' || c === "'" || c === '`') { j = skipString(s, j); continue; }
-    if (c === '{') depth++;
-    else if (c === '}' && --depth === 0) return j + 1;
-    j++;
-  }
-  fault('open');
-  return s.length;
-}
-
-/**
  * One tag from its `<`, after the HTML tokenizer's tag states: the name runs to white space,
  * `/` or `>`; an attribute name to white space, `/`, `>` or `=`; a value is single- or
- * double-quoted (to the same quote, whatever lies between), braced (`{…}`,
- * {@link skipBraces}), or unquoted (to white space or `>`). A `/>` ends the tag like `>`:
- * HTML does not let an element close itself. An unclosed tag runs to the end of the text.
+ * double-quoted (to the same quote, whatever lies between) or unquoted (to white space or
+ * `>`, a `/` included). `self`: the tag ends in `/>` as the tokenizer reads it (never after
+ * an unquoted value); HTML ignores that, foreign content honours it. A brace anywhere in the
+ * tag, an attribute name that cannot start so, and a tag or quote that never ends are
+ * outside the subset.
  * @param {string} s
  * @param {number} i
  * @param {boolean} isEnd whether it is `</…`
@@ -906,12 +930,14 @@ function scanTag(s, i, isEnd) {
   while (j < n && !isSpace(s[j]) && s[j] !== '/' && s[j] !== '>') j++;
   const name = s.slice(nameStart, j);
   const attrs = [];
+  let slash = false; // the last character read was a `/` between attributes
+  let self = false;
   while (j < n) {
     const c = s[j];
-    if (isSpace(c) || c === '/') { j++; continue; }
-    if (c === '>') { j++; break; }
-    if (c === '{') { j = skipBraces(s, j); continue; }
-    if (c === '<' || c === '"' || c === "'" || c === '=') fault('lost'); // no attribute name starts so
+    if (c === '>') { self = slash; j++; break; }
+    slash = c === '/';
+    if (isSpace(c) || slash) { j++; continue; }
+    if (c === '<' || c === '"' || c === "'" || c === '=') outside(); // no attribute name starts so
     const attrStart = j++;
     while (j < n && !isSpace(s[j]) && s[j] !== '/' && s[j] !== '>' && s[j] !== '=') j++;
     attrs.push(s.slice(attrStart, j).toLowerCase());
@@ -922,16 +948,15 @@ function scanTag(s, i, isEnd) {
     const q = s[j];
     if (q === '"' || q === "'") {
       const e = s.indexOf(q, j + 1);
-      if (e < 0) fault('open');
+      if (e < 0) outside();
       j = e < 0 ? n : e + 1;
-    } else if (q === '{') {
-      j = skipBraces(s, j);
     } else {
       while (j < n && !isSpace(s[j]) && s[j] !== '>') j++;
     }
   }
-  if (j >= n && s[n - 1] !== '>') fault('open'); // the tag never ended
-  return { k: 'tag', v: s.slice(i, j), name, end: isEnd, attrs };
+  const v = s.slice(i, j);
+  if (v[v.length - 1] !== '>' || v.includes('{') || v.includes('}')) outside(); // never ended, or a brace in it
+  return { k: 'tag', v, name, end: isEnd, attrs, self };
 }
 
 /**
@@ -951,6 +976,9 @@ function optionState(tag, open) {
  * The end of a raw-text element's content, from just after its start tag: for `<script>`
  * the script-data states (`<!--` escapes, `<script` inside it escapes twice, and only a
  * `</script` outside the double escape ends the block); for the others their closing tag.
+ * Inside a script block the comment rule of the subset holds too: a `<!--` followed at once
+ * by `>` or `->` (a browser leaves the escape there), a `<!--` inside another and a `--!>`
+ * inside one are outside the subset.
  * @param {string} s @param {number} from @param {string} name lower case @returns {number}
  */
 function rawEnd(s, from, name) {
@@ -959,139 +987,270 @@ function rawEnd(s, from, name) {
     const re = RAW_CLOSE[/** @type {keyof RAW_CLOSE} */ (name)];
     re.lastIndex = from;
     const m = re.exec(s);
-    if (!m) fault('open');
+    if (!m) outside();
     return m ? m.index : s.length;
   }
   let state = 0; // 0 script data, 1 escaped, 2 double escaped
   SCRIPT_MARKS.lastIndex = from;
   let m;
   while ((m = SCRIPT_MARKS.exec(s)) !== null) {
-    if (m[0] === '<!--') { if (state === 0) state = 1; }
-    else if (m[0] === '-->') state = 0;
+    if (m[0] === '<!--') {
+      if (state !== 0 || s[m.index + 4] === '>' || s.startsWith('->', m.index + 4)) outside();
+      if (state === 0) state = 1;
+    } else if (m[0] === '-->') state = 0;
+    else if (m[0] === '--!>') { if (state !== 0) outside(); }
     else if (m[1]) { if (state === 2) state = 1; else return m.index; }
     else if (state === 1) state = 2;
   }
-  fault('open');
+  outside();
   return s.length;
 }
 
 /**
- * Rule 4 — the tokens of a whole HTML file, or of Markdown prose (`md`, where only `{{…}}`
- * and `{%…%}` are template braces). The open elements are kept on a stack, their names in
- * lower case. Text is `quiet`, never wording, while an element that holds text is open
- * ({@link holdsText}: a code element, a `<template>`, a component or custom element, an
- * element with an `is` attribute) or inside an `<option>` with no `value`. An end tag that
- * closes the element on top of the stack pops it. Any other end tag, while an element that
- * holds text is open, cannot be followed (`lost`): HTML itself ignores such an end tag or
- * closes several elements with it, by rules this scanner does not copy, so where the held
- * text ends is not known. With no such element open the same end tag closes the nearest
- * open element of its name, or nothing. A void element never opens, and `/>` closes
- * nothing. The text of `<title>` is read to its closing tag as one text token.
+ * The end of a piece that starts `<!`, `<?` or `</` before no letter. Inside the subset are
+ * only `<!DOCTYPE html>` (any letter case) and a standard comment: `<!--`, not followed at
+ * once by `>` or `->`, holding no `<!--` and no `--!>`, not ending in `<!-`, and closed by
+ * the first `-->`. A browser ends every other such piece by recovery rules this scanner
+ * does not copy (`<![CDATA[`, `<?…>`, `<!x>`, `</ x>`), so each is outside the subset.
+ * @param {string} s @param {number} i the index of its `<` @returns {number} the index after it
+ */
+function declarationEnd(s, i) {
+  if (s.startsWith('<!--', i)) {
+    const e = s.indexOf('-->', i + 4);
+    const inner = s.slice(i + 4, e < 0 ? s.length : e);
+    if (e < 0 || inner[0] === '>' || inner.startsWith('->') || inner.includes('<!--') || inner.includes('--!>')
+      || inner.endsWith('<!-')) outside();
+    return e < 0 ? s.length : e + 3;
+  }
+  if (s.slice(i, i + 15).toLowerCase() === '<!doctype html>') return i + 15;
+  outside();
+  const e = s.indexOf('>', i + 2);
+  return e < 0 ? s.length : e + 1;
+}
+
+/**
+ * The end of foreign content: from the `<` of an `<svg>` or `<math>` start tag to the end
+ * of its matching end tag, which the caller compares exactly as one opaque piece (no text
+ * inside counts as wording). The tags inside are read as the tokenizer reads them (no raw
+ * text there; `/>` closes), on a stack of their own, and the piece is inside the subset
+ * only where a browser stays in the foreign content from end to end: every end tag closes
+ * the element on top; no tag stands inside an element where HTML is read again
+ * ({@link FOREIGN_TEXT_ONLY}); no start tag carries an HTML element's name but those SVG
+ * shares ({@link FOREIGN_SHARED}) or another name the parser knows ({@link PARSER_KNOWN}),
+ * because a browser leaves the foreign content at many of them; and the piece ends in the
+ * file.
+ * @param {string} s @param {number} from @returns {number} the index after the piece
+ */
+function foreignEnd(s, from) {
+  /** @type {string[]} */
+  const stack = [];
+  let i = from;
+  while (i < s.length) {
+    const lt = s.indexOf('<', i);
+    if (lt < 0) break;
+    const d = s[lt + 1] || '';
+    if (isLetter(d) || (d === '/' && isLetter(s[lt + 2] || ''))) {
+      const tag = scanTag(s, lt, d === '/');
+      i = lt + tag.v.length;
+      const name = /** @type {string} */ (tag.name).toLowerCase();
+      if (tag.end) {
+        if (stack.pop() !== name) outside();
+      } else {
+        if (stack.length > 0 && (FOREIGN_TEXT_ONLY.has(stack[stack.length - 1]) || PARSER_KNOWN.has(name)
+          || (HOST_ELEMENTS.has(name) && !FOREIGN_SHARED.has(name)))) outside();
+        if (!tag.self) stack.push(name);
+      }
+      if (stack.length === 0) return i;
+    } else if (d === '!' || d === '?' || d === '/') {
+      i = declarationEnd(s, lt);
+    } else {
+      i = lt + 1;
+    }
+  }
+  outside(); // never closed
+  return s.length;
+}
+
+/** A Markdown autolink with a scheme: `<http://…>`, `<https://…>` or `<mailto:…>`, no white space, `<` or control character inside. */
+const AUTOLINK = /<(?:https?:\/\/|mailto:)[^\s<>\u0000-\u001f\u007f]*>/iy;
+/** The characters of an e-mail address's local part, as CommonMark's e-mail autolink reads them. */
+const EMAIL_LOCAL = /[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]/;
+
+/**
+ * Rule 4 (Markdown) — the end of an autolink that starts at this `<`, or -1: one with a
+ * scheme ({@link AUTOLINK}), or an e-mail address `<name@host>` as CommonMark reads it (the
+ * host: labels of letters, digits and inner hyphens, at most 63 characters each, joined by
+ * dots). An autolink is no tag: it is one opaque piece, compared exactly.
+ * @param {string} s @param {number} i @returns {number}
+ */
+function autolinkEnd(s, i) {
+  AUTOLINK.lastIndex = i;
+  const m = AUTOLINK.exec(s);
+  if (m) return i + m[0].length;
+  let j = i + 1;
+  while (j < s.length && EMAIL_LOCAL.test(s[j])) j++;
+  if (j === i + 1 || s[j] !== '@') return -1;
+  const hostStart = ++j;
+  while (j < s.length && /[A-Za-z0-9.-]/.test(s[j])) j++;
+  if (s[j] !== '>') return -1;
+  const labels = s.slice(hostStart, j).split('.');
+  return labels.every((l) => l.length > 0 && l.length <= 63 && l[0] !== '-' && l[l.length - 1] !== '-') ? j + 1 : -1;
+}
+
+/**
+ * Rule 4 — the tokens of a whole HTML file, or of Markdown prose (`breaks` given). The open
+ * elements are kept on a stack, their names in lower case. Text is `quiet`, never wording,
+ * while an element that holds its text is open (a code element, a `<template>`, a component
+ * or custom element: {@link isComponent}, then also `inexact`) or inside an `<option>` with
+ * no `value`. An end tag that closes the element on top of the stack pops it. Any other end
+ * tag, while an element that holds text is open, is outside the subset: HTML itself ignores
+ * such an end tag or closes several elements with it, by rules this scanner does not copy.
+ * With no such element open the same end tag closes the nearest open element of its name,
+ * or nothing. A void element never opens, and `/>` closes nothing. The text of `<title>` is
+ * read to its closing tag as one text token. `<svg>` and `<math>` are one `foreign` token
+ * each ({@link foreignEnd}). Inside `<select>` only options are followed. In an HTML file an
+ * element still open at the end is outside the subset.
+ * IN MARKDOWN an autolink is one `link` token ({@link autolinkEnd}), and an element may stay
+ * open, as a placeholder such as `<file>` does. `breaks` holds the blank lines: at one whose
+ * `reset` is set (no line of the paragraph before it starts with `<`, so no HTML block
+ * starts there and the paragraph is rendered inside an element of its own, whose end tag a
+ * browser closes everything inside it with), the elements opened in that paragraph and
+ * still open are closed, when every tag of the paragraph was the start tag of a name the
+ * HTML parser does not know, or the end tag of such an element opened in the same
+ * paragraph. In every other case the element stays open to the end of the file, as before.
  * @param {string} s the text, line feeds only
- * @param {boolean} md
+ * @param {(Array<{at: number, reset: boolean}>|null)} breaks Markdown's blank lines in order, or null for an HTML file
  * @returns {Tok[]}
  */
-function scanMarkup(s, md) {
+function scanMarkup(s, breaks) {
   /** @type {Tok[]} */
   const out = [];
   const n = s.length;
   let i = 0;
   let start = 0;
-  /** @type {Array<{name: string, holds: boolean}>} the open elements, the innermost last */
+  /** @type {Array<{name: string, holds: boolean, component: boolean}>} the open elements, the innermost last */
   const stack = [];
   /** @type {Map<string, number>} how many open elements carry each name */
   const open = new Map();
   let held = 0;
+  let components = 0;
   let option = false;
-  const text = (end) => { if (end > start) out.push({ k: 'text', v: s.slice(start, end), quiet: held > 0 || option }); };
+  let b = 0; // the next of Markdown's blank lines
+  let mark = 0; // the stack's depth where the current paragraph began
+  let plain = true; // every tag of the current paragraph is a placeholder's
+  let tokenEnd = 0; // where the last token that is no text ended
+  const text = (end) => {
+    if (end > start) out.push({ k: 'text', v: s.slice(start, end), quiet: held > 0 || option, inexact: components > 0 });
+  };
   const take = (k, end) => {
     text(i);
     out.push({ k, v: s.slice(i, end) });
     i = end;
     start = end;
+    tokenEnd = end;
   };
   const pop = () => {
-    const el = /** @type {{name: string, holds: boolean}} */ (stack.pop());
+    const el = /** @type {{name: string, holds: boolean, component: boolean}} */ (stack.pop());
     open.set(el.name, /** @type {number} */ (open.get(el.name)) - 1);
     if (el.holds) held--;
+    if (el.component) components--;
     return el.name;
   };
   while (i < n) {
-    const c = s[i];
-    if (c === '<') {
-      const d = s[i + 1] || '';
-      if (isLetter(d) || (d === '/' && isLetter(s[i + 2] || ''))) {
+    if (breaks && b < breaks.length && i >= breaks[b].at) {
+      if (breaks[b].reset && plain && tokenEnd <= breaks[b].at && stack.length > mark) {
         text(i);
-        const tag = scanTag(s, i, d === '/');
-        out.push(tag);
-        i += tag.v.length;
         start = i;
-        option = optionState(tag, option);
-        const name = /** @type {string} */ (tag.name).toLowerCase();
-        if (tag.end) {
-          if (stack.length > 0 && stack[stack.length - 1].name === name) pop();
-          else if (held > 0) fault('lost'); // where the held text ends is not known
-          else if (open.get(name)) while (pop() !== name);
-          continue;
-        }
-        if (!VOID_ELEMENTS.has(name)) {
-          const holds = holdsText(name, /** @type {string[]} */ (tag.attrs));
-          stack.push({ name, holds });
-          open.set(name, (open.get(name) || 0) + 1);
-          if (holds) held++;
-        }
-        if (name === 'title') {
-          i = rawEnd(s, i, name);
-          text(i);
-          start = i;
-        } else if (RAW_TEXT.has(name)) {
-          const end = rawEnd(s, i, name);
-          if (end > i) take('raw', end);
-        }
-        continue;
+        while (stack.length > mark) pop();
       }
-      if (d === '!' || d === '?' || d === '/') {
-        const [close, from] = s.startsWith('<!--', i) ? ['-->', i + 4] : s.startsWith('<![CDATA[', i) ? [']]>', i + 9] : ['>', i + 2];
-        const e = s.indexOf(close, from);
-        if (e < 0) fault('open');
-        take('comment', e < 0 ? n : e + close.length);
-        continue;
-      }
-    } else if (c === '{' && (!md || s[i + 1] === '{' || s[i + 1] === '%')) {
-      let end;
-      if (md) {
-        const e = s.indexOf(s[i + 1] === '{' ? '}}' : '%}', i + 2);
-        if (e < 0) fault('open');
-        end = e < 0 ? n : e + 2;
-      } else end = skipBraces(s, i);
-      take('expr', end);
+      b++;
+      mark = stack.length;
+      plain = true;
       continue;
     }
-    i++;
+    if (s[i] !== '<') { i++; continue; }
+    const d = s[i + 1] || '';
+    const linkEnd = breaks ? autolinkEnd(s, i) : -1;
+    if (linkEnd > 0) {
+      take('link', linkEnd);
+    } else if (isLetter(d) || (d === '/' && isLetter(s[i + 2] || ''))) {
+      const tag = scanTag(s, i, d === '/');
+      const name = /** @type {string} */ (tag.name).toLowerCase();
+      const attrs = /** @type {string[]} */ (tag.attrs);
+      if (open.get('select') && !['option', 'optgroup', tag.end ? 'select' : 'hr'].includes(name)) outside();
+      if (!tag.end && (name === 'svg' || name === 'math')) {
+        plain = false;
+        take('foreign', foreignEnd(s, i));
+        continue;
+      }
+      text(i);
+      out.push(tag);
+      i += tag.v.length;
+      start = i;
+      tokenEnd = i;
+      option = optionState(tag, option);
+      if (tag.end) {
+        if (stack.length > 0 && stack[stack.length - 1].name === name) {
+          if (stack.length <= mark) plain = false;
+          pop();
+          continue;
+        }
+        plain = false;
+        if (held > 0) outside(); // where the held text ends is not known
+        else if (open.get(name)) while (pop() !== name);
+        continue;
+      }
+      if (HOST_ELEMENTS.has(name) || PARSER_KNOWN.has(name)) plain = false;
+      if (!VOID_ELEMENTS.has(name)) {
+        const code = CODE_ELEMENTS.has(name) || name === 'template';
+        const component = !code && isComponent(name, attrs);
+        stack.push({ name, holds: code || component, component });
+        open.set(name, (open.get(name) || 0) + 1);
+        if (code || component) held++;
+        if (component) components++;
+      }
+      if (name === 'title') {
+        i = rawEnd(s, i, name);
+        text(i);
+        start = i;
+        tokenEnd = i;
+      } else if (RAW_TEXT.has(name)) {
+        const end = rawEnd(s, i, name);
+        if (end > i) take('raw', end);
+      }
+    } else if (d === '!' || d === '?' || d === '/') {
+      take('comment', declarationEnd(s, i));
+    } else {
+      i++;
+    }
   }
-  if (open.get('template')) fault('open'); // a `<template>` never closed
+  if (breaks ? open.get('template') : stack.length > 0) outside(); // an element never closed
   text(n);
   return out;
 }
 
 /**
  * Rule 4 — compare two token sequences: equal in length and kind, every token identical
- * but changed text tokens, each of which `wording` accepts on both sides. Returns the old
- * and new values of the changed text tokens (rule 6 reads them), or null.
+ * but changed text tokens, each of which `wording` accepts on both sides. Returns `runs`,
+ * the old and new values of the changed text tokens (rule 6 reads them), or `runs: null`
+ * with `inexact`: the first change that is no wording stands in a component or custom
+ * element, or in `<svg>` or `<math>`.
  * @param {Tok[]} a @param {Tok[]} b
  * @param {(toks: Tok[], k: number) => boolean} wording
- * @returns {string[]|null}
+ * @returns {{runs: (string[]|null), inexact: boolean}}
  */
 function changedTexts(a, b, wording) {
-  if (a.length !== b.length) return null;
+  if (a.length !== b.length) return { runs: null, inexact: false };
   const runs = [];
   for (let k = 0; k < a.length; k++) {
-    if (a[k].k !== b[k].k) return null;
+    if (a[k].k !== b[k].k) return { runs: null, inexact: false };
     if (a[k].v === b[k].v) continue;
-    if (a[k].k !== 'text' || !wording(a, k) || !wording(b, k)) return null;
+    if (a[k].k !== 'text' || !wording(a, k) || !wording(b, k)) {
+      return { runs: null, inexact: a[k].k === 'foreign' || Boolean(a[k].inexact || b[k].inexact) };
+    }
     runs.push(a[k].v, b[k].v);
   }
-  return runs;
+  return { runs, inexact: false };
 }
 
 /** Characters a markup text token never holds when it changes (template, script or entity starts, a line break). */
@@ -1376,10 +1535,11 @@ function cssStatements(blank) {
  * declaration is read from the whole file ({@link cssStatements}): a statement that ends in
  * `{` is a selector or a rule's head, wherever its `{` stands; a declaration starts with
  * `name:`, and at depth 0 only a custom property (`--x`) is one. The property's name must
- * stand on the token's own line. A colour function is read only in its written forms
+ * stand on the token's own line. `whole`: the token is the declaration's whole value (an
+ * `!important` after it aside). A colour function is read only in its written forms
  * ({@link colourFunction}). One forward pass.
  * @param {string} text
- * @returns {Array<{t: string, i: number, j: number, prop: (string|null)}>}
+ * @returns {Array<{t: string, i: number, j: number, prop: (string|null), whole: boolean}>}
  */
 function colourSlots(text) {
   const blank = blankCss(text);
@@ -1404,7 +1564,7 @@ function colourSlots(text) {
       nextBreak = blank.indexOf('\n', lineStart);
     }
     while (statements[si].end < i) si++;
-    const st = /** @type {{start: number, end: number, term: string, depth: number, decl?: ({name: string, at: number, valueAt: number}|null)}} */ (statements[si]);
+    const st = /** @type {{start: number, end: number, term: string, depth: number, decl?: ({name: string, at: number, valueAt: number}|null), value?: string}} */ (statements[si]);
     if (st.decl === undefined) {
       head.lastIndex = st.start;
       const h = st.term === '{' ? null : head.exec(blank);
@@ -1413,7 +1573,8 @@ function colourSlots(text) {
         : null;
     }
     const d = st.decl;
-    out.push({ t, i, j, prop: d && d.valueAt <= i && d.at >= lineStart ? d.name : null });
+    if (d && st.value === undefined) st.value = blank.slice(d.valueAt, st.end).replace(/![ \t\n]*important[ \t\n]*$/i, '').trim();
+    out.push({ t, i, j, prop: d && d.valueAt <= i && d.at >= lineStart ? d.name : null, whole: Boolean(d) && st.value === t });
   }
   return out;
 }
@@ -1514,21 +1675,25 @@ function customProperties(text) {
  * order, and every one whose value changed has `color` or `colour` in its name and holds
  * exactly one colour before and after ({@link oneColour}). Returns the two stylesheets
  * with each such value replaced by one same colour, for the rest of the comparison (every
- * other character must still be identical, or a colour in a real colour property), or null:
- * any other custom-property change is a setting.
- * @param {string} o @param {string} n @returns {[string, string]|null}
+ * other character must still be identical, or a colour in a real colour property); or
+ * `inexact`: a property named for a colour changed, and its value is not exactly one colour
+ * before and after; or null: any other custom-property change is a setting.
+ * @param {string} o @param {string} n @returns {([string, string]|'inexact'|null)}
  */
 function colourNamedEdit(o, n) {
   const a = customProperties(o);
   const b = customProperties(n);
   if (a.length !== b.length) return null;
   const changed = [];
+  let inexact = false;
   for (let k = 0; k < a.length; k++) {
     if (a[k].name !== b[k].name) return null;
     if (a[k].value === b[k].value) continue;
-    if (!/colou?r/i.test(a[k].name) || !oneColour(a[k].value) || !oneColour(b[k].value)) return null;
+    if (!/colou?r/i.test(a[k].name)) return null;
+    if (!oneColour(a[k].value) || !oneColour(b[k].value)) inexact = true;
     changed.push(k);
   }
+  if (inexact) return 'inexact';
   const levelled = (text, list) => {
     const parts = [];
     let at = 0;
@@ -1560,20 +1725,24 @@ function masked(text, toks) {
  * identical (strings and comments included), at least one token differs, and every changed
  * token stands, on both sides, in the value of a real colour property
  * ({@link colourSlots}, {@link colourMayStand}), so `animation: red 2s` and `width: #fff`
- * are never a colour. Linear in the files' length.
- * @param {string} o @param {string} n @returns {boolean}
+ * are never a colour. `inexact`: a changed colour stands in a real colour property on both
+ * sides but is not its whole value (`border: 1px solid red`), which the functional plan
+ * refuses as a change the check cannot read exactly. Linear in the files' length.
+ * @param {string} o @param {string} n @returns {(boolean|'inexact')}
  */
 function colourEdit(o, n) {
   const a = colourSlots(o);
   const b = colourSlots(n);
   if (a.length !== b.length || masked(o, a) !== masked(n, b)) return false;
   let changed = 0;
+  let inexact = false;
   for (let k = 0; k < a.length; k++) {
     if (a[k].t === b[k].t) continue;
     changed++;
     if (!colourMayStand(a[k].prop) || !colourMayStand(b[k].prop)) return false;
+    if (!a[k].whole || !b[k].whole) inexact = true;
   }
-  return changed > 0;
+  return inexact ? 'inexact' : changed > 0;
 }
 
 /** Program code — empty the inside of every string literal (a backtick literal with `${` kept). */
@@ -1636,6 +1805,13 @@ const DOCTEST = /^[ \t]*>>>(?:[ \t]|$)/;
  */
 const MDX_SCRIPT = /^(?:import|export) /;
 /**
+ * @param {string} text a heading's text @returns {string} the anchor a site generator makes
+ * of it: lower case, everything dropped that is no letter, digit, space, hyphen or
+ * underscore, the spaces then turned into hyphens. An `&` is kept, so that a character
+ * reference that comes or goes (`copy` and `&copy;`) changes the anchor.
+ */
+const anchorOf = (text) => text.toLowerCase().replace(/[^\p{L}\p{N} _&-]/gu, '').trim().replace(/ /g, '-');
+/**
  * @param {string} line @returns {boolean} a Markdown thematic break (`* * *`, `---`), which
  * is no list item: three or more of one of `-`, `*`, `_` with only spaces and tabs between.
  * Read by hand, one pass.
@@ -1663,7 +1839,8 @@ const NESTING_DEPTH = 16;
  * Code is a fenced block of either fence kind (its fences included, unclosed to the end),
  * an indented block (four columns beyond the list item it stands in, after a blank line or
  * another such line), a doctest ({@link DOCTEST}) and an `import` or `export` block
- * ({@link MDX_SCRIPT}, where a block starts). The list items are read after CommonMark's rules: an item's own
+ * ({@link MDX_SCRIPT}, where a block starts: after a blank line, a heading, a closed fence
+ * or any other line that is no paragraph's text). The list items are read after CommonMark's rules: an item's own
  * text is read as a line of its own at the item's content column, so it may open a fence,
  * a doctest, a block quote or another item, or be indented code; a paragraph indented to an
  * item's content column is prose; any line indented less than an item's content column
@@ -1684,8 +1861,9 @@ const NESTING_DEPTH = 16;
  * @param {string[]} lines
  * @param {number} top the number of front matter lines, classed `settings`
  * @param {number} depth how many block quotes enclose these lines
- * @returns {{cls: string[], starts: boolean[], ends: boolean[], paragraph: boolean}}
- * `paragraph`: the last line is a paragraph's text, which the next line may continue
+ * @returns {{cls: string[], starts: boolean[], ends: boolean[], paragraph: boolean, anchors: string[]}}
+ * `paragraph`: the last line is a paragraph's text, which the next line may continue;
+ * `anchors`: the generated anchor of every heading, in order ({@link anchorOf})
  */
 function markdownBlocks(lines, top, depth) {
   const n = lines.length;
@@ -1703,6 +1881,9 @@ function markdownBlocks(lines, top, depth) {
   /** @type {''|'own'|'lazy'} whether the line above is a paragraph's text, and one that ran on lazily */
   let prevParagraph = '';
   let block = false; // inside a doctest or an `import` / `export` block
+  /** @type {string[]} */
+  const anchors = [];
+  let paragraphFrom = 0; // the first line of the paragraph the line above belongs to
   for (let i = top; i < n; i++) {
     if (fence) {
       cls[i] = 'code';
@@ -1747,7 +1928,7 @@ function markdownBlocks(lines, top, depth) {
         cls[i] = 'code';
         break;
       }
-      if (block || DOCTEST.test(line) || (afterBlank && MDX_SCRIPT.test(line))) {
+      if (block || DOCTEST.test(line) || ((afterBlank || prevParagraph === '') && MDX_SCRIPT.test(line))) {
         block = true;
         cls[i] = 'code';
         break;
@@ -1764,6 +1945,7 @@ function markdownBlocks(lines, top, depth) {
           return l.slice(marker.length);
         });
         const inner = followed ? markdownBlocks(quoted, 0, depth + 1) : null;
+        if (inner) anchors.push(...inner.anchors);
         for (let k = 0; k < run.length; k++) {
           cls[i + k] = inner ? inner.cls[k] : 'code';
           starts[i + k] = k === 0 || Boolean(inner && inner.starts[k]);
@@ -1783,6 +1965,8 @@ function markdownBlocks(lines, top, depth) {
       const heading = /^#{1,6}(?:[ \t]|$)/.test(body);
       const underline = prevParagraph === 'own' && !inItem && !lazy && /^(?:=+|-+)[ \t]*$/.test(body);
       if (rel <= 3 && (heading || underline || thematicBreak(body))) {
+        if (heading) anchors.push(anchorOf(body));
+        else if (underline) anchors.push(anchorOf(lines.slice(paragraphFrom, i).map((l) => l.trim()).join(' ')));
         starts[i] = !underline;
         ends[i] = true;
         prevIndented = true;
@@ -1807,10 +1991,11 @@ function markdownBlocks(lines, top, depth) {
       line = ' '.repeat(after >= 5 ? col + after - 1 : col) + line.slice(m[0].length - 1);
     }
     prevItem = item;
+    if (paragraph !== '' && prevParagraph === '') paragraphFrom = i;
     prevParagraph = paragraph;
   }
   if (fence) fault('open');
-  return { cls, starts, ends, paragraph: prevParagraph !== '' };
+  return { cls, starts, ends, paragraph: prevParagraph !== '', anchors };
 }
 
 /**
@@ -2015,14 +2200,56 @@ function linkTargets(s) {
 }
 
 /**
+ * Rule 4 (Markdown) — which lines a brace reaches. Where the Markdown is built as MDX a `{`
+ * starts an expression: inside a paragraph it ends with the paragraph, so a brace reaches
+ * every line of its own paragraph (bounded by blank lines); an expression that starts a
+ * block may run on over blank lines, so a paragraph that leaves a brace open, closes one
+ * that was never opened, or holds a quote, a backtick or a `/` inside braces (a string, a
+ * template or a comment, where braces no longer count) reaches every line after it.
+ * @param {string[]} lines the file's lines @param {string[]} prose the same lines as prose (code lines empty, code spans blanked)
+ * @returns {boolean[]} for each line, whether a brace reaches it
+ */
+function braceReach(lines, prose) {
+  const reached = new Array(lines.length).fill(false);
+  let unsure = false; // a paragraph above may have left an expression open
+  let from = 0;
+  let depth = 0;
+  let braced = unsure;
+  let after = unsure;
+  for (let i = 0; i <= lines.length; i++) {
+    if (i === lines.length || lines[i].trim() === '') {
+      if (braced) reached.fill(true, from, i);
+      unsure = after || depth !== 0;
+      from = i + 1;
+      depth = 0;
+      braced = unsure;
+      after = unsure;
+      continue;
+    }
+    for (const c of prose[i]) {
+      if (c === '{') { depth++; braced = true; }
+      else if (c === '}') { braced = true; if (--depth < 0) { depth = 0; after = true; } }
+      else if (depth > 0 && (c === '"' || c === "'" || c === '`' || c === '/')) after = true;
+    }
+  }
+  return reached;
+}
+
+/** A line that starts with `<` behind white space and the markers of a list item or a block quote: an HTML block may start there. */
+const HTML_BLOCK_START = /^[\s>*+.)\d-]*</;
+
+/**
  * Rule 4 (Markdown) — the cause word of a Markdown change that is not wording, or null.
  * Front matter is settings; a code line is code ({@link markdownBlocks}), and so is an
- * unchanged line whose class the change moved. The rest is read whole, code spans blanked:
- * the code spans and the link targets must be identical, and the HTML scanner's tokens
- * ({@link scanMarkup}) identical but changed prose text, never inside an element that holds
- * its text, an `<option>` with no `value` or template braces `{{…}}` / `{%…%}`, and never
- * with a `{` or `}` in it: where the Markdown is built as MDX a brace starts an expression.
- * @param {ChangedFile} f @returns {('settings'|'code'|null)}
+ * unchanged line whose class the change moved, and a changed line that starts `import ` or
+ * `export ` wherever it stands ({@link MDX_SCRIPT}). The generated anchors of the headings
+ * must be identical (`inexact`: other pages and tools link to them). The rest is read
+ * whole, code spans blanked: the code spans and the link targets must be identical, and the
+ * HTML scanner's tokens ({@link scanMarkup}) identical but changed prose text, never inside
+ * an element that holds its text or an `<option>` with no `value` (`inexact` inside a
+ * component or custom element, or `<svg>` or `<math>`), and never on a line a brace reaches
+ * ({@link braceReach}).
+ * @param {ChangedFile} f @returns {('settings'|'code'|'inexact'|null)}
  */
 function markdownRefusal(f) {
   const read = (text) => {
@@ -2031,16 +2258,35 @@ function markdownRefusal(f) {
   };
   const o = read(f.oldText);
   const n = read(f.newText);
-  const moved = lineClassChange(/** @type {Hunk[]} */ (f.hunks), o.blocks.cls, n.blocks.cls);
+  const hunks = /** @type {Hunk[]} */ (f.hunks);
+  const moved = lineClassChange(hunks, o.blocks.cls, n.blocks.cls);
   if (moved) return /** @type {'settings'|'code'} */ (moved);
+  if (hunks.some((h) => h.removed.some((l) => MDX_SCRIPT.test(l)) || h.added.some((l) => MDX_SCRIPT.test(l)))) return 'code';
+  if (o.blocks.anchors.join('\n') !== n.blocks.anchors.join('\n')) return 'inexact';
   const prose = ({ lines, blocks }) => {
     const { blanked, spans } = codeSpans(lines.map((l, i) => (blocks.cls[i] === 'prose' ? l : '')), blocks);
-    return { tokens: scanMarkup(blanked, true), fixed: `${spans}\u0001${linkTargets(blanked)}` };
+    const proseLines = blanked.split('\n');
+    // The blank lines, where a paragraph ends: each one's place in the text, and whether no
+    // line of the paragraph before it could start an HTML block.
+    const breaks = [];
+    let at = 0;
+    let reset = true;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === '') {
+        breaks.push({ at, reset });
+        reset = true;
+      } else if (HTML_BLOCK_START.test(proseLines[i])) reset = false;
+      at += proseLines[i].length + 1;
+    }
+    return { tokens: scanMarkup(blanked, breaks), fixed: `${spans}\u0001${linkTargets(blanked)}`, reached: braceReach(lines, proseLines) };
   };
   const a = prose(o);
   const b = prose(n);
   if (a.fixed !== b.fixed) return 'code';
-  return changedTexts(a.tokens, b.tokens, (toks, k) => !toks[k].quiet && !/[{}]/.test(toks[k].v)) ? null : 'code';
+  const texts = changedTexts(a.tokens, b.tokens, (toks, k) => !toks[k].quiet);
+  if (!texts.runs) return texts.inexact ? 'inexact' : 'code';
+  const reached = (side, first, count) => side.reached.slice(first - 1, first - 1 + count).includes(true);
+  return hunks.some((h) => reached(a, h.oldStart, h.removed.length) || reached(b, h.newStart, h.added.length)) ? 'code' : null;
 }
 
 /**
@@ -2054,11 +2300,21 @@ function textRefusal(f) {
 }
 
 /**
+ * The functional plan's clause for a file whose format the check reads but whose change it
+ * cannot vouch for: text inside a component or custom element, text inside `<svg>` or
+ * `<math>`, HTML outside the strict subset, a Markdown heading whose generated anchor
+ * changes, a colour that is not the whole value of a colour property.
+ * @param {string} display @returns {string}
+ */
+const inexactClause = (display) => `it changes ${display} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
+
+/**
  * Rule 4 — place the file in the first kind that fits and judge the whole old and new file
  * with that kind's scanner; a place that governs the work never qualifies, whatever the
  * kind; otherwise the clause of the first other kind it matches. When a scanner of either
  * side ended inside an unfinished construct or lost its place, the change could not be read
- * (every scanner fails closed).
+ * (every scanner fails closed); when the markup scanner met something outside its strict
+ * subset, the change cannot be read exactly.
  * @param {ChangedFile} f
  * @returns {{kind: string, runs: string[]}|{clause: string, cause: string}}
  */
@@ -2066,6 +2322,7 @@ function ruleKind(f) {
   scanFault = null;
   const judged = kindOf(f);
   if (!scanFault) return judged;
+  if (scanFault === 'subset') return { clause: inexactClause(f.display), cause: 'unreadable' };
   const why = scanFault === 'open' ? 'leaves a tag, quote, comment, block, fence or span open' : 'holds something I cannot follow';
   return { clause: `I could not read the change (${f.display} ${why})`, cause: 'unreadable' };
 }
@@ -2083,6 +2340,7 @@ function kindOf(f) {
   const unrecognised = { clause: `I do not recognise ${d} as wording or a colour`, cause: 'unrecognised' };
   const setting = { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
   const build = { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
+  const inexact = { clause: inexactClause(d), cause: 'unrecognised' };
   const isDependency = DEPENDENCY_NAMES.has(base)
     || (ext === '.txt' && (/requirements|constraints/i.test(base) || topFolders.includes('requirements')));
   const governing = governingName(lowerBase)
@@ -2111,14 +2369,14 @@ function kindOf(f) {
   if (kind === 'documentation') {
     // Rule 2 has already refused a file with a missing side, so both texts are present.
     const refused = ext === '.md' ? markdownRefusal(f) : textRefusal(f);
-    if (refused) return refused === 'settings' ? setting : unrecognised;
+    if (refused) return refused === 'settings' ? setting : refused === 'inexact' ? inexact : unrecognised;
     return { kind, runs: changedWords(f.hunks) };
   }
   if (kind === 'markup') {
     if (!equalHunks(f.hunks)) return unrecognised;
-    const runs = changedTexts(scanMarkup(lineFeeds(/** @type {string} */ (f.oldText)), false),
-      scanMarkup(lineFeeds(/** @type {string} */ (f.newText)), false), markupWording);
-    return runs ? { kind, runs } : unrecognised;
+    const texts = changedTexts(scanMarkup(lineFeeds(/** @type {string} */ (f.oldText)), null),
+      scanMarkup(lineFeeds(/** @type {string} */ (f.newText)), null), markupWording);
+    return texts.runs ? { kind, runs: texts.runs } : texts.inexact ? inexact : unrecognised;
   }
   if (kind === 'catalogue') {
     if (!equalHunks(f.hunks)) return unrecognised;
@@ -2144,12 +2402,16 @@ function kindOf(f) {
     const o = lineFeeds(/** @type {string} */ (f.oldText));
     const n = lineFeeds(/** @type {string} */ (f.newText));
     // A custom property's change is a setting, unless the property is named for a colour and
-    // holds exactly one colour before and after; those values are then levelled, and what
-    // is left must be identical or a colour in a real colour property.
+    // holds exactly one colour before and after (any other value of such a property cannot be
+    // read exactly); those values are then levelled, and what is left must be identical or a
+    // colour that is the whole value of a real colour property.
     const levelled = colourNamedEdit(o, n);
+    if (levelled === 'inexact') return { clause: inexactClause(d), cause: 'setting' };
     if (!levelled) return setting;
+    if (!equalHunks(f.hunks)) return unrecognised;
     const [a, b] = levelled;
-    return equalHunks(f.hunks) && ((a === b && o !== n) || colourEdit(a, b)) ? { kind, runs: [] } : unrecognised;
+    const edit = a === b ? o !== n : colourEdit(a, b);
+    return edit === true ? { kind, runs: [] } : edit === 'inexact' ? inexact : unrecognised;
   }
 
   if (isDependency) return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
@@ -2179,7 +2441,10 @@ function sensitiveWord(part) {
 
 /**
  * Rule 5 — not in a sensitive area: no letter run of the path from the repository top is a
- * sensitive word (also in the plural, but not in a stylesheet's own file name: `tokens.css`
+ * sensitive word, and no camel-case sub-word of one (`AuthPanel` holds `auth`, `Author`
+ * does not). The path is folded first (Unicode NFKC, so full-width letters read as plain
+ * ones, then lower case) and split at every character that is no letter; a sub-word starts
+ * where a capital letter follows a small one. The words count also in the plural, but not in a stylesheet's own file name: `tokens.css`
  * holds design tokens, while `login.css` and `payment.css` still name their area); the path is no
  * secret-bearing file by CTOC's own secret-file guard (`isSecretTarget`: the word
  * `secret`), and, in CTOC's own repository only, no part of CTOC's enforcement by its
@@ -2191,12 +2456,14 @@ function sensitiveWord(part) {
  */
 function ruleSensitiveArea(f, ctoc) {
   const nameAt = f.topRel.lastIndexOf('/') + 1;
-  /** @param {string} text @param {boolean} plural @returns {string|null} the first sensitive word among its letter runs */
+  /** @param {string} text @param {boolean} plural @returns {string|null} the first sensitive word among its letter runs and their camel-case sub-words */
   const wordIn = (text, plural) => {
-    for (const run of text.split(/[^A-Za-z]+/)) {
-      const part = run.toLowerCase();
-      const found = plural ? sensitiveWord(part) : SENSITIVE_WORDS.has(part) ? part : null;
-      if (found) return found;
+    for (const run of text.normalize('NFKC').split(/\P{L}+/u)) {
+      for (const piece of [run, ...run.split(/(?<=\p{Ll})(?=\p{Lu})/u)]) {
+        const part = piece.toLowerCase();
+        const found = plural ? sensitiveWord(part) : SENSITIVE_WORDS.has(part) ? part : null;
+        if (found) return found;
+      }
     }
     return null;
   };
