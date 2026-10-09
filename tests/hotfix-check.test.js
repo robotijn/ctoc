@@ -34,6 +34,13 @@ const DOC_ONLY = 'The project has no test command, and the change is documentati
 const refusal = (clause) => `I did not treat this as a hotfix because ${clause}; `
   + 'it goes through a normal plan, and your edits stay in place, not committed.';
 const unreadable = (why) => refusal(`I could not read the change (${why})`);
+// The owner's decision of 2026-10-09 (answer "a"): the hotfix check keeps only the formats
+// it can read exactly (plain HTML, colours in plain CSS, catalogue wording in JSON, YAML and
+// properties files, prose in Markdown and plain text), because five rounds of security
+// attacks kept finding new ways to get a behaviour change committed as a hotfix, the last
+// ones where a hand-written reader disagrees with the real compiler. Every case of a
+// removed format is kept, grouped at the end of its table, and asserts this clause.
+const gone = (f) => `I do not recognise ${f} as wording or a colour`;
 
 const HOME = '<!doctype html>\n<html>\n<body>\n<button>Save</button>\n</body>\n</html>\n';
 const HOME_STORE = HOME.replace('<button>Save</button>', '<button>Store</button>');
@@ -1249,14 +1256,8 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['src/pages/tail.html', '<p>Save<\n', '<p>Store<\n', un('src/pages/tail.html')],
     ['src/pages/heart.html', '<p>Save <3</p>\n', '<p>Store <3</p>\n', un('src/pages/heart.html')],
     ['src/pages/grow.html', '<p>a</p>\n', '<p>a</p>\n<p>b</p>\n', un('src/pages/grow.html')],
-    ['src/components/Close.jsx', '  <span>Save</span>\n', '  <span>Store</span>\n', NO_TEST],
-    ['src/components/Shut.jsx', '  </span>Save</span>\n', '  </span>Store</span>\n', un('src/components/Shut.jsx')],
-    ['src/components/Other.jsx', '  <span>Save</b>\n', '  <span>Store</b>\n', un('src/components/Other.jsx')],
-    ['src/components/Longer.jsx', '  <span>Save</spanx>\n', '  <span>Store</spanx>\n', un('src/components/Longer.jsx')],
     ['locales/num.json', '{\n  "count": 1,\n  "x": "y"\n}\n', '{\n  "count": 2,\n  "x": "y"\n}\n', un('locales/num.json')],
     ['locales/grow.json', '{\n  "a": "b"\n}\n', '{\n  "a": "b",\n  "c": "d"\n}\n', un('locales/grow.json')],
-    ['translations/id.po', 'msgid "Save"\nmsgstr "S"\n', 'msgid "Store"\nmsgstr "S"\n', un('translations/id.po')],
-    ['translations/plural.po', 'msgid "x"\nmsgstr[1] "Saves"\n', 'msgid "x"\nmsgstr[1] "Stores"\n', NO_TEST],
     ['lang/cont.properties', 'a=Save \\\n  more\n', 'a=Store \\\n  more\n', un('lang/cont.properties')],
     ['lang/comment.properties', '# Save\na=b\n', '# Store\na=b\n', un('lang/comment.properties')],
     ['i18n/list.yaml', '- Save\n', '- Store\n', un('i18n/list.yaml')],
@@ -1268,7 +1269,6 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['i18n/hash.yaml', 'save: Save # c\n', 'save: Store # c\n', un('i18n/hash.yaml')],
     ['src/styles/start.css', 'a {\n  color:\nred;\n}\n', 'a {\n  color:\nblue;\n}\n', un('src/styles/start.css')],
     ['src/styles/two.css', 'a { border: 1px solid red; color: blue; }\n', 'a { border: 1px solid red; color: green; }\n', NO_TEST],
-    ['src/styles/mixin.scss', '@include theme(red);\n', '@include theme(blue);\n', un('src/styles/mixin.scss')],
     ['src/styles/grow.css', 'a { color: red; }\n', 'a { color: red; }\nb { color: red; }\n', un('src/styles/grow.css')],
     ['src/esc.js', 'say("Say \\"hi\\"");\n', 'say("Say \\"hey\\"");\n', 'it changes text inside program code in src/esc.js, and no check can tell whether people read that text or the program depends on it'],
     ['src/open.js', 'const s = "abc\n', 'const s = "abd\n', 'it changes program logic in src/open.js, and only wording and colours qualify'],
@@ -1287,14 +1287,24 @@ test('edge shapes of every kind give the exact verdict', async () => {
     // is harmless, a first line `---` that is never closed is no front matter, front matter
     // after a byte-order mark is still settings, an escaped scheme is still an address, and
     // a `value` inside another attribute's value is no `value` attribute.
-    ['src/components/Click.jsx', '  <button onClick={() => go(a > b)}>Save</button>\n', '  <button onClick={() => go(a > b)}>Store</button>\n', NO_TEST],
     ['src/pages/stray.html', '<p data-x=}>Save</p>\n', '<p data-x=}>Store</p>\n', NO_TEST],
     // An unclosed first-line `---` was no front matter; since every scanner fails closed
     // (2026-10-09) it is a front matter left open, and the change is unreadable.
     ['docs/rule.md', '---\nOld text.\n', '---\nNew text.\n', 'I could not read the change (docs/rule.md leaves a tag, quote, comment, block, fence or span open)'],
     ['docs/bom.md', '\uFEFF---\ntitle: a\n---\nBody.\n', '\uFEFF---\ntitle: b\n---\nBody.\n', 'it changes a setting in docs/bom.md, and settings changes are a common cause of outages'],
     ['locales/esc.json', '{\n  "help": "Help"\n}\n', '{\n  "help": "\\u006aavascript:alert()"\n}\n', un('locales/esc.json')],
-    ['src/pages/opt.html', '<option title="no value here">Red</option>\n', '<option title="no value here">Blue</option>\n', un('src/pages/opt.html')]
+    ['src/pages/opt.html', '<option title="no value here">Red</option>\n', '<option title="no value here">Blue</option>\n', un('src/pages/opt.html')],
+    // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
+    // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
+    // stay, and each now asserts the "not recognised" refusal.
+    ['src/components/Close.jsx', '  <span>Save</span>\n', '  <span>Store</span>\n', gone('src/components/Close.jsx')],
+    ['src/components/Shut.jsx', '  </span>Save</span>\n', '  </span>Store</span>\n', gone('src/components/Shut.jsx')],
+    ['src/components/Other.jsx', '  <span>Save</b>\n', '  <span>Store</b>\n', gone('src/components/Other.jsx')],
+    ['src/components/Longer.jsx', '  <span>Save</spanx>\n', '  <span>Store</spanx>\n', gone('src/components/Longer.jsx')],
+    ['translations/id.po', 'msgid "Save"\nmsgstr "S"\n', 'msgid "Store"\nmsgstr "S"\n', gone('translations/id.po')],
+    ['translations/plural.po', 'msgid "x"\nmsgstr[1] "Saves"\n', 'msgid "x"\nmsgstr[1] "Stores"\n', gone('translations/plural.po')],
+    ['src/styles/mixin.scss', '@include theme(red);\n', '@include theme(blue);\n', gone('src/styles/mixin.scss')],
+    ['src/components/Click.jsx', '  <button onClick={() => go(a > b)}>Save</button>\n', '  <button onClick={() => go(a > b)}>Store</button>\n', gone('src/components/Click.jsx')]
   ];
   const base = {};
   for (const [p, b] of shapes) base[p] = b;
@@ -1702,41 +1712,23 @@ test('round 4: components, code elements, conditional templates, variables, lite
   const shapes = [
     // Only HTML host elements carry wording: a lowercase name with no hyphen, in every
     // markup kind, and nothing anywhere inside a component.
-    ['src/pages/upper.html', '<DIV>Save</DIV>\n', '<DIV>Store</DIV>\n', un('src/pages/upper.html')],
+    // The fifth round (2026-10-09): element names are matched in any letter case, as HTML reads
+    // them, so `<DIV>` is the host element `div` and its text is wording (it was refused).
+    ['src/pages/upper.html', '<DIV>Save</DIV>\n', '<DIV>Store</DIV>\n', null],
     ['src/pages/inside.html', '<MyAction><b>charge</b></MyAction>\n', '<MyAction><b>refund</b></MyAction>\n', un('src/pages/inside.html')],
     ['src/pages/after.html', '<my-widget>x</my-widget>\n<p>Save</p>\n', '<my-widget>x</my-widget>\n<p>Store</p>\n', null],
-    ['src/components/Deep.jsx', 'export const D = () => <Box><p>Save</p></Box>;\n', 'export const D = () => <Box><p>Store</p></Box>;\n', un('src/components/Deep.jsx')],
-    ['src/components/Member.jsx', 'export const M = () => <ui.p>Save</ui.p>;\n', 'export const M = () => <ui.p>Store</ui.p>;\n', un('src/components/Member.jsx')],
-    ['src/components/Frag.jsx', 'export const F = () => <><p>Save</p></>;\n', 'export const F = () => <><p>Store</p></>;\n', null],
-    ['src/components/Head.svelte', '<svelte:head><title>Save</title></svelte:head>\n', '<svelte:head><title>Store</title></svelte:head>\n', un('src/components/Head.svelte')],
     // Code elements: in JSX too, and an end tag of another element does not leave one.
-    ['src/components/Kbd.jsx', 'export const K = () => <p><kbd>Ctrl</kbd></p>;\n', 'export const K = () => <p><kbd>Alt</kbd></p>;\n', un('src/components/Kbd.jsx')],
     ['src/pages/pre.html', '<pre></code>pip install requests</pre>\n', '<pre></code>pip install reqests</pre>\n', un('src/pages/pre.html')],
     ['src/pages/after-code.html', '<p><code>x</code> Save</p>\n', '<p><code>x</code> Store</p>\n', null],
     ['src/pages/after-code-tag.html', '<p><code>x</code><b>Save</b></p>\n', '<p><code>x</code><b>Store</b></p>\n', null],
     // Vue's conditional templates render; a loop or a slot template does not count as one.
-    ['src/components/Else.vue', '<template>\n  <div>\n    <template v-if="a">Hi</template>\n    <template v-else>Save</template>\n  </div>\n</template>\n', '<template>\n  <div>\n    <template v-if="a">Hi</template>\n    <template v-else>Store</template>\n  </div>\n</template>\n', null],
-    ['src/components/ElseIf.vue', '<template>\n  <template v-else-if="b"><p>Save</p></template>\n</template>\n', '<template>\n  <template v-else-if="b"><p>Store</p></template>\n</template>\n', null],
-    ['src/components/Loop.vue', '<template>\n  <template v-for="x in xs"><p>Save</p></template>\n</template>\n', '<template>\n  <template v-for="x in xs"><p>Store</p></template>\n</template>\n', un('src/components/Loop.vue')],
-    ['src/components/SlotIf.vue', '<template>\n  <template #x v-if="a"><p>Save</p></template>\n</template>\n', '<template>\n  <template #x v-if="a"><p>Store</p></template>\n</template>\n', un('src/components/SlotIf.vue')],
-    ['src/components/InSlot.vue', '<template>\n  <template #x><template v-if="a"><p>Save</p></template></template>\n</template>\n', '<template>\n  <template #x><template v-if="a"><p>Store</p></template></template>\n</template>\n', un('src/components/InSlot.vue')],
     // Variables and custom properties: any change to their values, colour or not.
-    ['src/styles/gap.less', '@gap: 4px;\na { color: red; }\n', '@gap: 8px;\na { color: red; }\n', setting('src/styles/gap.less')],
-    ['src/styles/map.scss', '$theme: (\n  main: red,\n  alt: blue\n);\n', '$theme: (\n  main: red,\n  alt: green\n);\n', setting('src/styles/map.scss')],
     ['src/styles/font.css', ':root { --font: "Old"; }\n', ':root { --font: "New"; }\n', setting('src/styles/font.css')],
-    ['src/styles/beside.scss', '$brand: #0a58ca;\na { color: red; }\n', '$brand: #0a58ca;\na { color: blue; }\n', null],
     ['src/styles/width.css', 'a { width: #fff; }\n', 'a { width: #000; }\n', un('src/styles/width.css')],
     ['src/styles/fill.css', 'path { fill: red; stroke: blue; outline-color: red; }\n', 'path { fill: blue; stroke: red; outline-color: blue; }\n', null],
     ['src/styles/design-tokens.css', '.a { border-color: red; }\n', '.a { border-color: blue; }\n', null],
     // reStructuredText: a quoted literal block, a nested code directive inside a prose one,
     // a prose directive's own text, and a paragraph that only mentions `::` mid-line.
-    ['docs/quoted.rst', 'Run this::\n\n> pip install requests\n', 'Run this::\n\n> pip install reqests\n', un('docs/quoted.rst')],
-    ['docs/nested.rst', '.. note::\n\n   Old words.\n\n   .. code-block:: sh\n\n      pip install requests\n', '.. note::\n\n   Old words.\n\n   .. code-block:: sh\n\n      pip install reqests\n', un('docs/nested.rst')],
-    ['docs/note-body.rst', '.. note::\n\n   Old words.\n\n   .. code-block:: sh\n\n      pip install requests\n', '.. note::\n\n   New words.\n\n   .. code-block:: sh\n\n      pip install requests\n', null],
-    ['docs/warning-line.rst', '.. warning:: Old words.\n', '.. warning:: New words.\n', null],
-    ['docs/to-raw.rst', '.. note:: Old words.\n', '.. raw:: Old words.\n', un('docs/to-raw.rst')],
-    ['docs/mid.rst', 'Use a :: in the middle, old words.\n\n   Quoted old words.\n', 'Use a :: in the middle, new words.\n\n   Quoted new words.\n', null],
-    ['docs/footnote.rst', 'Old words.\n\n.. [1] Old note.\n', 'Old words.\n\n.. [1] New note.\n', null],
     // Markdown lists: a fence inside an item whose content starts at column 4, a thematic
     // break that is no list item, and code after a list that has ended.
     ['docs/list-fence.md', '1.  Step:\n\n    ```\n    pip install requests\n    ```\n', '1.  Step:\n\n    ```\n    pip install reqests\n    ```\n', un('docs/list-fence.md')],
@@ -1749,14 +1741,37 @@ test('round 4: components, code elements, conditional templates, variables, lite
     ['docs/item-fence.md', '- ```\n  pip install requests\n  ```\n', '- ```\n  pip install reqests\n  ```\n', un('docs/item-fence.md')],
     ['docs/item-doctest.md', '- >>> print("old")\n  old\n', '- >>> print("old")\n  new\n', un('docs/item-doctest.md')],
     ['docs/two-defs.md', 'See [it][b].\n\n[a]:\n[b]: /one\n', 'See [it][b].\n\n[a]:\n[b]: /two\n', un('docs/two-defs.md')],
-    ['docs/note-literal.rst', '.. note:: Run this::\n\n   pip install requests\n', '.. note:: Run this::\n\n   pip install reqests\n', un('docs/note-literal.rst')],
     // TypeScript generics with `extends`, and a reference definition with an inline title.
-    ['src/components/Ext.tsx', 'export const f = <T extends object>(x: T) => x;\nexport const s = "<b>Save</b>";\n', 'export const f = <T extends object>(x: T) => x;\nexport const s = "<b>Store</b>";\n', un('src/components/Ext.tsx')],
-    ['src/components/Const.tsx', 'export const f = <const T,>(x: T) => x;\nexport const s = "<b>Save</b>";\n', 'export const f = <const T,>(x: T) => x;\nexport const s = "<b>Store</b>";\n', un('src/components/Const.tsx')],
-    ['src/components/In.tsx', 'export const P = () => <in >Save</in>;\n', 'export const P = () => <in >Store</in>;\n', null],
-    ['src/components/Arrow.tsx', 'export const f = <T extends () => void,>(x: T) => x;\nexport const P = () => <p>Save</p>;\n', 'export const f = <T extends () => void,>(x: T) => x;\nexport const P = () => <p>Store</p>;\n', null],
     ['docs/inline-title.md', 'See [it][a].\n\n[a]: /u\n"Old title"\n', 'See [it][a].\n\n[a]: /u\n"New title"\n', un('docs/inline-title.md')],
-    ['docs/after-def.md', 'See [it][a].\n\n[a]: /u\nOld words.\n', 'See [it][a].\n\n[a]: /u\nNew words.\n', null]
+    ['docs/after-def.md', 'See [it][a].\n\n[a]: /u\nOld words.\n', 'See [it][a].\n\n[a]: /u\nNew words.\n', null],
+    // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
+    // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
+    // stay, and each now asserts the "not recognised" refusal.
+    ['src/components/Deep.jsx', 'export const D = () => <Box><p>Save</p></Box>;\n', 'export const D = () => <Box><p>Store</p></Box>;\n', gone('src/components/Deep.jsx')],
+    ['src/components/Member.jsx', 'export const M = () => <ui.p>Save</ui.p>;\n', 'export const M = () => <ui.p>Store</ui.p>;\n', gone('src/components/Member.jsx')],
+    ['src/components/Frag.jsx', 'export const F = () => <><p>Save</p></>;\n', 'export const F = () => <><p>Store</p></>;\n', gone('src/components/Frag.jsx')],
+    ['src/components/Head.svelte', '<svelte:head><title>Save</title></svelte:head>\n', '<svelte:head><title>Store</title></svelte:head>\n', gone('src/components/Head.svelte')],
+    ['src/components/Kbd.jsx', 'export const K = () => <p><kbd>Ctrl</kbd></p>;\n', 'export const K = () => <p><kbd>Alt</kbd></p>;\n', gone('src/components/Kbd.jsx')],
+    ['src/components/Else.vue', '<template>\n  <div>\n    <template v-if="a">Hi</template>\n    <template v-else>Save</template>\n  </div>\n</template>\n', '<template>\n  <div>\n    <template v-if="a">Hi</template>\n    <template v-else>Store</template>\n  </div>\n</template>\n', gone('src/components/Else.vue')],
+    ['src/components/ElseIf.vue', '<template>\n  <template v-else-if="b"><p>Save</p></template>\n</template>\n', '<template>\n  <template v-else-if="b"><p>Store</p></template>\n</template>\n', gone('src/components/ElseIf.vue')],
+    ['src/components/Loop.vue', '<template>\n  <template v-for="x in xs"><p>Save</p></template>\n</template>\n', '<template>\n  <template v-for="x in xs"><p>Store</p></template>\n</template>\n', gone('src/components/Loop.vue')],
+    ['src/components/SlotIf.vue', '<template>\n  <template #x v-if="a"><p>Save</p></template>\n</template>\n', '<template>\n  <template #x v-if="a"><p>Store</p></template>\n</template>\n', gone('src/components/SlotIf.vue')],
+    ['src/components/InSlot.vue', '<template>\n  <template #x><template v-if="a"><p>Save</p></template></template>\n</template>\n', '<template>\n  <template #x><template v-if="a"><p>Store</p></template></template>\n</template>\n', gone('src/components/InSlot.vue')],
+    ['src/styles/gap.less', '@gap: 4px;\na { color: red; }\n', '@gap: 8px;\na { color: red; }\n', gone('src/styles/gap.less')],
+    ['src/styles/map.scss', '$theme: (\n  main: red,\n  alt: blue\n);\n', '$theme: (\n  main: red,\n  alt: green\n);\n', gone('src/styles/map.scss')],
+    ['src/styles/beside.scss', '$brand: #0a58ca;\na { color: red; }\n', '$brand: #0a58ca;\na { color: blue; }\n', gone('src/styles/beside.scss')],
+    ['docs/quoted.rst', 'Run this::\n\n> pip install requests\n', 'Run this::\n\n> pip install reqests\n', gone('docs/quoted.rst')],
+    ['docs/nested.rst', '.. note::\n\n   Old words.\n\n   .. code-block:: sh\n\n      pip install requests\n', '.. note::\n\n   Old words.\n\n   .. code-block:: sh\n\n      pip install reqests\n', gone('docs/nested.rst')],
+    ['docs/note-body.rst', '.. note::\n\n   Old words.\n\n   .. code-block:: sh\n\n      pip install requests\n', '.. note::\n\n   New words.\n\n   .. code-block:: sh\n\n      pip install requests\n', gone('docs/note-body.rst')],
+    ['docs/warning-line.rst', '.. warning:: Old words.\n', '.. warning:: New words.\n', gone('docs/warning-line.rst')],
+    ['docs/to-raw.rst', '.. note:: Old words.\n', '.. raw:: Old words.\n', gone('docs/to-raw.rst')],
+    ['docs/mid.rst', 'Use a :: in the middle, old words.\n\n   Quoted old words.\n', 'Use a :: in the middle, new words.\n\n   Quoted new words.\n', gone('docs/mid.rst')],
+    ['docs/footnote.rst', 'Old words.\n\n.. [1] Old note.\n', 'Old words.\n\n.. [1] New note.\n', gone('docs/footnote.rst')],
+    ['docs/note-literal.rst', '.. note:: Run this::\n\n   pip install requests\n', '.. note:: Run this::\n\n   pip install reqests\n', gone('docs/note-literal.rst')],
+    ['src/components/Ext.tsx', 'export const f = <T extends object>(x: T) => x;\nexport const s = "<b>Save</b>";\n', 'export const f = <T extends object>(x: T) => x;\nexport const s = "<b>Store</b>";\n', gone('src/components/Ext.tsx')],
+    ['src/components/Const.tsx', 'export const f = <const T,>(x: T) => x;\nexport const s = "<b>Save</b>";\n', 'export const f = <const T,>(x: T) => x;\nexport const s = "<b>Store</b>";\n', gone('src/components/Const.tsx')],
+    ['src/components/In.tsx', 'export const P = () => <in >Save</in>;\n', 'export const P = () => <in >Store</in>;\n', gone('src/components/In.tsx')],
+    ['src/components/Arrow.tsx', 'export const f = <T extends () => void,>(x: T) => x;\nexport const P = () => <p>Save</p>;\n', 'export const f = <T extends () => void,>(x: T) => x;\nexport const P = () => <p>Store</p>;\n', gone('src/components/Arrow.tsx')]
   ];
   const base = {};
   for (const [p, b] of shapes) base[p] = b;
@@ -1785,21 +1800,10 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
     ['src/pages/note.html', '<p>Save</p>\n<!-- note\n', '<p>Store</p>\n<!-- note\n', open('src/pages/note.html')],
     ['src/pages/script.html', '<p>Save</p>\n<script>\nrun();\n', '<p>Store</p>\n<script>\nrun();\n', open('src/pages/script.html')],
     ['src/pages/tag.html', '<p>Save</p>\n<a href="/x"\n', '<p>Store</p>\n<a href="/x"\n', open('src/pages/tag.html')],
-    ['src/components/Mustache.vue', '<template>\n  <p>Save</p>\n  <p>{{ msg </p>\n</template>\n', '<template>\n  <p>Store</p>\n  <p>{{ msg </p>\n</template>\n', open('src/components/Mustache.vue')],
-    ['src/components/Root.vue', '<template>\n  <p>Save</p>\n', '<template>\n  <p>Store</p>\n', open('src/components/Root.vue')],
     ['src/pages/cdata-open.html', '<p>Save</p>\n<svg><![CDATA[ x\n', '<p>Store</p>\n<svg><![CDATA[ x\n', open('src/pages/cdata-open.html')],
     // JSX and JavaScript: an unclosed brace, comment, element, string, template and
     // regular expression; a closing brace with nothing open.
-    ['src/components/Brace.jsx', 'export const P = () => <p>Save</p>;\nconst x = {\n', 'export const P = () => <p>Store</p>;\nconst x = {\n', open('src/components/Brace.jsx')],
-    ['src/components/Shut.jsx', 'export const P = () => <p>Save</p>;\n}\n', 'export const P = () => <p>Store</p>;\n}\n', lost('src/components/Shut.jsx')],
-    ['src/components/Comment.jsx', 'export const P = () => <p>Save</p>;\n/* note\n', 'export const P = () => <p>Store</p>;\n/* note\n', open('src/components/Comment.jsx')],
-    ['src/components/Unshut.jsx', 'export const P = () => <div><p>Save</p>;\n', 'export const P = () => <div><p>Store</p>;\n', open('src/components/Unshut.jsx')],
-    ['src/components/Line.jsx', 'const s = "abc\nexport const P = () => <p>Save</p>;\n', 'const s = "abc\nexport const P = () => <p>Store</p>;\n', lost('src/components/Line.jsx')],
-    ['src/components/Str.jsx', "export const P = () => <p>Save</p>;\nconst s = 'abc", "export const P = () => <p>Store</p>;\nconst s = 'abc", open('src/components/Str.jsx')],
-    ['src/components/Tick.jsx', 'export const P = () => <p>Save</p>;\nconst t = `abc', 'export const P = () => <p>Store</p>;\nconst t = `abc', open('src/components/Tick.jsx')],
-    ['src/components/Re.jsx', 'export const P = () => <p>Save</p>;\nconst q = /abc', 'export const P = () => <p>Store</p>;\nconst q = /abc', open('src/components/Re.jsx')],
     // The `.tsx` generic arrow function (item B9), a regression guard.
-    ['src/components/GenGuard.tsx', 'export const f = <T,>(x: T) => x;\nexport const s = "<b>Save</b>";\n', 'export const f = <T,>(x: T) => x;\nexport const s = "<b>Store</b>";\n', un('src/components/GenGuard.tsx')],
     // Stylesheets: an unclosed comment, block and string; a closing brace with nothing open.
     ['src/styles/note.css', 'a { color: red; }\n/* note\n', 'a { color: blue; }\n/* note\n', open('src/styles/note.css')],
     ['src/styles/block.css', 'a { color: red; }\nb {\n', 'a { color: blue; }\nb {\n', open('src/styles/block.css')],
@@ -1813,15 +1817,12 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
     ['docs/brace-open.md', 'Old words {{ x\n', 'New words {{ x\n', open('docs/brace-open.md')],
     ['docs/comment-open.md', 'Old words.\n\n<!-- note\n', 'New words.\n\n<!-- note\n', open('docs/comment-open.md')],
     // reStructuredText: a role span or inline literal left open.
-    ['docs/span-open.rst', 'Old words.\n\nPress :kbd:`Ctrl now.\n', 'New words.\n\nPress :kbd:`Ctrl now.\n', open('docs/span-open.rst')],
-    ['docs/literal-open.rst', 'Old words.\n\nRun ``pip now.\n', 'New words.\n\nRun ``pip now.\n', open('docs/literal-open.rst')],
     // One side well-formed and the other not.
     ['src/pages/one-side.html', '<p>Save</p>\n<!-- c -->\n', '<p>Store</p>\n<!-- c --\n', open('src/pages/one-side.html')],
     ['docs/one-side.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n``\n', open('docs/one-side.md')],
     // Well-formed files still qualify.
     ['src/pages/closed.html', '<p>Save</p>\n<!-- note -->\n<script>run();</script>\n', '<p>Store</p>\n<!-- note -->\n<script>run();</script>\n', null],
     ['docs/closed.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n```\n', null],
-    ['docs/closed.rst', 'Old words.\n\nPress :kbd:`Ctrl` now.\n', 'New words.\n\nPress :kbd:`Ctrl` now.\n', null],
     // A catalogue line whose state at its start is not a fresh entry: inside a YAML block
     // scalar, a quoted value or a flow collection begun above, or a properties value
     // continued from the line above.
@@ -1833,9 +1834,26 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
     ['i18n/after-block.yaml', 'desc: |\n  Long text.\nsave: Save\n', 'desc: |\n  Long text.\nsave: Store\n', null],
     ['lang/after-cont.properties', 'a=Save \\\n  more\nb=Cancel\n', 'a=Save \\\n  more\nb=Close\n', null],
     // A file emptied is the content of a removal, never wording (found by the cut-short property case).
-    ['docs/emptied.rst', 'Old words.\n', '', un('docs/emptied.rst')],
     ['notes/emptied.txt', 'Old words.\n', '', un('notes/emptied.txt')],
-    ['notes/filled.txt', '', 'New words.\n', un('notes/filled.txt')]
+    ['notes/filled.txt', '', 'New words.\n', un('notes/filled.txt')],
+    // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
+    // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
+    // stay, and each now asserts the "not recognised" refusal.
+    ['src/components/Mustache.vue', '<template>\n  <p>Save</p>\n  <p>{{ msg </p>\n</template>\n', '<template>\n  <p>Store</p>\n  <p>{{ msg </p>\n</template>\n', gone('src/components/Mustache.vue')],
+    ['src/components/Root.vue', '<template>\n  <p>Save</p>\n', '<template>\n  <p>Store</p>\n', gone('src/components/Root.vue')],
+    ['src/components/Brace.jsx', 'export const P = () => <p>Save</p>;\nconst x = {\n', 'export const P = () => <p>Store</p>;\nconst x = {\n', gone('src/components/Brace.jsx')],
+    ['src/components/Shut.jsx', 'export const P = () => <p>Save</p>;\n}\n', 'export const P = () => <p>Store</p>;\n}\n', gone('src/components/Shut.jsx')],
+    ['src/components/Comment.jsx', 'export const P = () => <p>Save</p>;\n/* note\n', 'export const P = () => <p>Store</p>;\n/* note\n', gone('src/components/Comment.jsx')],
+    ['src/components/Unshut.jsx', 'export const P = () => <div><p>Save</p>;\n', 'export const P = () => <div><p>Store</p>;\n', gone('src/components/Unshut.jsx')],
+    ['src/components/Line.jsx', 'const s = "abc\nexport const P = () => <p>Save</p>;\n', 'const s = "abc\nexport const P = () => <p>Store</p>;\n', gone('src/components/Line.jsx')],
+    ['src/components/Str.jsx', "export const P = () => <p>Save</p>;\nconst s = 'abc", "export const P = () => <p>Store</p>;\nconst s = 'abc", gone('src/components/Str.jsx')],
+    ['src/components/Tick.jsx', 'export const P = () => <p>Save</p>;\nconst t = `abc', 'export const P = () => <p>Store</p>;\nconst t = `abc', gone('src/components/Tick.jsx')],
+    ['src/components/Re.jsx', 'export const P = () => <p>Save</p>;\nconst q = /abc', 'export const P = () => <p>Store</p>;\nconst q = /abc', gone('src/components/Re.jsx')],
+    ['src/components/GenGuard.tsx', 'export const f = <T,>(x: T) => x;\nexport const s = "<b>Save</b>";\n', 'export const f = <T,>(x: T) => x;\nexport const s = "<b>Store</b>";\n', gone('src/components/GenGuard.tsx')],
+    ['docs/span-open.rst', 'Old words.\n\nPress :kbd:`Ctrl now.\n', 'New words.\n\nPress :kbd:`Ctrl now.\n', gone('docs/span-open.rst')],
+    ['docs/literal-open.rst', 'Old words.\n\nRun ``pip now.\n', 'New words.\n\nRun ``pip now.\n', gone('docs/literal-open.rst')],
+    ['docs/closed.rst', 'Old words.\n\nPress :kbd:`Ctrl` now.\n', 'New words.\n\nPress :kbd:`Ctrl` now.\n', gone('docs/closed.rst')],
+    ['docs/emptied.rst', 'Old words.\n', '', gone('docs/emptied.rst')]
   ];
   const base = {};
   for (const [p, b] of shapes) base[p] = b;
@@ -1871,11 +1889,6 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     // JavaScript around JSX: a template literal with a substitution, a regular expression
     // with a class and flags, a self-closing element, an unclosed string and regular
     // expression at the end of the file.
-    ['src/components/Tpl.jsx', 'export const T = () => <p className={`a ${b}`}>Save</p>;\n', 'export const T = () => <p className={`a ${b}`}>Store</p>;\n', null],
-    ['src/components/Re.jsx', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Save</p>;\nconst q = /abc', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Store</p>;\nconst q = /abc', open('src/components/Re.jsx')],
-    ['src/components/Str.jsx', "export const P = () => <p>Save</p>;\nconst s = 'abc", "export const P = () => <p>Store</p>;\nconst s = 'abc", open('src/components/Str.jsx')],
-    ['src/components/Tick.jsx', 'export const P = () => <p>Save</p>;\nconst t = `abc', 'export const P = () => <p>Store</p>;\nconst t = `abc', open('src/components/Tick.jsx')],
-    ['src/components/Gen.tsx', 'const f = <T,>(x: T) => x;\nexport const P = () => <p>Save</p>;\n', 'const f = <T,>(x: T) => x;\nexport const P = () => <p>Store</p>;\n', null],
     // A script block's escape states: `</script>` inside `<!--<script>` does not end it.
     ['src/pages/escaped.html', '<script><!--<script></script><b>Save</b></script>\n<p>Hi</p>\n', '<script><!--<script></script><b>Store</b></script>\n<p>Hi</p>\n', un('src/pages/escaped.html')],
     ['src/pages/escaped-after.html', '<script><!--<script></script>--></script>\n<p>Save</p>\n', '<script><!--<script></script>--></script>\n<p>Store</p>\n', null],
@@ -1884,15 +1897,9 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     ['src/pages/title.html', '<title>Save</title>\n', '<title>Store</title>\n', null],
     ['src/pages/tpl.html', '<template><p>Save</p></template>\n', '<template><p>Store</p></template>\n', un('src/pages/tpl.html')],
     // A conditional template inside the component's markup renders, so its text is wording.
-    ['src/components/Slot.vue', '<template>\n  <template v-if="a"><p>Save</p></template>\n  <p>Hi</p>\n</template>\n', '<template>\n  <template v-if="a"><p>Store</p></template>\n  <p>Hi</p>\n</template>\n', null],
-    ['src/components/After.vue', '<template>\n  <template v-if="a"><p>Hi</p></template>\n  <p>Save</p>\n</template>\n', '<template>\n  <template v-if="a"><p>Hi</p></template>\n  <p>Store</p>\n</template>\n', null],
     ['src/pages/cdata.html', '<svg><![CDATA[ a > <b>Save</b> ]]></svg>\n', '<svg><![CDATA[ a > <b>Store</b> ]]></svg>\n', un('src/pages/cdata.html')],
-    ['src/components/Each.svelte', '{#if a}<p>Hi</p>{/if}\n<p>Save</p>\n', '{#if a}<p>Hi</p>{/if}\n<p>Store</p>\n', null],
     // Catalogue escapes: Gettext's hexadecimal and octal, YAML's \x and \u; an unknown or
     // short escape is not wording.
-    ['translations/esc.po', 'msgid "x"\nmsgstr "Speichern"\n', 'msgid "x"\nmsgstr "Sp\\x65ichern \\101b"\n', null],
-    ['translations/bad.po', 'msgid "x"\nmsgstr "Speichern"\n', 'msgid "x"\nmsgstr "Spei\\qchern"\n', un('translations/bad.po')],
-    ['translations/nohex.po', 'msgid "x"\nmsgstr "Speichern"\n', 'msgid "x"\nmsgstr "Spei\\xzhern"\n', un('translations/nohex.po')],
     ['i18n/esc.yaml', 'title: "Save"\n', 'title: "Sto\\x72e"\n', null],
     ['i18n/at.yaml', 'title: "Save"\n', 'title: "Mail \\u0040x"\n', risk('i18n/at.yaml')],
     ['i18n/short.yaml', 'title: "Save"\n', 'title: "Sto\\x7"\n', un('i18n/short.yaml')],
@@ -1904,12 +1911,6 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     // Stylesheets: SCSS line comments, Sass's indented blocks, a colour function in its
     // space form.
     // A Sass variable is a setting, whatever colour it holds (the security attack, 2026-10-09).
-    ['src/styles/main.scss', '$brand: #0a58ca; // main\n', '$brand: #0b5ed7; // main\n', setting('src/styles/main.scss')],
-    ['src/styles/note.scss', '$brand: #0a58ca; // main\n', '$brand: #0a58ca; // other\n', un('src/styles/note.scss')],
-    ['src/styles/end.scss', 'a { color: #0a58ca; } // main', 'a { color: #0b5ed7; } // main', null],
-    ['src/styles/block.sass', 'a\n  color: red\n\n  display: none\n', 'a\n  color: blue\n\n  display: none\n', null],
-    ['src/styles/sel.sass', 'nav:hover #add\n  display: none\n', 'nav:hover #bad\n  display: none\n', un('src/styles/sel.sass')],
-    ['src/styles/top.sass', 'color: red\n', 'color: blue\n', un('src/styles/top.sass')],
     ['src/styles/space.css', 'a { color: rgb(1 2 3 / 50%); }\n', 'a { color: rgb(1 2 4 / 50%); }\n', null],
     ['src/styles/badfn.css', 'a { color: rgb(1 2 3); }\n', 'a { color: rgb(1 2 3 / 4 / 5); }\n', un('src/styles/badfn.css')],
     ['src/styles/str.css', 'a { color: red; content: "x"; }\n', 'a { color: red; content: "y"; }\n', un('src/styles/str.css')],
@@ -1924,26 +1925,46 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     ['docs/escaped.md', 'See [x](a\\)b) old.\n', 'See [x](a\\)b) new.\n', null],
     ['docs/after-code.md', 'Text.\n\n    code here\n\nOld words.\n', 'Text.\n\n    code here\n\nNew words.\n', null],
     ['docs/unfence.md', '```\ncode\n```\nOld words.\n', '```\ncode\n\nOld words.\n', open('docs/unfence.md')],
-    ['docs/sub.rst', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>one</b>\n\nOld words.\n', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>two</b>\n\nOld words.\n', un('docs/sub.rst')],
-    ['docs/note.rst', 'Title\n=====\n\n.. note::\n\n   Old words.\n', 'Title\n=====\n\n.. note::\n\n   New words.\n', null],
-    ['docs/jinja.rst', 'Title\n=====\n\nOld words.\n', 'Title\n=====\n\nNew {{ words }}.\n', un('docs/jinja.rst')],
     // reStructuredText spans that are never wording (the commit security review, 2026-10-09):
     // a link target, a hyperlink reference's target, a named reference, an inline literal,
     // interpreted text without a role, a default role; plain text beside them is wording.
-    ['docs/target.rst', 'Old words.\n\n.. _guide: /one\n', 'Old words.\n\n.. _guide: /two\n', un('docs/target.rst')],
-    ['docs/hyper.rst', 'See `Go <a.html>`_ now.\n', 'See `Go <b.html>`_ now.\n', un('docs/hyper.rst')],
-    ['docs/hyper-text.rst', 'See `Go <a.html>`_ now.\n', 'See `Go <a.html>`_ today.\n', null],
-    ['docs/named.rst', 'See `Guide`_ now.\n', 'See `Other`_ now.\n', un('docs/named.rst')],
-    ['docs/literal.rst', 'Run ``pip install requests`` now.\n', 'Run ``pip install reqests`` now.\n', un('docs/literal.rst')],
-    ['docs/interp.rst', 'Read `old` now.\n', 'Read `new` now.\n', un('docs/interp.rst')],
-    ['docs/default.rst', 'Old words.\n', '.. default-role:: raw-html\n\nOld words.\n', un('docs/default.rst')],
     // Instruction files by class, and documentation in any other dot-folder.
     ['docs/GEMINI.local.md', 'Old rule.\n', 'New rule.\n', un('docs/GEMINI.local.md')],
     ['src/copilot-instructions.md', 'Old rule.\n', 'New rule.\n', un('src/copilot-instructions.md')],
     ['.vscode/notes.txt', 'Old note.\n', 'New note.\n', un('.vscode/notes.txt')],
     // GitHub's assistant files stay governing under `.github/`.
     ['.github/instructions/web.instructions.md', 'Old rule.\n', 'New rule.\n', un('.github/instructions/web.instructions.md')],
-    ['.github/ISSUE_TEMPLATE/bug.md', 'Describe the old bug.\n', 'Describe the new bug.\n', null]
+    ['.github/ISSUE_TEMPLATE/bug.md', 'Describe the old bug.\n', 'Describe the new bug.\n', null],
+    // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
+    // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
+    // stay, and each now asserts the "not recognised" refusal.
+    ['src/components/Tpl.jsx', 'export const T = () => <p className={`a ${b}`}>Save</p>;\n', 'export const T = () => <p className={`a ${b}`}>Store</p>;\n', gone('src/components/Tpl.jsx')],
+    ['src/components/Re.jsx', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Save</p>;\nconst q = /abc', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Store</p>;\nconst q = /abc', gone('src/components/Re.jsx')],
+    ['src/components/Str.jsx', "export const P = () => <p>Save</p>;\nconst s = 'abc", "export const P = () => <p>Store</p>;\nconst s = 'abc", gone('src/components/Str.jsx')],
+    ['src/components/Tick.jsx', 'export const P = () => <p>Save</p>;\nconst t = `abc', 'export const P = () => <p>Store</p>;\nconst t = `abc', gone('src/components/Tick.jsx')],
+    ['src/components/Gen.tsx', 'const f = <T,>(x: T) => x;\nexport const P = () => <p>Save</p>;\n', 'const f = <T,>(x: T) => x;\nexport const P = () => <p>Store</p>;\n', gone('src/components/Gen.tsx')],
+    ['src/components/Slot.vue', '<template>\n  <template v-if="a"><p>Save</p></template>\n  <p>Hi</p>\n</template>\n', '<template>\n  <template v-if="a"><p>Store</p></template>\n  <p>Hi</p>\n</template>\n', gone('src/components/Slot.vue')],
+    ['src/components/After.vue', '<template>\n  <template v-if="a"><p>Hi</p></template>\n  <p>Save</p>\n</template>\n', '<template>\n  <template v-if="a"><p>Hi</p></template>\n  <p>Store</p>\n</template>\n', gone('src/components/After.vue')],
+    ['src/components/Each.svelte', '{#if a}<p>Hi</p>{/if}\n<p>Save</p>\n', '{#if a}<p>Hi</p>{/if}\n<p>Store</p>\n', gone('src/components/Each.svelte')],
+    ['translations/esc.po', 'msgid "x"\nmsgstr "Speichern"\n', 'msgid "x"\nmsgstr "Sp\\x65ichern \\101b"\n', gone('translations/esc.po')],
+    ['translations/bad.po', 'msgid "x"\nmsgstr "Speichern"\n', 'msgid "x"\nmsgstr "Spei\\qchern"\n', gone('translations/bad.po')],
+    ['translations/nohex.po', 'msgid "x"\nmsgstr "Speichern"\n', 'msgid "x"\nmsgstr "Spei\\xzhern"\n', gone('translations/nohex.po')],
+    ['src/styles/main.scss', '$brand: #0a58ca; // main\n', '$brand: #0b5ed7; // main\n', gone('src/styles/main.scss')],
+    ['src/styles/note.scss', '$brand: #0a58ca; // main\n', '$brand: #0a58ca; // other\n', gone('src/styles/note.scss')],
+    ['src/styles/end.scss', 'a { color: #0a58ca; } // main', 'a { color: #0b5ed7; } // main', gone('src/styles/end.scss')],
+    ['src/styles/block.sass', 'a\n  color: red\n\n  display: none\n', 'a\n  color: blue\n\n  display: none\n', gone('src/styles/block.sass')],
+    ['src/styles/sel.sass', 'nav:hover #add\n  display: none\n', 'nav:hover #bad\n  display: none\n', gone('src/styles/sel.sass')],
+    ['src/styles/top.sass', 'color: red\n', 'color: blue\n', gone('src/styles/top.sass')],
+    ['docs/sub.rst', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>one</b>\n\nOld words.\n', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>two</b>\n\nOld words.\n', gone('docs/sub.rst')],
+    ['docs/note.rst', 'Title\n=====\n\n.. note::\n\n   Old words.\n', 'Title\n=====\n\n.. note::\n\n   New words.\n', gone('docs/note.rst')],
+    ['docs/jinja.rst', 'Title\n=====\n\nOld words.\n', 'Title\n=====\n\nNew {{ words }}.\n', gone('docs/jinja.rst')],
+    ['docs/target.rst', 'Old words.\n\n.. _guide: /one\n', 'Old words.\n\n.. _guide: /two\n', gone('docs/target.rst')],
+    ['docs/hyper.rst', 'See `Go <a.html>`_ now.\n', 'See `Go <b.html>`_ now.\n', gone('docs/hyper.rst')],
+    ['docs/hyper-text.rst', 'See `Go <a.html>`_ now.\n', 'See `Go <a.html>`_ today.\n', gone('docs/hyper-text.rst')],
+    ['docs/named.rst', 'See `Guide`_ now.\n', 'See `Other`_ now.\n', gone('docs/named.rst')],
+    ['docs/literal.rst', 'Run ``pip install requests`` now.\n', 'Run ``pip install reqests`` now.\n', gone('docs/literal.rst')],
+    ['docs/interp.rst', 'Read `old` now.\n', 'Read `new` now.\n', gone('docs/interp.rst')],
+    ['docs/default.rst', 'Old words.\n', '.. default-role:: raw-html\n\nOld words.\n', gone('docs/default.rst')]
   ];
   const base = {};
   for (const [p, b] of shapes) base[p] = b;
@@ -1955,4 +1976,119 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     if (expected === null) assertChecking(res, [p]);
     else assert.equal(res.text, refusal(expected), `${p}: ${JSON.stringify(res)}`);
   }
+});
+
+// The fifth round (2026-10-09): the fixes that still apply after the owner's decision to
+// keep only the formats the check reads exactly. Each trap answered `checking` on
+// `6de2f75c`. [fix, path, base content, new content, the clause, or null for `checking`]
+test('round 5: host elements, the element stack, MDX, backtick pairing, block quotes, labels, stylesheet names, colour-named custom properties', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
+  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  const area = (f, word) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
+  const sql = ['SELECT name FROM users', 'SELECT pass FROM admins'];
+  const pip = ['pip install requests', 'pip install reqests'];
+  const rm = ['rm -rf build', 'rm -rf dist'];
+  /** One row from a template holding `@`, replaced by the old and the new text. */
+  const row = (fix, p, template, [o, n], expected) => [fix, p, template.replace('@', o), template.replace('@', n), expected];
+  const shapes = [
+    // 1. Host elements are a fixed list (HTML, SVG, MathML), matched in any letter case; an
+    // element with an `is` attribute, a custom element and an unknown name hold their text.
+    row(1, 'src/pages/is.html', '<button is="run-sql">@</button>\n', sql, un('src/pages/is.html')),
+    row(1, 'src/pages/is-upper.html', '<P IS="x">@</P>\n', ['Save', 'Store'], un('src/pages/is-upper.html')),
+    row(1, 'src/pages/runsql.html', '<runsql>@</runsql>\n', sql, un('src/pages/runsql.html')),
+    row(1, 'src/pages/mixed.html', '<DIV>@</div>\n', ['Save', 'Store'], null),
+    row(1, 'src/pages/svg-text.html', '<svg><text>@</text><foreignObject><p>x</p></foreignObject></svg>\n', ['Save', 'Store'], null),
+    row(1, 'src/pages/math.html', '<math><mtext>@</mtext></math>\n', ['Save', 'Store'], null),
+    // 2. A stack of open elements: an end tag that does not close the top of the stack while
+    // an element that holds text is open cannot be followed.
+    row(2, 'src/pages/stack.html', '<run-sql><div></run-sql>@</div></run-sql>\n', sql, lost('src/pages/stack.html')),
+    row(2, 'docs/stack.md', 'Text.\n\n<run-sql><div></run-sql>@</div></run-sql>\n', sql, lost('docs/stack.md')),
+    row(2, 'src/pages/implied.html', '<ul><li>One<li>@</ul>\n<p>a<br>b</p>\n', ['Save', 'Store'], null),
+    row(2, 'src/pages/stray.html', '<p>@</p></b></p>\n', ['Save', 'Store'], null),
+    row(2, 'src/pages/held-implied.html', '<my-card><p>one<p>two</my-card>\n<p>@</p>\n', ['Save', 'Store'], lost('src/pages/held-implied.html')),
+    row(2, 'src/pages/self-closed.html', '<my-widget/>\n<p>@</p>\n', ['Save', 'Store'], un('src/pages/self-closed.html')),
+    row(2, 'src/pages/after-held.html', '<my-card><p>one</p></my-card>\n<p>@</p>\n', ['Save', 'Store'], null),
+    // 3. Markdown that may be built as MDX: a brace in the changed prose and an `import` or
+    // `export` block are code.
+    row(3, 'docs/mdx-brace.md', 'Hello {eval(@)} there.\n', ['name', 'code'], un('docs/mdx-brace.md')),
+    row(3, 'docs/mdx-open.md', 'Hello {\n  eval(@)\n} there.\n', ['name', 'code'], un('docs/mdx-open.md')),
+    row(3, 'docs/mdx-beside.md', 'Hello {name}. @ words.\n', ['Old', 'New'], un('docs/mdx-beside.md')),
+    row(3, 'docs/mdx-import.md', "import Chart from './@'\n\nWords.\n", ['chart', 'other'], un('docs/mdx-import.md')),
+    row(3, 'docs/mdx-wrap.md', "import Chart\n  from './@'\n\nWords.\n", ['chart', 'other'], un('docs/mdx-wrap.md')),
+    row(3, 'docs/mdx-export.md', "export const meta = '@'\n\nWords.\n", ['old', 'new'], un('docs/mdx-export.md')),
+    row(3, 'docs/mdx-far.md', '<p>Hello {name}</p>\n\n@ words.\n', ['Old', 'New'], null),
+    row(3, 'docs/important.md', 'important @ words.\n', ['old', 'new'], null),
+    // 4. Backticks pair inside one paragraph or heading, never across a blank line or the
+    // start of a block; where a table cell, an escape or a tag makes the pairing uncertain,
+    // everything from the first to the last backtick is compared exactly.
+    row(4, 'docs/tick-para.md', 'A lone ` here.\n\nRun `@` now.\n', rm, un('docs/tick-para.md')),
+    row(4, 'docs/tick-heading.md', '# A lone ` here\nRun `@` now.\n', rm, un('docs/tick-heading.md')),
+    row(4, 'docs/tick-list.md', '- a lone ` here\n- run `@` now\n', rm, un('docs/tick-list.md')),
+    row(4, 'docs/tick-setext.md', 'A lone ` here\n===\nRun `@` now.\n', rm, un('docs/tick-setext.md')),
+    row(4, 'docs/tick-break.md', 'A lone ` here\n* * *\nRun `@` now.\n', rm, un('docs/tick-break.md')),
+    row(4, 'docs/tick-quote.md', 'A lone ` here\n> Run `@` now.\n', rm, un('docs/tick-quote.md')),
+    row(4, 'docs/tick-cell.md', '| ` | `@` |\n', rm, un('docs/tick-cell.md')),
+    row(4, 'docs/tick-escape.md', 'A \\` then `@` now.\n', rm, un('docs/tick-escape.md')),
+    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, un('docs/tick-tag.md')),
+    row(4, 'docs/tick-lazy.md', '> a `@\nc` d\n', ['b', 'x'], un('docs/tick-lazy.md')),
+    row(4, 'docs/tick-second.md', '2. a `@\n3. b` c\n', ['b', 'x'], un('docs/tick-second.md')),
+    row(4, 'docs/tick-wrapped.md', 'Run `rm -rf\n@` now.\n', ['build', 'dist'], un('docs/tick-wrapped.md')),
+    row(4, 'docs/tick-alone.md', 'Run `npm test` first.\n\n@ words with ` alone.\n', ['Old', 'New'], null),
+    row(4, 'docs/tick-items.md', '- run `npm test`\n- @ words\n- then `npm start`\n', ['old', 'new'], null),
+    // 5. Block quotes are read like the document they quote.
+    row(5, 'docs/quote-code.md', '> Install:\n>\n>     @\n', pip, un('docs/quote-code.md')),
+    row(5, 'docs/quote-fence.md', '> ~~~\n> @\n> ~~~\n', pip, un('docs/quote-fence.md')),
+    row(5, 'docs/quote-doctest.md', '> >>> print("old")\n> @\n', ['old', 'new'], un('docs/quote-doctest.md')),
+    row(5, 'docs/quote-list.md', '> - Install:\n>\n>       @\n', pip, un('docs/quote-list.md')),
+    row(5, 'docs/quote-nested.md', '> > Install:\n> >\n> >     @\n', pip, un('docs/quote-nested.md')),
+    row(5, 'docs/item-quote.md', '- >     @\n', pip, un('docs/item-quote.md')),
+    row(5, 'docs/quote-tab.md', '>\t@\n', pip, un('docs/quote-tab.md')),
+    row(5, 'docs/quote-deep.md', `${'> '.repeat(40)}@ words.\n`, ['Old', 'New'], un('docs/quote-deep.md')),
+    row(5, 'docs/quote-prose.md', '> @ words.\n>\n> More words.\n\nAfter.\n', ['Old', 'New'], null),
+    row(5, 'docs/quote-after.md', '> ~~~\n> code\n> ~~~\n\n@ words.\n', ['Old', 'New'], null),
+    // 6. Link labels fold case as CommonMark does.
+    ['6', 'docs/fold.md', 'See [guide] now.\n\n[SS]: /u/delete\n', 'See [ẞ] now.\n\n[SS]: /u/delete\n', un('docs/fold.md')],
+    // 7. `listing` and `tt` are code elements.
+    row(7, 'src/pages/listing.html', '<listing>@</listing>\n', pip, un('src/pages/listing.html')),
+    row(7, 'src/pages/tt.html', '<p>Run <tt>@</tt></p>\n', pip, un('src/pages/tt.html')),
+    // 8. A stylesheet's own name: a sensitive word still counts, its plural does not.
+    row(8, 'src/styles/login.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/login.css', 'login')),
+    row(8, 'src/styles/payment.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/payment.css', 'payment')),
+    row(8, 'src/styles/tokens.css', 'a { color: @; }\n', ['red', 'blue'], null),
+    row(8, 'src/tokens/base.css', 'a { color: @; }\n', ['red', 'blue'], area('src/tokens/base.css', 'token')),
+    // 9. A custom property named for a colour, holding exactly one colour before and after,
+    // is a colour; every other custom-property change is a setting.
+    row(9, 'src/styles/enabled.css', ':root { --enabled: @; }\n', ['green', 'red'], setting('src/styles/enabled.css')),
+    row(9, 'src/styles/mode.css', ':root { --mode: @; }\n', ['red', 'lime'], setting('src/styles/mode.css')),
+    row(9, 'src/styles/color-mode.css', ':root { --color-mode: @; }\n', ['dark', 'light'], setting('src/styles/color-mode.css')),
+    row(9, 'src/styles/two-tokens.css', ':root { --brand-color: @; }\n', ['red', 'red url(x)'], setting('src/styles/two-tokens.css')),
+    row(9, 'src/styles/var.css', ':root { --color-a: var(--@); }\n', ['b', 'c'], setting('src/styles/var.css')),
+    row(9, 'src/styles/important.css', ':root { --color-a: @ !important; }\n', ['red', 'blue'], setting('src/styles/important.css')),
+    row(9, 'src/styles/important-added.css', ':root { --color-a: @; }\n', ['red', 'blue !important'], setting('src/styles/important-added.css')),
+    row(9, 'src/styles/commented.css', ':root { --color-a: @ /* x */; }\n', ['red', 'blue'], setting('src/styles/commented.css')),
+    row(9, 'src/styles/renamed.css', ':root { --color-@: red; }\n', ['a', 'b'], setting('src/styles/renamed.css')),
+    row(9, 'src/styles/bad-function.css', ':root { --color-a: @; }\n', ['red', 'oklch(60% 0.2)'], setting('src/styles/bad-function.css')),
+    row(9, 'src/styles/and-more.css', ':root { --color-a: @; }\na { width: 1px; }\n', ['red', 'blue; }\na { width: 2px; }\nb { --x: y'], setting('src/styles/and-more.css')),
+    row(9, 'src/styles/ruleset.css', ':root { --color-a: { color: @ } }\n', ['red', 'blue'], lost('src/styles/ruleset.css')),
+    row(9, 'src/styles/color-brand.css', ':root {\n  --color-brand: @;\n}\n', ['#0b5ed7', '#1a73e8'], null),
+    row(9, 'src/styles/button-colour.css', ':root { --button-colour: @; }\n', ['red', 'blue'], null),
+    row(9, 'src/styles/upper.css', ':root { --Brand-COLOR: @; }\n', ['RED', 'Transparent'], null),
+    row(9, 'src/styles/functions.css', ':root { --color-a: @; }\n', ['hwb(120 0% 0% / 0.5)', 'oklch(60% 0.2 240)'], null),
+    row(9, 'src/styles/spaces.css', ':root { --color-a: @; }\n', ['lab(50% 40 59)', 'color(display-p3 1 0.5 0 / 50%)'], null),
+    row(9, 'src/styles/both.css', ':root { --color-a: @; }\na { color: red; }\n', ['red', 'blue; }\na { color: blue'], null)
+  ];
+  const base = {};
+  for (const [, p, b] of shapes) base[p] = b;
+  const root = makeRepo(base);
+  const wrong = [];
+  for (const [fix, p, b, n, expected] of shapes) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    const want = expected === null ? STATUS_LINE : refusal(expected);
+    if (res.text !== want) wrong.push(`fix ${fix} ${p}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
+    else if (expected === null) assertChecking(res, [p]);
+  }
+  assert.deepEqual(wrong, []);
 });

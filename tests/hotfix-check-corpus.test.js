@@ -1,7 +1,8 @@
 'use strict';
 
-// The classifier corpus: 34 edit shapes that qualify as a hotfix and 167 traps that must
-// not, plus one mode change, each judged through the menu router's first call (rules 1
+// The classifier corpus: 31 edit shapes that qualify as a hotfix and 195 traps that must
+// not (42 of them the kept cases of the formats the owner's decision of 2026-10-09 removed),
+// plus one mode change, each judged through the menu router's first call (rules 1
 // to 7; no test runs) against ONE committed temporary repository with no test command.
 // A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
 // Plan: plans/todo/ctoc-checks-that-a-hotfix-is-really-small-and-safe-s1-the-hotfix-check.md,
@@ -230,27 +231,47 @@ const BASE = {
   'src/styles/tokens.css': lines('.save {', '  color: #0a58ca;', '}'),
   'docs/list.md': lines('- Step one.', '  - Sub step.', '', '    Old words in the sub step.'),
   'docs/list-code.md': lines('- Install:', '', '      pip install requests'),
-  'src/components/GenStr.tsx': lines('export const f = <T,>(x: T) => x;', 'export const s = "<b>Save</b>";')
+  'src/components/GenStr.tsx': lines('export const f = <T,>(x: T) => x;', 'export const s = "<b>Save</b>";'),
+  // The fifth round (2026-10-09): the owner's decision and the fixes that still apply.
+  'docs/page.mdx': lines('# Page', '', 'Old words.'),
+  'src/pages/mixed.html': page('<DIV>Save</div>'),
+  'src/pages/is.html': page('<button is="run-sql">SELECT name FROM users</button>'),
+  'src/pages/runsql.html': page('<runsql>SELECT name FROM users</runsql>'),
+  'src/pages/stack.html': page('<run-sql><div></run-sql>SELECT name FROM users</div></run-sql>'),
+  'docs/stack.md': lines('Text.', '', '<run-sql><div></run-sql>SELECT name FROM users</div></run-sql>'),
+  'docs/mdx-brace.md': lines('Hello {eval(name)} there.'),
+  'docs/mdx-import.md': lines("import Chart from './chart'", '', 'Words.'),
+  'docs/tick-para.md': lines('A lone ` here.', '', 'Run `rm -rf build` now.'),
+  'docs/tick-alone.md': lines('Run `npm test` first.', '', 'Old words with ` alone.'),
+  'docs/quote-code.md': lines('> Install:', '>', '>     pip install requests'),
+  'docs/quote-fence.md': lines('> ~~~', '> pip install requests', '> ~~~'),
+  'docs/quote-doctest.md': lines('> >>> print("old")', '> old'),
+  'docs/quote-list.md': lines('> - Install:', '>', '>       pip install requests'),
+  'docs/quote-prose.md': lines('> Old words.', '>', '> More words.'),
+  'docs/fold.md': lines('See [guide] now.', '', '[SS]: /u/delete'),
+  'src/pages/listing.html': page('<listing>pip install requests</listing>'),
+  'src/pages/tt.html': page('<p>Run <tt>pip install requests</tt></p>'),
+  'src/styles/login.css': lines('a {', '  color: red;', '}'),
+  'src/styles/payment.css': lines('a {', '  color: red;', '}'),
+  'src/styles/color-mode.css': lines(':root {', '  --color-mode: dark;', '}'),
+  'src/styles/two-tokens.css': lines(':root {', '  --brand-color: red;', '}'),
+  'src/styles/var.css': lines(':root {', '  --color-a: var(--b);', '}'),
+  'src/styles/color-brand.css': lines(':root {', '  --color-brand: #0b5ed7;', '}'),
+  'src/styles/button-colour.css': lines(':root {', '  --button-colour: red;', '}')
 };
 
 const QUALIFY = [
   ['src/pages/home.html', page('<button>Store</button>')],
   ['src/pages/welcome.html', page('<p>Welcome home!</p>')],
   ['site/about.htm', page('<h2>Who we are</h2>')],
-  ['src/components/Greeting.jsx', BASE['src/components/Greeting.jsx'].replace('Hello there', 'Hello friend')],
-  ['src/components/CancelButton.tsx', BASE['src/components/CancelButton.tsx'].replace('>Cancel<', '>Close<')],
-  ['src/components/NameField.vue', BASE['src/components/NameField.vue'].replace('>Name<', '>Full name<')],
-  ['src/components/Loading.svelte', lines('<p>Please wait</p>')],
   ['src/pages/nav.html', page('<a class="nav" href="/home">Start</a>')],
   ['locales/en.json', BASE['locales/en.json'].replace('"Save {count} items"', '"Store {count} items"')],
   ['i18n/fr.yaml', lines('save: Sauvegarder', 'cancel: Annuler')],
-  ['translations/de.po', lines('msgid "Save"', 'msgstr "Sichern"')],
   ['lang/app.properties', lines('button.save=Store', 'button.cancel=Cancel')],
   ['messages/en.yml', lines('greeting: "Hi, {{name}}"')],
   ['src/styles/button.css', lines('.save { background-color: #0b5ed7; }')],
   ['src/styles/link.css', lines('a {', '  color: hsla(210, 50%, 40%, 0.9);', '}')],
   ['README.md', lines('# Fixture', '', 'This project shows the new wording.')],
-  ['docs/guide.rst', lines('Guide', '=====', '', 'Read this handbook first.')],
   ['notes/todo.txt', lines('Write the start page.')],
   ['docs/intro.md', '# Intro\r\n\r\nThe intro says welcome.\r\n'],
   // 20 changed lines in one file: ten lines reworded, the size limit exactly.
@@ -271,16 +292,23 @@ const QUALIFY = [
   ['docs/fenced-ok.md', lines('# Setup', '', 'Run the new installer.', '', '```sh', 'pip install requests', '```')],
   // The commit security review: an issue template under `.github/`; plain text beside a role.
   ['.github/ISSUE_TEMPLATE/bug.md', lines('Describe the new bug.')],
-  ['docs/shortcuts.rst', lines('Press :kbd:`Ctrl` to save the new file.')],
   // The fourth round (2026-10-09). A title is wording; Vue's conditional templates inside
   // markup render; a design-token stylesheet with a real colour property; a paragraph that
   // continues a list item; a React project's `src/hooks/` notes (CTOC's enforcement list
   // is CTOC's own, and this repository is not CTOC).
   ['src/pages/titled.html', BASE['src/pages/titled.html'].replace('Save', 'Store')],
-  ['src/components/Cond.vue', BASE['src/components/Cond.vue'].replace('Save', 'Store')],
   ['src/styles/tokens.css', BASE['src/styles/tokens.css'].replace('#0a58ca', '#0b5ed7')],
   ['docs/list.md', BASE['docs/list.md'].replace('Old', 'New')],
-  ['src/hooks/README.md', BASE['src/hooks/README.md'].replace('Old', 'New')]
+  ['src/hooks/README.md', BASE['src/hooks/README.md'].replace('Old', 'New')],
+  // The fifth round (2026-10-09). An element name is matched in any letter case; a lone
+  // backtick in another paragraph pairs with nothing; a block quote's prose is prose; a
+  // custom property named for a colour, holding exactly one colour before and after, is a
+  // colour (the session's decision on the owner's instruction).
+  ['src/pages/mixed.html', page('<DIV>Store</div>')],
+  ['docs/tick-alone.md', BASE['docs/tick-alone.md'].replace('Old', 'New')],
+  ['docs/quote-prose.md', BASE['docs/quote-prose.md'].replace('Old', 'New')],
+  ['src/styles/color-brand.css', BASE['src/styles/color-brand.css'].replace('#0b5ed7', '#1a73e8')],
+  ['src/styles/button-colour.css', BASE['src/styles/button-colour.css'].replace('red', 'blue')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -315,8 +343,6 @@ const TRAPS = [
   [{ 'src/pages/script-block.html': BASE['src/pages/script-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/script-block.html')],
   [{ 'src/pages/style-block.html': BASE['src/pages/style-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/style-block.html')],
   [{ 'src/pages/textarea-block.html': BASE['src/pages/textarea-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/textarea-block.html')],
-  [{ 'src/components/Hello.jsx': BASE['src/components/Hello.jsx'].replace('Hello {name}', 'Hi {name}') }, null, unrecognised('src/components/Hello.jsx')],
-  [{ 'src/components/Msg.vue': BASE['src/components/Msg.vue'].replace('now', 'today') }, null, unrecognised('src/components/Msg.vue')],
   [{ 'src/pages/multiline.html': BASE['src/pages/multiline.html'].replace('Save your work', 'Store your work') }, null, unrecognised('src/pages/multiline.html')],
   [{ 'src/pages/crossing.html': page('<b>Save now</b>') }, null, unrecognised('src/pages/crossing.html')],
   [{ 'src/pages/rules.html': page('<p>Terms &amp; conditions</p>') }, null, unrecognised('src/pages/rules.html')],
@@ -332,12 +358,8 @@ const TRAPS = [
   [{ 'public/robots.txt': lines('User-agent: *', 'Disallow: /') }, null, 'it changes a setting in public/robots.txt, and settings changes are a common cause of outages'],
   [{ 'src/styles/mask.css': BASE['src/styles/mask.css'].replace('#fade', '#face') }, null, unrecognised('src/styles/mask.css')],
   [{ 'src/styles/motion.css': BASE['src/styles/motion.css'].replace('red 2s', 'blue 2s') }, null, unrecognised('src/styles/motion.css')],
-  [{ 'src/components/Pick.tsx': BASE['src/components/Pick.tsx'].replace('y < z;', 'y < w;') }, null, unrecognised('src/components/Pick.tsx')],
-  [{ 'src/components/Generic.tsx': BASE['src/components/Generic.tsx'].replace('("a")', '("b")') }, null, unrecognised('src/components/Generic.tsx')],
   // Only the closing-element rule catches these two: the `<` after the text must close the
   // element whose opening tag ends at the `>` before it.
-  [{ 'src/components/Compare.tsx': BASE['src/components/Compare.tsx'].replace('a<b>limit<c', 'a<b>max<c') }, null, unrecognised('src/components/Compare.tsx')],
-  [{ 'src/components/Types.tsx': BASE['src/components/Types.tsx'].replace('Box<A>|Box<B>', 'Box<A>|Bag<B>') }, null, unrecognised('src/components/Types.tsx')],
   [{ 'tests/home.test.js': BASE['tests/home.test.js'].replace('shows Save', 'shows Store'), 'src/pages/home.html': page('<button>Store</button>') }, null, 'it changes a test (tests/home.test.js)'],
   [{ 'src/__tests__/cart.spec.js': lines("it('adds items', () => {});") }, null, 'it changes a test (src/__tests__/cart.spec.js)'],
   [{ 'src/components/Button.spec.tsx': lines("it('renders', () => { render(<Button>Store</Button>); });") }, null, 'it changes a test (src/components/Button.spec.tsx)'],
@@ -356,7 +378,6 @@ const TRAPS = [
   // The security check's second round (2026-10-08). Code inside an attribute value that
   // holds `>` before the change and `<` plus a letter after it is never visible text.
   [{ 'src/pages/onclick.html': BASE['src/pages/onclick.html'].replace('save()', 'drop()') }, null, unrecognised('src/pages/onclick.html')],
-  [{ 'src/components/Limit.vue': BASE['src/components/Limit.vue'].replace('count>max', 'count>top') }, null, unrecognised('src/components/Limit.vue')],
   [{ 'src/pages/angular.html': BASE['src/pages/angular.html'].replace('save()', 'drop()') }, null, unrecognised('src/pages/angular.html')],
   [{ 'src/pages/help-link.html': BASE['src/pages/help-link.html'].replace('href="/help"', 'href="javascript:steal()"') }, null, unrecognised('src/pages/help-link.html')],
   [{ 'src/pages/banner.html': BASE['src/pages/banner.html'].replace('url(/one.png)', 'url(/evil.png)') }, null, unrecognised('src/pages/banner.html')],
@@ -403,7 +424,6 @@ const TRAPS = [
   [{ 'docs/click.md': BASE['docs/click.md'].replace("'one'", "'two'") }, null, unrecognised('docs/click.md')],
   [{ 'docs/js-link.md': BASE['docs/js-link.md'].replace('go()', 'stop()') }, null, unrecognised('docs/js-link.md')],
   [{ 'docs/tpl.md': BASE['docs/tpl.md'].replace('one()', 'two()') }, null, unrecognised('docs/tpl.md')],
-  [{ 'docs/raw.rst': BASE['docs/raw.rst'].replace('one', 'two') }, null, unrecognised('docs/raw.rst')],
   [{ 'content/post.md': BASE['content/post.md'].replace('false', 'true') }, null, 'it changes a setting in content/post.md, and settings changes are a common cause of outages'],
   // Other assistants' instruction files.
   [{ 'CLAUDE.local.md': BASE['CLAUDE.local.md'].replace('Old', 'New') }, null, unrecognised('CLAUDE.local.md')],
@@ -423,16 +443,11 @@ const TRAPS = [
   [{ 'docs/ref.md': BASE['docs/ref.md'].replace('/guide', '/other') }, null, unrecognised('docs/ref.md')],
   [{ 'docs/auto.md': BASE['docs/auto.md'].replace('one.example', 'two.example') }, null, unrecognised('docs/auto.md')],
   [{ 'docs/liquid.md': BASE['docs/liquid.md'].replace('one.html', 'two.html') }, null, unrecognised('docs/liquid.md')],
-  [{ 'docs/code.rst': BASE['docs/code.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/code.rst')],
-  [{ 'docs/inc.rst': BASE['docs/inc.rst'].replace('one.rst', 'two.rst') }, null, unrecognised('docs/inc.rst')],
   [{ '.github/workflows/README.md': BASE['.github/workflows/README.md'].replace('old', 'new') }, null, 'it changes how the project is built or shipped in .github/workflows/README.md'],
   // Attribute shapes: a character reference in a value, an unquoted value, Vue's `@click`
   // and `v-bind:`, and nested braces in a JSX handler.
   [{ 'src/pages/entity.html': BASE['src/pages/entity.html'].replace('a&gt;b', 'a&gt;c') }, null, unrecognised('src/pages/entity.html')],
   [{ 'src/pages/unquoted.html': BASE['src/pages/unquoted.html'].replace('/one', '/two') }, null, unrecognised('src/pages/unquoted.html')],
-  [{ 'src/components/Clicker.vue': BASE['src/components/Clicker.vue'].replace("'one'", "'two'") }, null, unrecognised('src/components/Clicker.vue')],
-  [{ 'src/components/Bind.vue': BASE['src/components/Bind.vue'].replace('"one"', '"two"') }, null, unrecognised('src/components/Bind.vue')],
-  [{ 'src/components/Nested.jsx': BASE['src/components/Nested.jsx'].replace("'one'", "'two'") }, null, unrecognised('src/components/Nested.jsx')],
   // CTOC's own lists: sensitive words in the plural, the secret-file guard, the protected paths.
   [{ 'tokens.txt': lines('New note.') }, null, 'tokens.txt sits in an area named token, and such areas are never a hotfix'],
   [{ 'config/locales/secrets.yml': lines('title: New') }, null, 'config/locales/secrets.yml sits in an area named secret, and such areas are never a hotfix'],
@@ -450,17 +465,9 @@ const TRAPS = [
   [{ '.cursor/rules/a.mdc': lines('New rules.') }, null, unrecognised('.cursor/rules/a.mdc')],
   [{ 'rules.mdc': lines('New rules.') }, null, unrecognised('rules.mdc')],
   // reStructuredText roles: a role defined as raw HTML, and any text inside a role span.
-  [{ 'docs/span-def.rst': lines('Title', '=====', '', '.. role:: raw-html(raw)', '   :format: html', '', 'Old words.') }, null, unrecognised('docs/span-def.rst')],
-  [{ 'docs/raw-span.rst': BASE['docs/raw-span.rst'].replace('<b>x</b>', '<b>y</b>') }, null, unrecognised('docs/raw-span.rst')],
-  [{ 'docs/span-text.rst': BASE['docs/span-text.rst'].replace('Ctrl', 'Alt') }, null, unrecognised('docs/span-text.rst')],
-  [{ 'docs/span-after.rst': BASE['docs/span-after.rst'].replace('Ctrl', 'Alt') }, null, unrecognised('docs/span-after.rst')],
   // The fourth round (2026-10-09). Text inside a component or a custom element is whatever
   // the component makes of it (a query, an action name), never wording, in every markup kind.
-  [{ 'src/components/RunSql.jsx': BASE['src/components/RunSql.jsx'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, unrecognised('src/components/RunSql.jsx')],
-  [{ 'src/components/Charge.vue': BASE['src/components/Charge.vue'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/Charge.vue')],
   [{ 'src/pages/widget.html': BASE['src/pages/widget.html'].replace('>x<', '>y<') }, null, unrecognised('src/pages/widget.html')],
-  [{ 'src/components/SlotPass.vue': BASE['src/components/SlotPass.vue'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/SlotPass.vue')],
-  [{ 'src/components/Pay.svelte': BASE['src/components/Pay.svelte'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/Pay.svelte')],
   // A reference definition whose destination, or title, stands on the next line.
   [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '/u/delete') }, null, unrecognised('docs/wrapped-ref.md')],
   [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '//evil.example/x') }, null, unrecognised('docs/wrapped-ref.md')],
@@ -471,32 +478,103 @@ const TRAPS = [
   [{ 'src/styles/flags.css': BASE['src/styles/flags.css'].replace('--mode: red', '--mode: lime') }, null, setting('src/styles/flags.css')],
   [{ 'src/styles/custom.css': lines(':root {', '  --accent: blue;', '}') }, null, setting('src/styles/custom.css')],
   [{ 'src/styles/vars.css': lines(':root {', '  --brand: #fafafa;', '}') }, null, setting('src/styles/vars.css')],
-  [{ 'src/styles/theme.scss': lines('$brand: rgb(11, 94, 215);') }, null, setting('src/styles/theme.scss')],
-  [{ 'src/styles/accent.less': lines('@accent: tomato;') }, null, setting('src/styles/accent.less')],
   // reStructuredText literal blocks and doctest lines are code; so is every directive but
   // the prose ones, whose options are compared exactly.
-  [{ 'docs/literal.rst': BASE['docs/literal.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/literal.rst')],
-  [{ 'docs/expanded.rst': BASE['docs/expanded.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/expanded.rst')],
-  [{ 'docs/doctest.rst': BASE['docs/doctest.rst'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest.rst')],
   [{ 'notes/doctest.txt': BASE['notes/doctest.txt'].replace(/old$/m, 'new') }, null, unrecognised('notes/doctest.txt')],
   [{ 'docs/doctest.md': BASE['docs/doctest.md'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest.md')],
-  [{ 'docs/ifconfig.rst': BASE['docs/ifconfig.rst'].replace('"old"', '"new"') }, null, unrecognised('docs/ifconfig.rst')],
-  [{ 'docs/doctest-dir.rst': BASE['docs/doctest-dir.rst'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest-dir.rst')],
-  [{ 'docs/image.rst': BASE['docs/image.rst'].replace('one.png', 'two.png') }, null, unrecognised('docs/image.rst')],
-  [{ 'docs/toctree.rst': BASE['docs/toctree.rst'].replace('usage', 'install') }, null, unrecognised('docs/toctree.rst')],
-  [{ 'docs/automodule.rst': BASE['docs/automodule.rst'].replace('one', 'two') }, null, unrecognised('docs/automodule.rst')],
-  [{ 'docs/note-class.rst': BASE['docs/note-class.rst'].replace(':class: one', ':class: two') }, null, unrecognised('docs/note-class.rst')],
   // Text inside an HTML code element is code, in HTML and in Markdown's inline HTML.
   [{ 'docs/code-el.md': BASE['docs/code-el.md'].replace('requests', 'reqests') }, null, unrecognised('docs/code-el.md')],
   [{ 'src/pages/code-el.html': BASE['src/pages/code-el.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/code-el.html')],
   // A real indented code block inside a list item: four spaces beyond the content column.
   [{ 'docs/list-code.md': BASE['docs/list-code.md'].replace('requests', 'reqests') }, null, unrecognised('docs/list-code.md')],
   // A TypeScript generic arrow function is no element: the string after it is code.
-  [{ 'src/components/GenStr.tsx': BASE['src/components/GenStr.tsx'].replace('Save', 'Store') }, null, unrecognised('src/components/GenStr.tsx')]
+  // The fifth round (2026-10-09), each trap an answer of `checking` on `6de2f75c`. Host
+  // elements are a fixed list: an `is` attribute and an unknown name hold their text.
+  [{ 'src/pages/is.html': BASE['src/pages/is.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, unrecognised('src/pages/is.html')],
+  [{ 'src/pages/runsql.html': BASE['src/pages/runsql.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, unrecognised('src/pages/runsql.html')],
+  // An end tag that does not close the element on top, while a holder is open, cannot be followed.
+  [{ 'src/pages/stack.html': BASE['src/pages/stack.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, 'I could not read the change (src/pages/stack.html holds something I cannot follow)'],
+  [{ 'docs/stack.md': BASE['docs/stack.md'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, 'I could not read the change (docs/stack.md holds something I cannot follow)'],
+  // Markdown that may be built as MDX: a brace in the changed prose, an `import` line.
+  [{ 'docs/mdx-brace.md': BASE['docs/mdx-brace.md'].replace('name', 'code') }, null, unrecognised('docs/mdx-brace.md')],
+  [{ 'docs/mdx-import.md': BASE['docs/mdx-import.md'].replace('./chart', './other') }, null, unrecognised('docs/mdx-import.md')],
+  // A lone backtick in one paragraph pairs with nothing in the next.
+  [{ 'docs/tick-para.md': BASE['docs/tick-para.md'].replace('build', 'dist') }, null, unrecognised('docs/tick-para.md')],
+  // A block quote is read like the document it quotes: indented code, a fence, a doctest,
+  // and indented code under a list item.
+  [{ 'docs/quote-code.md': BASE['docs/quote-code.md'].replace('requests', 'reqests') }, null, unrecognised('docs/quote-code.md')],
+  [{ 'docs/quote-fence.md': BASE['docs/quote-fence.md'].replace('requests', 'reqests') }, null, unrecognised('docs/quote-fence.md')],
+  [{ 'docs/quote-doctest.md': BASE['docs/quote-doctest.md'].replace(/old$/m, 'new') }, null, unrecognised('docs/quote-doctest.md')],
+  [{ 'docs/quote-list.md': BASE['docs/quote-list.md'].replace('requests', 'reqests') }, null, unrecognised('docs/quote-list.md')],
+  // Link labels fold case as CommonMark does: `[\u1e9e]` names the definition `[SS]`.
+  [{ 'docs/fold.md': BASE['docs/fold.md'].replace('[guide]', '[\u1e9e]') }, null, unrecognised('docs/fold.md')],
+  // `listing` and `tt` are code elements.
+  [{ 'src/pages/listing.html': BASE['src/pages/listing.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/listing.html')],
+  [{ 'src/pages/tt.html': BASE['src/pages/tt.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/tt.html')],
+  // A sensitive word that is a stylesheet's own name still counts (its plural does not).
+  [{ 'src/styles/login.css': BASE['src/styles/login.css'].replace('red', 'blue') }, null, 'src/styles/login.css sits in an area named login, and such areas are never a hotfix'],
+  [{ 'src/styles/payment.css': BASE['src/styles/payment.css'].replace('red', 'blue') }, null, 'src/styles/payment.css sits in an area named payment, and such areas are never a hotfix'],
+  // A custom property named for a colour that holds no colour, a second token, or a variable.
+  [{ 'src/styles/color-mode.css': BASE['src/styles/color-mode.css'].replace('dark', 'light') }, null, setting('src/styles/color-mode.css')],
+  [{ 'src/styles/two-tokens.css': BASE['src/styles/two-tokens.css'].replace('red', 'red url(x)') }, null, setting('src/styles/two-tokens.css')],
+  [{ 'src/styles/var.css': BASE['src/styles/var.css'].replace('--b', '--c') }, null, setting('src/styles/var.css')]
 ];
 
-assert.equal(QUALIFY.length, 34, 'the corpus holds 34 shapes that qualify');
-assert.equal(TRAPS.length, 167, 'the corpus holds 167 traps');
+// The owner's decision of 2026-10-09 (answer "a"): the hotfix check keeps only the formats
+// it can read exactly, because five rounds of security attacks kept finding new ways to get
+// a behaviour change committed as a hotfix, the last ones in Vue, MDX, reStructuredText and
+// Less, where a hand-written reader disagrees with the real compiler. Every qualifying shape
+// and every trap of a removed format (Vue, Svelte, JSX and TSX, MDX, reStructuredText, Sass
+// and Less, gettext) is kept here, and each now asserts the "not recognised" refusal.
+const REMOVED_FORMATS = [
+  [{ 'src/components/Greeting.jsx': BASE['src/components/Greeting.jsx'].replace('Hello there', 'Hello friend') }, null, unrecognised('src/components/Greeting.jsx')],
+  [{ 'src/components/CancelButton.tsx': BASE['src/components/CancelButton.tsx'].replace('>Cancel<', '>Close<') }, null, unrecognised('src/components/CancelButton.tsx')],
+  [{ 'src/components/NameField.vue': BASE['src/components/NameField.vue'].replace('>Name<', '>Full name<') }, null, unrecognised('src/components/NameField.vue')],
+  [{ 'src/components/Loading.svelte': lines('<p>Please wait</p>') }, null, unrecognised('src/components/Loading.svelte')],
+  [{ 'translations/de.po': lines('msgid "Save"', 'msgstr "Sichern"') }, null, unrecognised('translations/de.po')],
+  [{ 'docs/guide.rst': lines('Guide', '=====', '', 'Read this handbook first.') }, null, unrecognised('docs/guide.rst')],
+  [{ 'docs/shortcuts.rst': lines('Press :kbd:`Ctrl` to save the new file.') }, null, unrecognised('docs/shortcuts.rst')],
+  [{ 'src/components/Cond.vue': BASE['src/components/Cond.vue'].replace('Save', 'Store') }, null, unrecognised('src/components/Cond.vue')],
+  [{ 'src/components/Hello.jsx': BASE['src/components/Hello.jsx'].replace('Hello {name}', 'Hi {name}') }, null, unrecognised('src/components/Hello.jsx')],
+  [{ 'src/components/Msg.vue': BASE['src/components/Msg.vue'].replace('now', 'today') }, null, unrecognised('src/components/Msg.vue')],
+  [{ 'src/components/Pick.tsx': BASE['src/components/Pick.tsx'].replace('y < z;', 'y < w;') }, null, unrecognised('src/components/Pick.tsx')],
+  [{ 'src/components/Generic.tsx': BASE['src/components/Generic.tsx'].replace('("a")', '("b")') }, null, unrecognised('src/components/Generic.tsx')],
+  [{ 'src/components/Compare.tsx': BASE['src/components/Compare.tsx'].replace('a<b>limit<c', 'a<b>max<c') }, null, unrecognised('src/components/Compare.tsx')],
+  [{ 'src/components/Types.tsx': BASE['src/components/Types.tsx'].replace('Box<A>|Box<B>', 'Box<A>|Bag<B>') }, null, unrecognised('src/components/Types.tsx')],
+  [{ 'src/components/Limit.vue': BASE['src/components/Limit.vue'].replace('count>max', 'count>top') }, null, unrecognised('src/components/Limit.vue')],
+  [{ 'docs/raw.rst': BASE['docs/raw.rst'].replace('one', 'two') }, null, unrecognised('docs/raw.rst')],
+  [{ 'docs/code.rst': BASE['docs/code.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/code.rst')],
+  [{ 'docs/inc.rst': BASE['docs/inc.rst'].replace('one.rst', 'two.rst') }, null, unrecognised('docs/inc.rst')],
+  [{ 'src/components/Clicker.vue': BASE['src/components/Clicker.vue'].replace("'one'", "'two'") }, null, unrecognised('src/components/Clicker.vue')],
+  [{ 'src/components/Bind.vue': BASE['src/components/Bind.vue'].replace('"one"', '"two"') }, null, unrecognised('src/components/Bind.vue')],
+  [{ 'src/components/Nested.jsx': BASE['src/components/Nested.jsx'].replace("'one'", "'two'") }, null, unrecognised('src/components/Nested.jsx')],
+  [{ 'docs/span-def.rst': lines('Title', '=====', '', '.. role:: raw-html(raw)', '   :format: html', '', 'Old words.') }, null, unrecognised('docs/span-def.rst')],
+  [{ 'docs/raw-span.rst': BASE['docs/raw-span.rst'].replace('<b>x</b>', '<b>y</b>') }, null, unrecognised('docs/raw-span.rst')],
+  [{ 'docs/span-text.rst': BASE['docs/span-text.rst'].replace('Ctrl', 'Alt') }, null, unrecognised('docs/span-text.rst')],
+  [{ 'docs/span-after.rst': BASE['docs/span-after.rst'].replace('Ctrl', 'Alt') }, null, unrecognised('docs/span-after.rst')],
+  [{ 'src/components/RunSql.jsx': BASE['src/components/RunSql.jsx'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, unrecognised('src/components/RunSql.jsx')],
+  [{ 'src/components/Charge.vue': BASE['src/components/Charge.vue'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/Charge.vue')],
+  [{ 'src/components/SlotPass.vue': BASE['src/components/SlotPass.vue'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/SlotPass.vue')],
+  [{ 'src/components/Pay.svelte': BASE['src/components/Pay.svelte'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/Pay.svelte')],
+  [{ 'src/styles/theme.scss': lines('$brand: rgb(11, 94, 215);') }, null, unrecognised('src/styles/theme.scss')],
+  [{ 'src/styles/accent.less': lines('@accent: tomato;') }, null, unrecognised('src/styles/accent.less')],
+  [{ 'docs/literal.rst': BASE['docs/literal.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/literal.rst')],
+  [{ 'docs/expanded.rst': BASE['docs/expanded.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/expanded.rst')],
+  [{ 'docs/doctest.rst': BASE['docs/doctest.rst'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest.rst')],
+  [{ 'docs/ifconfig.rst': BASE['docs/ifconfig.rst'].replace('"old"', '"new"') }, null, unrecognised('docs/ifconfig.rst')],
+  [{ 'docs/doctest-dir.rst': BASE['docs/doctest-dir.rst'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest-dir.rst')],
+  [{ 'docs/image.rst': BASE['docs/image.rst'].replace('one.png', 'two.png') }, null, unrecognised('docs/image.rst')],
+  [{ 'docs/toctree.rst': BASE['docs/toctree.rst'].replace('usage', 'install') }, null, unrecognised('docs/toctree.rst')],
+  [{ 'docs/automodule.rst': BASE['docs/automodule.rst'].replace('one', 'two') }, null, unrecognised('docs/automodule.rst')],
+  [{ 'docs/note-class.rst': BASE['docs/note-class.rst'].replace(':class: one', ':class: two') }, null, unrecognised('docs/note-class.rst')],
+  [{ 'src/components/GenStr.tsx': BASE['src/components/GenStr.tsx'].replace('Save', 'Store') }, null, unrecognised('src/components/GenStr.tsx')],
+  [{ 'docs/page.mdx': BASE['docs/page.mdx'].replace('Old', 'New') }, null, unrecognised('docs/page.mdx')]
+];
+TRAPS.push(...REMOVED_FORMATS);
+
+assert.equal(QUALIFY.length, 31, 'the corpus holds 31 shapes that qualify');
+assert.equal(REMOVED_FORMATS.length, 42, 'the corpus holds 42 cases of removed formats');
+assert.equal(TRAPS.length, 195, 'the corpus holds 195 traps, the removed formats among them');
 
 let root;
 
@@ -614,15 +692,14 @@ const INSERTED = ['<', '>', '"', "'", '{', '}', '(', ')', '=', ':', '/', '\\', '
 const plain = (chars, why) => Object.fromEntries([...chars].map((c) => [c, () => why]));
 const ALLOWED = {
   markup: plain('"\'()=:/\\#;*[]|_', 'plain punctuation in an element\'s visible text, shown as typed'),
-  jsx: plain(':/\\#*[]|_', 'punctuation that JSX prints as typed in an element\'s text'),
   catalogue: {
     ...plain('\'()=:/#;*"[]|_&', 'punctuation inside a message value, shown as typed'),
     '\\': (v) => (/\\[tnrbf]/.test(v) ? 'a backslash that makes a tab, line break or other control character in the shown text'
       : 'a backslash before a letter in a .properties value, which the reader drops')
   },
   markdown: {
-    ...plain('>"\'()=:/\\#;*}|_', 'Markdown punctuation in prose: shown as typed or as emphasis, a heading, a quote or a table cell'),
-    '{': () => 'a lone brace in Markdown prose is shown as typed (only {{ and {% start a template)',
+    // A brace is no longer named: Markdown may be built as MDX, where it starts an expression.
+    ...plain('>"\'()=:/\\#;*|_', 'Markdown punctuation in prose: shown as typed or as emphasis, a heading, a quote or a table cell'),
     '<': (v, at) => (/[A-Za-z/!?]/.test(v[at + 1] || '') ? null : 'a < that starts no tag is shown as typed'),
     '[': () => 'a bracket that names no reference definition is shown as typed (link targets are compared exactly)',
     ']': () => 'a bracket that names no reference definition is shown as typed (link targets are compared exactly)',
@@ -631,20 +708,14 @@ const ALLOWED = {
       : 'an ampersand that starts no character reference is shown as typed')
   },
   text: plain('<>"\'{}()=:/\\#;*[]&`|_', 'any punctuation in a plain-text paragraph is shown as typed'),
-  rst: {
-    ...plain('<>"\'{}()=:/\\#;*[]&|', 'punctuation in a reStructuredText paragraph is shown as typed (spans and references are compared exactly)'),
-    '_': (v, at) => (/[A-Za-z0-9]$/.test(v.slice(0, at)) && /^_?(?:$|[\s)>}'".,;:!?])/.test(v.slice(at + 1)) ? null
-      : 'an underscore that ends no reference name is shown as typed')
-  },
   colour: {}
 };
 const kindOf = (rel) => {
   const ext = path.extname(rel).toLowerCase();
-  if (['.jsx', '.tsx'].includes(ext)) return 'jsx';
-  if (['.html', '.htm', '.vue', '.svelte'].includes(ext)) return 'markup';
-  if (['.json', '.yaml', '.yml', '.po', '.properties'].includes(ext)) return 'catalogue';
-  if (['.css', '.scss', '.sass', '.less'].includes(ext)) return 'colour';
-  return ext === '.md' ? 'markdown' : ext === '.rst' ? 'rst' : 'text';
+  if (['.html', '.htm'].includes(ext)) return 'markup';
+  if (['.json', '.yaml', '.yml', '.properties'].includes(ext)) return 'catalogue';
+  if (ext === '.css') return 'colour';
+  return ext === '.md' ? 'markdown' : 'text';
 };
 
 /** One group per changed line, as git's `-U0` diff gives for two texts with the same lines. */
@@ -711,7 +782,8 @@ test('property: one inserted character in the changed text of every qualifying s
       write(rel, BASE[rel]);
     }
   }
-  // Inside a reStructuredText role span nothing is wording: every insertion refuses.
+  // Inside a reStructuredText role span nothing is wording: every insertion refuses (kept
+  // from the time the check read reStructuredText; the whole format refuses now).
   const roleOld = BASE['docs/shortcuts.rst'];
   for (let at = roleOld.indexOf('`') + 1; at <= roleOld.lastIndexOf('`'); at++) {
     for (const ch of INSERTED) {
@@ -757,12 +829,12 @@ function closedAtEnd(kind, cut) {
   const balanced = (t, o, c) => t.split(o).length === t.split(c).length;
   if (cut.trim() === '') return false; // an emptied file is no wording edit
   if (kind === 'text') return true;
-  if (kind === 'catalogue') return even(tail, '"') && !/^\s*[{}[\]]?\s*$/.test(tail) && /[:=]|^msgstr/.test(tail);
-  if (kind === 'markdown' || kind === 'rst') {
+  if (kind === 'catalogue') return even(tail, '"') && !/^\s*[{}[\]]?\s*$/.test(tail) && /[:=]/.test(tail);
+  if (kind === 'markdown') {
     const fences = lines.filter((l) => /^\s*(```|~~~)/.test(l)).length;
     const front = lines[0] === '---' && !lines.slice(1).some((l) => l === '---');
     return fences % 2 === 0 && !front && even(tail, '`') && !tail.includes('<') && !tail.includes('{{')
-      && balanced(tail, '[', ']') && balanced(tail, '(', ')') && !/^\s*\.\. /.test(tail);
+      && balanced(tail, '[', ']') && balanced(tail, '(', ')');
   }
   return false; // markup, JSX and stylesheets: a cut always leaves a tag, element or block open
 }
@@ -820,12 +892,25 @@ test('the whole-file scanners stay linear on input built against them', () => {
     'src/components/Holds.vue': `<template>\n<p>Old</p>\n${'<MyThing>'.repeat(30000)}\n</template>\n`,
     'src/styles/vars.scss': `a { color: red; }\n${'$a: b;'.repeat(50000)}\n`,
     // Every scanner fails closed: catalogue line states over many open quotes and blocks.
-    'i18n/states.yaml': `title: Old\n${'a: "x\n  b: |\n'.repeat(30000)}`
+    'i18n/states.yaml': `title: Old\n${'a: "x\n  b: |\n'.repeat(30000)}`,
+    // The fifth round's scanners: a deep stack of open elements closed by end tags of other
+    // names, with and without a holder open; deeply nested and very long block quotes; many
+    // paragraphs of backticks; many custom properties.
+    'src/pages/stack.html': `<p>Old</p>\n${'<a>'.repeat(30000)}${'</b>'.repeat(30000)}\n`,
+    'src/pages/held.html': `<p>Old</p>\n<x-y>${'<a>'.repeat(30000)}${'</b>'.repeat(30000)}\n`,
+    'src/pages/names.html': `<p>Old</p>\n${Array.from({ length: 20000 }, (_, i) => `<a${i}>`).join('')}${'</b></a0>'.repeat(20000)}\n`,
+    'docs/quotes.md': `Old words.\n\n${'> '.repeat(40000)}x\n`,
+    'docs/quoted.md': `Old words.\n\n${'> > > a \\` b\n'.repeat(30000)}`,
+    'docs/paragraphs.md': `Old words.\n\n${'a \` b | c\n\n- d \` e\n'.repeat(30000)}`,
+    'docs/items.md': `Old words.\n\n${'- > - > - a\n'.repeat(20000)}`,
+    'src/styles/properties.css': `a { color: red; }\n:root {${'--color-a: red;'.repeat(50000)}}\n`
   };
   for (const [rel, old] of Object.entries(cases)) {
-    const changed = rel.endsWith('.css') ? old.replace('red', 'blue') : old.replace('Old', 'New');
+    const changed = /\.s?css$/.test(rel) ? old.replace('red', 'blue') : old.replace('Old', 'New');
     const start = process.cpuUsage();
-    ruleRefusal(changeOf(rel, old, changed));
+    const refused = ruleRefusal(changeOf(rel, old, changed));
+    // The inputs of the removed formats are kept: each is refused as not recognised, at once.
+    if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(refused.cause, 'unrecognised', rel);
     const used = process.cpuUsage(start);
     const ms = (used.user + used.system) / 1000;
     assert.ok(ms < 250, `${rel}: ${old.length} characters took ${ms.toFixed(1)} ms`);
