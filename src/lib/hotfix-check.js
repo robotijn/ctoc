@@ -43,9 +43,13 @@
  *                                          working file, every file text
  *   2  same files, same names            — nothing added, removed, renamed, re-moded, linked
  *   7  no test is edited                 — fix the code, not the tests
- *   4  only kinds that qualify           — documentation, visible text in markup, message
- *                                          catalogue values, colour values in stylesheets;
- *                                          never in a place that governs the work
+ *   4  only kinds that qualify           — documentation (Markdown and plain text), visible text in
+ *                                          plain HTML, message catalogue values (JSON, YAML,
+ *                                          properties), colour values in plain CSS; these are the
+ *                                          formats the check reads exactly (the owner's decision of
+ *                                          2026-10-09), and a Vue, Svelte, JSX, TSX, MDX,
+ *                                          reStructuredText, Sass, Less or gettext file is a kind it
+ *                                          does not recognise; never in a place that governs the work
  *                                          (`CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`,
  *                                          `GEMINI.md`, `CONVENTIONS.md`, GitHub's assistant
  *                                          files, `.cursor/`, `.windsurf/`, `.clinerules/`,
@@ -56,38 +60,40 @@
  *                                          its kind are settings; a `.txt` named like
  *                                          `requirements` is a dependency list.
  *                                          EACH KIND IS JUDGED WHOLE, one scanner per side:
- *                                          markup by a token stream after the HTML tokenizer
- *                                          (tags with every attribute, raw text, comments and
- *                                          braces are compared exactly; only text between two
- *                                          tags may change, on one line, never inside raw text,
- *                                          a `<template>` (but Vue's markup and conditional
- *                                          ones), a code element, a component or a custom
- *                                          element, or an `<option>` with no `value`; a
- *                                          `<title>` is text); JSX as JavaScript whose elements
- *                                          are scanned the same way (a TypeScript type
- *                                          parameter list is no element); stylesheets by
- *                                          statements across the whole file (strings, comments
- *                                          and `url(…)` blanked), a colour only in the value of
- *                                          a real colour property on its line, and any change
- *                                          to a custom property or a Sass or Less variable a
- *                                          setting; Markdown by lines (front matter in three
- *                                          forms is settings, fenced and indented code, read
- *                                          inside list items, and doctests are code) and by
- *                                          the markup scanner for the prose, with code spans
- *                                          and link targets (a reference definition's next
- *                                          lines too) compared exactly; in reStructuredText
- *                                          every directive but the prose ones, literal blocks
- *                                          and doctests are code, and roles, literals and
- *                                          references are compared exactly; doctests in plain
- *                                          text are code; a catalogue value is decoded as its
- *                                          format reads it and read as a browser reads an
- *                                          address, each line only where it starts an entry.
- *                                          EVERY SCANNER FAILS CLOSED: a side that ends inside
- *                                          an unfinished construct, or holds one its scanner
- *                                          cannot follow, makes the change unreadable
+ *                                          HTML by a token stream after the HTML tokenizer (tags
+ *                                          with every attribute, raw text, comments and braces are
+ *                                          compared exactly; only text between two tags may change,
+ *                                          on one line, never inside raw text, an `<option>` with
+ *                                          no `value`, or an element that holds its text: a code
+ *                                          element, a `<template>`, an element with an `is`
+ *                                          attribute, a custom element and every name outside the
+ *                                          fixed list of HTML, SVG and MathML elements; the open
+ *                                          elements are kept on a stack, and an end tag that does
+ *                                          not close its top while such an element is open cannot be
+ *                                          followed; a `<title>` is text); stylesheets by
+ *                                          statements across the whole file (strings, comments and
+ *                                          `url(…)` blanked), a colour only in the value of a real
+ *                                          colour property on its line, and a change to a custom
+ *                                          property a setting unless the property is named for a
+ *                                          colour and holds exactly one colour before and after;
+ *                                          Markdown by lines (front matter in three forms is
+ *                                          settings; fenced and indented code, read inside list
+ *                                          items and block quotes, doctests and `import` / `export`
+ *                                          blocks are code) and by the HTML scanner for the prose,
+ *                                          with code spans (paired inside one paragraph, heading or
+ *                                          list item) and link targets (a reference definition's
+ *                                          next lines too, labels matched as CommonMark folds them)
+ *                                          compared exactly, and no brace in changed prose (the file
+ *                                          may be built as MDX); doctests in plain text are code; a
+ *                                          catalogue value is decoded as its format reads it and
+ *                                          read as a browser reads an address, each line only where
+ *                                          it starts an entry.
+ *                                          EVERY SCANNER FAILS CLOSED: a side that ends inside an
+ *                                          unfinished construct, or holds one its scanner cannot
+ *                                          follow, makes the change unreadable
  *   5  not in a sensitive area           — 33 whole words, also in the plural, in the path from
- *                                          the repository top (auth, login, ...; a stylesheet's
- *                                          own file name aside), CTOC's own secret-file guard,
+ *                                          the repository top (auth, login, ...; in a stylesheet's
+ *                                          own file name not in the plural), CTOC's own secret-file guard,
  *                                          and in CTOC's own repository its protected paths; the test,
  *                                          governing, build and database folders are read from
  *                                          the top too
@@ -202,7 +208,7 @@
  * this is the right fix (not a safety question).
  *
  * Known gap, kept to the letter of the functional plan: the sensitive-word rule splits a
- * path only at characters that are not letters, so `AuthPanel.jsx` is not `auth`.
+ * path only at characters that are not letters, so `AuthPanel.html` is not `auth`.
  */
 
 const fs = require('fs'); // the native real path, the open-flag constants and descriptor calls; every path call goes through safe-fs
@@ -250,11 +256,19 @@ function governingName(lower) {
     || ((lower.startsWith('claude') || lower.startsWith('gemini')) && lower.endsWith('.md'))
     || GOVERNING_ENDINGS.some((x) => lower.endsWith(x));
 }
-const DOC_EXT = new Set(['.md', '.txt', '.rst']);
-const MARKUP_EXT = new Set(['.html', '.htm', '.jsx', '.tsx', '.vue', '.svelte']);
-const CATALOGUE_EXT = new Set(['.json', '.yaml', '.yml', '.po', '.properties']);
+/*
+ * THE FORMATS THAT ARE READ (the owner's decision of 2026-10-09). Only the formats the check
+ * can read exactly qualify: plain HTML, colours in plain CSS, catalogue wording in JSON,
+ * YAML and Java properties files, and prose in Markdown and plain text. Vue, Svelte, JSX and
+ * TSX, MDX, reStructuredText, Sass, Less and gettext files are no longer read: each needs
+ * its own compiler to say what a change does, a hand-written reader disagreed with that
+ * compiler round after round, and so such a file is a kind the check does not recognise and
+ * goes through a normal plan.
+ */
+const DOC_EXT = new Set(['.md', '.txt']);
+const MARKUP_EXT = new Set(['.html', '.htm']);
+const CATALOGUE_EXT = new Set(['.json', '.yaml', '.yml', '.properties']);
 const CATALOGUE_FOLDERS = new Set(['locales', 'locale', 'i18n', 'lang', 'translations', 'messages']);
-const COLOUR_EXT = new Set(['.css', '.scss', '.sass', '.less']);
 const TEST_FOLDERS = new Set(['test', 'tests', '__tests__', 'spec']);
 const DEPENDENCY_NAMES = new Set(['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock',
   'pnpm-lock.yaml', 'bun.lockb', 'Pipfile', 'Pipfile.lock', 'pyproject.toml', 'poetry.lock', 'uv.lock',
@@ -741,28 +755,28 @@ function commonEnds(o, n) {
 }
 
 /*
- * THE MARKUP SCANNER (rule 4: markup, and Markdown's inline HTML). One pass over a whole
+ * THE MARKUP SCANNER (rule 4: HTML, and Markdown's inline HTML). One pass over a whole
  * file, a state machine after the HTML tokenization model, simplified: data; a tag (its
  * name, attribute names, unquoted, single- and double-quoted values, `/>`); comments,
  * `<!…>`, `<?…>` and `</` not followed by a letter, each to its end; raw text after
  * `<script>` (with the script-data escape states), `<style>`, `<textarea>`, `<title>`,
  * `<xmp>`, `<iframe>`, `<noembed>`, `<noframes>`, `<noscript>` and `<plaintext>`; and
  * braces `{…}` / `{{…}}`, in data and inside a tag, as one opaque expression. Character
- * references stay part of their token. JSX files start in JavaScript instead
- * ({@link scanJs}), which hands every `<` that starts an element to {@link scanJsx}.
+ * references stay part of their token.
  * Every token is a slice of the text, and the slices cover it, so two token sequences that
  * are identical are two identical texts. No pattern backtracks: each scanner moves forward.
  */
 
-/** @typedef {{k: string, v: string, name?: string, end?: boolean, self?: boolean, attrs?: string[], quiet?: boolean}} Tok */
+/** @typedef {{k: string, v: string, name?: string, end?: boolean, attrs?: string[], quiet?: boolean}} Tok */
 
 /*
  * EVERY SCANNER FAILS CLOSED. A scanner that ends inside an unfinished construct (a tag, an
- * attribute quote, a comment, a raw-text element, a brace, a string, a template literal, a
- * regular expression, a stylesheet block, a fence, a front matter, a reStructuredText span)
- * reports `open`; one that meets a construct it cannot follow where it expects structure (an
- * attribute name starting with `<`, `"`, `'` or `=`; a string or regular expression running
- * into a line break; a `}` with nothing open) reports `lost`. Rule 4 resets the report
+ * attribute quote, a comment, a raw-text element, a `<template>`, a brace, a string, a
+ * stylesheet block, a fence, a front matter) reports `open`; one that meets a construct it
+ * cannot follow where it expects structure (an attribute name starting with `<`, `"`, `'`
+ * or `=`; a string running into a line break; a `}` with nothing open; an end tag that does
+ * not close the element on top while an element that holds text is open; a custom property
+ * whose value opens a block) reports `lost`. Rule 4 resets the report
  * before it judges a file and refuses the change as unreadable when either side reported
  * one: a scanner that lost its place never falls through to text.
  */
@@ -773,16 +787,49 @@ const fault = (kind) => { if (scanFault === null) scanFault = kind; };
 
 /** Elements whose content a browser reads as raw text, never as markup (`plaintext` runs to the end). */
 const RAW_TEXT = new Set(['script', 'style', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext']);
+/** HTML's void elements: they have no content and no end tag, so they never open. */
+const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param',
+  'source', 'track', 'wbr']);
 /**
- * An HTML host element's name: lower case letters and digits, no hyphen. Anything else is a
- * component (`RunSql`, `ui.p`) or a custom element (`my-widget`, `svelte:head`), whose text
- * is whatever the component makes of it, never wording.
+ * The host elements: the HTML, SVG and MathML element names, a fixed list. The names are
+ * those of Vue's `isHTMLTag`, `isSVGTag` and `isMathMLTag` lists (`HTML_TAGS`, `SVG_TAGS`
+ * and `MATH_TAGS` in `packages/shared/src/domTagConfig.ts` of vuejs/core), copied in and
+ * matched in lower case, as HTML reads element names. An element of any other name is
+ * unknown to the browser: a component or a custom element, whose text is whatever its
+ * script makes of it.
  */
-const HOST_NAME = /^[a-z][a-z0-9]*$/;
+const HOST_ELEMENTS = new Set((
+  // HTML_TAGS
+  'html,body,base,head,link,meta,style,title,address,article,aside,footer,header,hgroup,h1,h2,h3,h4,h5,h6,'
+  + 'nav,section,div,dd,dl,dt,figcaption,figure,picture,hr,img,li,main,ol,p,pre,ul,a,b,abbr,bdi,bdo,br,cite,'
+  + 'code,data,dfn,em,i,kbd,mark,q,rp,rt,ruby,s,samp,small,span,strong,sub,sup,time,u,var,wbr,area,audio,map,'
+  + 'track,video,embed,object,param,source,canvas,script,noscript,del,ins,caption,col,colgroup,table,thead,'
+  + 'tbody,td,th,tr,button,datalist,fieldset,form,input,label,legend,meter,optgroup,option,output,progress,'
+  + 'select,textarea,details,dialog,menu,summary,template,blockquote,iframe,tfoot,'
+  // SVG_TAGS
+  + 'svg,animate,animateMotion,animateTransform,circle,clipPath,color-profile,defs,desc,discard,ellipse,'
+  + 'feBlend,feColorMatrix,feComponentTransfer,feComposite,feConvolveMatrix,feDiffuseLighting,'
+  + 'feDisplacementMap,feDistantLight,feDropShadow,feFlood,feFuncA,feFuncB,feFuncG,feFuncR,feGaussianBlur,'
+  + 'feImage,feMerge,feMergeNode,feMorphology,feOffset,fePointLight,feSpecularLighting,feSpotLight,feTile,'
+  + 'feTurbulence,filter,foreignObject,g,hatch,hatchpath,image,line,linearGradient,marker,mask,mesh,'
+  + 'meshgradient,meshpatch,meshrow,metadata,mpath,path,pattern,polygon,polyline,radialGradient,rect,set,'
+  + 'solidcolor,stop,switch,symbol,text,textPath,title,tspan,unknown,use,view,'
+  // MATH_TAGS
+  + 'annotation,annotation-xml,maction,maligngroup,malignmark,math,menclose,merror,mfenced,mfrac,mfraction,'
+  + 'mglyph,mi,mlabeledtr,mlongdiv,mmultiscripts,mn,mo,mover,mpadded,mphantom,mprescripts,mroot,mrow,ms,'
+  + 'mscarries,mscarry,msgroup,msline,mspace,msqrt,msrow,mstack,mstyle,msub,msubsup,msup,mtable,mtd,mtext,'
+  + 'mtr,munder,munderover,none,semantics').toLowerCase().split(','));
 /** HTML's code elements: their text is code, compared exactly. */
-const CODE_ELEMENTS = new Set(['code', 'pre', 'kbd', 'samp', 'var']);
-/** @param {string} name @returns {boolean} the element's text, and all inside it, is never wording */
-const holdsText = (name) => name !== '' && (CODE_ELEMENTS.has(name.toLowerCase()) || !HOST_NAME.test(name));
+const CODE_ELEMENTS = new Set(['code', 'pre', 'kbd', 'samp', 'var', 'listing', 'tt']);
+/**
+ * @param {string} name the element's name, lower case @param {string[]} attrs its attribute names, lower case
+ * @returns {boolean} the element's text, and all inside it, is never wording: a code
+ * element, a `<template>` (inert content), an element with an `is` attribute (a customised
+ * built-in element), a custom element (a hyphen in its name, whatever the lists hold) and
+ * every name that is no host element
+ */
+const holdsText = (name, attrs) => CODE_ELEMENTS.has(name) || name === 'template' || attrs.includes('is')
+  || name.includes('-') || !HOST_ELEMENTS.has(name);
 /** The end of each raw-text element but `<script>` and `<plaintext>`, and of `<title>`: its closing tag, letter case ignored. */
 const RAW_CLOSE = {
   style: /<\/style(?=[\s/>]|$)/gi,
@@ -796,17 +843,11 @@ const RAW_CLOSE = {
 };
 /** The marks that move a script block between the script-data states. */
 const SCRIPT_MARKS = /<!--|-->|<(\/?)script(?=[\s/>]|$)/gi;
-/** The characters after which a JavaScript `/` starts a regular expression and a `<` an element. */
-const OPERAND_AFTER = new Set([...'([{,;:=?&|!~+-*%^<>']);
-const OPERAND_WORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw',
-  'case', 'do', 'else', 'yield', 'await', 'default']);
 
 /** @param {string} c @returns {boolean} */
 const isLetter = (c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 /** @param {string} c @returns {boolean} white space as the HTML tokenizer reads it */
 const isSpace = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f';
-/** @param {string} c @returns {boolean} a character of a JavaScript identifier */
-const isWordChar = (c) => isLetter(c) || (c >= '0' && c <= '9') || c === '_' || c === '$';
 
 /**
  * Skip a quoted string from its opening quote: to the matching unescaped quote, or to the
@@ -828,51 +869,9 @@ function skipString(s, i) {
 }
 
 /**
- * Skip a JavaScript template literal from its backtick, each `${…}` read as code.
- * @param {string} s @param {number} i @returns {number} the index after it
- */
-function skipTemplate(s, i) {
-  let j = i + 1;
-  while (j < s.length) {
-    const c = s[j];
-    if (c === '\\') j += 2;
-    else if (c === '`') return j + 1;
-    else if (c === '$' && s[j + 1] === '{') j = scanJs(s, j + 1, true, null);
-    else j++;
-  }
-  fault('open');
-  return s.length;
-}
-
-/**
- * Skip a JavaScript regular expression from its `/`: to the closing `/` outside a class,
- * then its flags; an unclosed one ends at the line's end.
- * @param {string} s @param {number} i @returns {number} the index after it
- */
-function skipRegex(s, i) {
-  let j = i + 1;
-  let inClass = false;
-  while (j < s.length) {
-    const c = s[j];
-    if (c === '\\') { j += 2; continue; }
-    if (c === '\n') { fault('lost'); return j; }
-    if (inClass) { if (c === ']') inClass = false; }
-    else if (c === '[') inClass = true;
-    else if (c === '/') {
-      j++;
-      while (j < s.length && isLetter(s[j])) j++;
-      return j;
-    }
-    j++;
-  }
-  fault('open');
-  return s.length;
-}
-
-/**
- * Skip a template expression from its `{`: braces counted, quoted strings skipped. Used in
- * HTML, Vue and Svelte, whose `{…}`, `{{…}}`, `{#if …}` and `{/if}` are not JavaScript
- * statements (a `/` there starts no regular expression).
+ * Skip a template expression from its `{`: braces counted, quoted strings skipped (a
+ * backtick string too, on one line). A page may be a template of some engine (`{{ … }}`),
+ * so an expression is one opaque token, compared exactly.
  * @param {string} s @param {number} i @returns {number} the index after the matching `}`, or the text's end
  */
 function skipBraces(s, i) {
@@ -880,7 +879,7 @@ function skipBraces(s, i) {
   let j = i;
   while (j < s.length) {
     const c = s[j];
-    if (c === '"' || c === "'" || c === '`') { j = c === '`' ? skipTemplate(s, j) : skipString(s, j); continue; }
+    if (c === '"' || c === "'" || c === '`') { j = skipString(s, j); continue; }
     if (c === '{') depth++;
     else if (c === '}' && --depth === 0) return j + 1;
     j++;
@@ -890,138 +889,28 @@ function skipBraces(s, i) {
 }
 
 /**
- * JavaScript, skimmed for its extent: strings, template literals, comments and regular
- * expressions skipped, braces counted, and every `<` that starts a JSX element (a letter or
- * `>` after it, where an operand is expected) handed to {@link scanJsx}. With `brace`, `s[i]`
- * is `{` and the scan ends after its match. With `out` (the top level of a JSX file), each
- * run of code becomes a `code` token and each element's tokens follow it.
- * @param {string} s
- * @param {number} i
- * @param {boolean} brace
- * @param {Tok[]|null} out
- * @returns {number} the index after the scanned code
- */
-function scanJs(s, i, brace, out) {
-  const n = s.length;
-  let depth = brace ? 1 : 0;
-  let codeStart = i;
-  let prev = brace ? '{' : '';
-  let word = '';
-  let j = brace ? i + 1 : i;
-  const flush = (end) => { if (out && end > codeStart) out.push({ k: 'code', v: s.slice(codeStart, end) }); };
-  while (j < n) {
-    const c = s[j];
-    if (c === '"' || c === "'" || c === '`') {
-      j = c === '`' ? skipTemplate(s, j) : skipString(s, j);
-      prev = 'a';
-      word = '';
-      continue;
-    }
-    if (c === '/' && s[j + 1] === '/') { const e = s.indexOf('\n', j); j = e < 0 ? n : e; continue; }
-    if (c === '/' && s[j + 1] === '*') {
-      const e = s.indexOf('*/', j + 2);
-      if (e < 0) fault('open');
-      j = e < 0 ? n : e + 2;
-      continue;
-    }
-    if (isSpace(c)) { j++; continue; }
-    if (isWordChar(c)) {
-      const start = j;
-      while (j < n && isWordChar(s[j])) j++;
-      word = s.slice(start, j);
-      prev = 'a';
-      continue;
-    }
-    const operand = prev === '' || OPERAND_AFTER.has(prev) || OPERAND_WORDS.has(word);
-    word = '';
-    if (c === '/' && operand) { j = skipRegex(s, j); prev = 'a'; continue; }
-    const generic = c === '<' && operand ? typeParameters(s, j) : -1;
-    if (generic > 0) { j = generic; prev = 'a'; continue; }
-    if (c === '<' && operand && (isLetter(s[j + 1] || '') || s[j + 1] === '>')) {
-      flush(j);
-      j = scanJsx(s, j, out);
-      codeStart = j;
-      prev = 'a';
-      continue;
-    }
-    if (c === '{') depth++;
-    else if (c === '}' && --depth === 0 && brace) return j + 1;
-    else if (depth < 0) fault('lost'); // a `}` with nothing open
-    prev = c;
-    j++;
-  }
-  if (brace || depth > 0) fault('open');
-  flush(n);
-  return n;
-}
-
-/**
- * A TypeScript type parameter list where JSX could start, `<T,>` or `<T extends X>` (also
- * after a `const`, `in` or `out` modifier): the index after its matching `>`, strings
- * skipped and the `>` of an arrow `=>` not counted; -1 when `s[i]` starts no such list.
- * Without this, a `.tsx` generic arrow function read as an element made the rest of the
- * file its children.
- * @param {string} s @param {number} i the `<` @returns {number}
- */
-function typeParameters(s, i) {
-  const n = s.length;
-  const word = (at) => {
-    let e = at;
-    while (e < n && isWordChar(s[e])) e++;
-    return e;
-  };
-  let j = word(i + 1);
-  if (j === i + 1) return -1;
-  if (['const', 'in', 'out'].includes(s.slice(i + 1, j)) && isSpace(s[j] || '')) {
-    while (j < n && isSpace(s[j])) j++;
-    const e = word(j);
-    if (e === j) return -1;
-    j = e;
-  }
-  while (j < n && isSpace(s[j])) j++;
-  if (s[j] !== ',' && !(s.startsWith('extends', j) && isSpace(s[j + 7] || ''))) return -1;
-  let depth = 1;
-  while (j < n) {
-    const c = s[j];
-    if (c === '"' || c === "'" || c === '`') { j = c === '`' ? skipTemplate(s, j) : skipString(s, j); continue; }
-    if (c === '<') depth++;
-    else if (c === '>' && s[j - 1] !== '=' && --depth === 0) return j + 1;
-    j++;
-  }
-  fault('open');
-  return n;
-}
-
-/**
  * One tag from its `<`, after the HTML tokenizer's tag states: the name runs to white space,
  * `/` or `>`; an attribute name to white space, `/`, `>` or `=`; a value is single- or
- * double-quoted (to the same quote, whatever lies between), braced (`{…}`, read by
- * `braces`), or unquoted (to white space or `>`). A `{` where an attribute starts (a JSX
- * spread) is braced too. An unclosed tag runs to the end of the text.
+ * double-quoted (to the same quote, whatever lies between), braced (`{…}`,
+ * {@link skipBraces}), or unquoted (to white space or `>`). A `/>` ends the tag like `>`:
+ * HTML does not let an element close itself. An unclosed tag runs to the end of the text.
  * @param {string} s
  * @param {number} i
  * @param {boolean} isEnd whether it is `</…`
- * @param {(s: string, i: number) => number} braces
  * @returns {Tok}
  */
-function scanTag(s, i, isEnd, braces) {
+function scanTag(s, i, isEnd) {
   const n = s.length;
   let j = i + (isEnd ? 2 : 1);
   const nameStart = j;
   while (j < n && !isSpace(s[j]) && s[j] !== '/' && s[j] !== '>') j++;
   const name = s.slice(nameStart, j);
   const attrs = [];
-  let self = false;
   while (j < n) {
     const c = s[j];
-    if (isSpace(c)) { j++; continue; }
+    if (isSpace(c) || c === '/') { j++; continue; }
     if (c === '>') { j++; break; }
-    if (c === '/') {
-      j++;
-      if (s[j] === '>') { self = true; j++; break; }
-      continue;
-    }
-    if (c === '{') { j = braces(s, j); continue; }
+    if (c === '{') { j = skipBraces(s, j); continue; }
     if (c === '<' || c === '"' || c === "'" || c === '=') fault('lost'); // no attribute name starts so
     const attrStart = j++;
     while (j < n && !isSpace(s[j]) && s[j] !== '/' && s[j] !== '>' && s[j] !== '=') j++;
@@ -1036,13 +925,13 @@ function scanTag(s, i, isEnd, braces) {
       if (e < 0) fault('open');
       j = e < 0 ? n : e + 1;
     } else if (q === '{') {
-      j = braces(s, j);
+      j = skipBraces(s, j);
     } else {
       while (j < n && !isSpace(s[j]) && s[j] !== '>') j++;
     }
   }
   if (j >= n && s[n - 1] !== '>') fault('open'); // the tag never ended
-  return { k: 'tag', v: s.slice(i, j), name, end: isEnd, self, attrs };
+  return { k: 'tag', v: s.slice(i, j), name, end: isEnd, attrs };
 }
 
 /**
@@ -1087,97 +976,45 @@ function rawEnd(s, from, name) {
 }
 
 /**
- * Tokens of a JSX element from its `<` to the end of its matching closing tag (or of a
- * self-closing tag): tags, the text between them, and `{…}` children as opaque expressions
- * (read as JavaScript). Text inside `<script>`, `<style>`, `<textarea>`, `<template>` and
- * the other raw-text elements, inside a code element, a component or a custom element
- * ({@link holdsText}), or inside an `<option>` with no `value`, is marked `quiet`: never
- * wording.
- * @param {string} s @param {number} i @param {Tok[]|null} out @returns {number} the index after the element
- */
-function scanJsx(s, i, out) {
-  const n = s.length;
-  const open = [];
-  let quiet = 0;
-  let option = false;
-  const quietName = (name) => RAW_TEXT.has(name.toLowerCase()) || name.toLowerCase() === 'template' || holdsText(name);
-  const push = (tok) => { if (out) out.push(tok); };
-  let j = i;
-  while (j < n) {
-    /** @type {Tok} */
-    let tag;
-    if (s[j + 1] === '>') tag = { k: 'tag', v: '<>', name: '', end: false, self: false, attrs: [] };
-    else if (s[j + 1] === '/' && s[j + 2] === '>') tag = { k: 'tag', v: '</>', name: '', end: true, self: false, attrs: [] };
-    else tag = scanTag(s, j, s[j + 1] === '/', (t, at) => scanJs(t, at, true, null));
-    push(tag);
-    j += tag.v.length;
-    option = optionState(tag, option);
-    const name = /** @type {string} */ (tag.name);
-    if (tag.end) {
-      const closed = open.pop();
-      if (closed !== undefined && quietName(closed)) quiet--;
-      if (open.length === 0) return j;
-    } else if (!tag.self) {
-      open.push(name);
-      if (quietName(name)) quiet++;
-    } else if (open.length === 0) {
-      return j;
-    }
-    let start = j;
-    while (j < n && s[j] !== '<') {
-      if (s[j] === '{') {
-        if (j > start) push({ k: 'text', v: s.slice(start, j), quiet: quiet > 0 || option });
-        const e = scanJs(s, j, true, null);
-        push({ k: 'expr', v: s.slice(j, e) });
-        j = e;
-        start = j;
-      } else {
-        j++;
-      }
-    }
-    if (j > start) push({ k: 'text', v: s.slice(start, j), quiet: quiet > 0 || option });
-  }
-  fault('open'); // an element still open at the end
-  return n;
-}
-
-/**
- * Rule 4 — the tokens of a whole file. `mode` is `jsx` (`.jsx`, `.tsx`: JavaScript with JSX
- * elements), `vue` (a top-level `<template>` is the component's markup, not raw text, and
- * so is a `<template>` with `v-if`, `v-else-if` or `v-else` and no slot inside it), `svelte`
- * (as `html`, but `<Name />` closes itself), `html` (`.html`, `.htm`) or `md` (Markdown
- * prose, where only `{{…}}` and `{%…%}` are template braces). Any other `<template>` is
- * read as raw text: its text is `quiet`, never wording. So is the text inside a code
- * element, a component or a custom element ({@link holdsText}), each counted by its own
- * name so that another element's end tag does not end it, and the text of `<title>` is
- * read to its closing tag as one text token.
+ * Rule 4 — the tokens of a whole HTML file, or of Markdown prose (`md`, where only `{{…}}`
+ * and `{%…%}` are template braces). The open elements are kept on a stack, their names in
+ * lower case. Text is `quiet`, never wording, while an element that holds text is open
+ * ({@link holdsText}: a code element, a `<template>`, a component or custom element, an
+ * element with an `is` attribute) or inside an `<option>` with no `value`. An end tag that
+ * closes the element on top of the stack pops it. Any other end tag, while an element that
+ * holds text is open, cannot be followed (`lost`): HTML itself ignores such an end tag or
+ * closes several elements with it, by rules this scanner does not copy, so where the held
+ * text ends is not known. With no such element open the same end tag closes the nearest
+ * open element of its name, or nothing. A void element never opens, and `/>` closes
+ * nothing. The text of `<title>` is read to its closing tag as one text token.
  * @param {string} s the text, line feeds only
- * @param {'jsx'|'vue'|'svelte'|'html'|'md'} mode
+ * @param {boolean} md
  * @returns {Tok[]}
  */
-function scanMarkup(s, mode) {
+function scanMarkup(s, md) {
   /** @type {Tok[]} */
   const out = [];
-  if (mode === 'jsx') {
-    scanJs(s, 0, false, out);
-    return out;
-  }
   const n = s.length;
   let i = 0;
   let start = 0;
-  let template = 0;
-  /** @type {boolean[]} per open `<template>`, whether it makes its text quiet */
-  const templates = [];
-  /** @type {Map<string, number>} the open elements whose text is never wording, by name */
-  const holds = new Map();
+  /** @type {Array<{name: string, holds: boolean}>} the open elements, the innermost last */
+  const stack = [];
+  /** @type {Map<string, number>} how many open elements carry each name */
+  const open = new Map();
   let held = 0;
   let option = false;
-  const text = (end) => { if (end > start) out.push({ k: 'text', v: s.slice(start, end), quiet: template > 0 || held > 0 || option }); };
+  const text = (end) => { if (end > start) out.push({ k: 'text', v: s.slice(start, end), quiet: held > 0 || option }); };
   const take = (k, end) => {
     text(i);
     out.push({ k, v: s.slice(i, end) });
     i = end;
     start = end;
+  };
+  const pop = () => {
+    const el = /** @type {{name: string, holds: boolean}} */ (stack.pop());
+    open.set(el.name, /** @type {number} */ (open.get(el.name)) - 1);
+    if (el.holds) held--;
+    return el.name;
   };
   while (i < n) {
     const c = s[i];
@@ -1185,36 +1022,29 @@ function scanMarkup(s, mode) {
       const d = s[i + 1] || '';
       if (isLetter(d) || (d === '/' && isLetter(s[i + 2] || ''))) {
         text(i);
-        const tag = scanTag(s, i, d === '/', skipBraces);
+        const tag = scanTag(s, i, d === '/');
         out.push(tag);
         i += tag.v.length;
         start = i;
         option = optionState(tag, option);
         const name = /** @type {string} */ (tag.name).toLowerCase();
-        if (name === 'template' && !tag.self) {
-          if (tag.end) { if (templates.length > 0 && templates.pop()) template--; }
-          else {
-            const attrs = /** @type {string[]} */ (tag.attrs);
-            const shown = mode === 'vue' && (templates.length === 0
-              || (attrs.some((a) => a === 'v-if' || a === 'v-else-if' || a === 'v-else')
-                && !attrs.some((a) => a.startsWith('#') || a.startsWith('v-slot'))));
-            templates.push(!shown);
-            if (!shown) template++;
-          }
+        if (tag.end) {
+          if (stack.length > 0 && stack[stack.length - 1].name === name) pop();
+          else if (held > 0) fault('lost'); // where the held text ends is not known
+          else if (open.get(name)) while (pop() !== name);
+          continue;
         }
-        const raw = /** @type {string} */ (tag.name);
-        if (holdsText(raw) && !(tag.self && (mode === 'vue' || mode === 'svelte'))) {
-          const count = holds.get(raw) || 0;
-          if (!tag.end) { holds.set(raw, count + 1); held++; }
-          else if (count > 0) { holds.set(raw, count - 1); held--; }
+        if (!VOID_ELEMENTS.has(name)) {
+          const holds = holdsText(name, /** @type {string[]} */ (tag.attrs));
+          stack.push({ name, holds });
+          open.set(name, (open.get(name) || 0) + 1);
+          if (holds) held++;
         }
-        if (!tag.end && name === 'title') {
+        if (name === 'title') {
           i = rawEnd(s, i, name);
           text(i);
           start = i;
-          continue;
-        }
-        if (!tag.end && RAW_TEXT.has(name)) {
+        } else if (RAW_TEXT.has(name)) {
           const end = rawEnd(s, i, name);
           if (end > i) take('raw', end);
         }
@@ -1227,9 +1057,9 @@ function scanMarkup(s, mode) {
         take('comment', e < 0 ? n : e + close.length);
         continue;
       }
-    } else if (c === '{' && (mode !== 'md' || s[i + 1] === '{' || s[i + 1] === '%')) {
+    } else if (c === '{' && (!md || s[i + 1] === '{' || s[i + 1] === '%')) {
       let end;
-      if (mode === 'md') {
+      if (md) {
         const e = s.indexOf(s[i + 1] === '{' ? '}}' : '%}', i + 2);
         if (e < 0) fault('open');
         end = e < 0 ? n : e + 2;
@@ -1239,7 +1069,7 @@ function scanMarkup(s, mode) {
     }
     i++;
   }
-  if (templates.length > 0) fault('open'); // a `<template>` never closed
+  if (open.get('template')) fault('open'); // a `<template>` never closed
   text(n);
   return out;
 }
@@ -1266,24 +1096,18 @@ function changedTexts(a, b, wording) {
 
 /** Characters a markup text token never holds when it changes (template, script or entity starts, a line break). */
 const MARKUP_TEXT_BAD = /[{}$`&<\n]/;
-/** In JSX, also the characters of code. */
-const JSX_TEXT_BAD = /[();="']/;
 
 /**
  * Rule 4 (markup) — a changed text token is visible text: not quiet, on one line, without
- * template, script or entity characters (in JSX also none of code), between two tags; in
- * JSX between an opening tag `<name …>` and its own closing tag `</name`, letter case
- * exact, so a generic type or a comparison chain is never text.
- * @param {Tok[]} toks @param {number} k @param {boolean} jsx @returns {boolean}
+ * template, script or entity characters, between two tags.
+ * @param {Tok[]} toks @param {number} k @returns {boolean}
  */
-function markupWording(toks, k, jsx) {
+function markupWording(toks, k) {
   const t = toks[k];
-  if (t.quiet || MARKUP_TEXT_BAD.test(t.v) || (jsx && JSX_TEXT_BAD.test(t.v))) return false;
+  if (t.quiet || MARKUP_TEXT_BAD.test(t.v)) return false;
   const prev = toks[k - 1];
   const next = toks[k + 1];
-  if (!prev || !next || prev.k !== 'tag' || next.k !== 'tag') return false;
-  if (!jsx) return true;
-  return !prev.end && !prev.self && isLetter((prev.name || '')[0] || '') && Boolean(next.end) && next.name === prev.name;
+  return Boolean(prev && next) && prev.k === 'tag' && next.k === 'tag';
 }
 
 /**
@@ -1374,10 +1198,6 @@ function catalogueEntry(line, ext) {
     m = /^(\s*"(?:[^"\\]|\\.)*"\s*:\s*)"((?:[^"\\]|\\.)*)"([\s,]*)$/.exec(line);
     return m && m[3].indexOf(',') === m[3].lastIndexOf(',') ? { key: `${m[1]}\u0000${m[3]}`, value: m[2] } : null;
   }
-  if (ext === '.po') {
-    m = /^(msgstr(?:\[\d\]|\[\d\d\])?[ \t]+)"((?:[^"\\]|\\.)*)"\s*$/.exec(line);
-    return m ? { key: m[1], value: m[2] } : null;
-  }
   if (ext === '.properties') {
     m = /^(\s*[^\s=:#!][^=:]*[=:][ \t]*)(.*)$/.exec(line);
     return m && !m[2].endsWith('\\') ? { key: m[1], value: m[2], bare: true } : null;
@@ -1397,8 +1217,6 @@ function catalogueEntry(line, ext) {
 /** YAML's double-quoted escapes, by the character after the backslash. */
 const YAML_ESCAPES = { 0: '\0', a: '\x07', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\v', f: '\f', r: '\r', e: '\x1b',
   ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\x85', _: '\xa0', L: '\u2028', P: '\u2029' };
-/** Gettext's C escapes (the hexadecimal and octal ones are read apart). */
-const C_ESCAPES = { a: '\x07', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v', '\\': '\\', '"': '"', "'": "'", '?': '?' };
 /** The properties escapes; a backslash before any other character is that character. */
 const PROPERTIES_ESCAPES = { t: '\t', n: '\n', r: '\r', f: '\f' };
 
@@ -1407,31 +1225,23 @@ const PROPERTIES_ESCAPES = { t: '\t', n: '\n', r: '\r', f: '\f' };
  * @param {string} raw
  * @param {Record<string, string>} simple the one-character escapes
  * @param {Record<string, number>} hex fixed-length hexadecimal escapes, by letter
- * @param {'yaml'|'c'|'properties'} format `c` also reads `\x` with any number of digits and octal; `properties` keeps any other escaped character
+ * @param {boolean} keep keep any other escaped character as itself (properties files)
  * @returns {string|null}
  */
-function unescapeValue(raw, simple, hex, format) {
+function unescapeValue(raw, simple, hex, keep) {
   let out = '';
   for (let i = 0; i < raw.length; i++) {
     if (raw[i] !== '\\') { out += raw[i]; continue; }
     const e = raw[++i];
     if (e === undefined) return null;
-    if (format === 'c' && (e === 'x' || (e >= '0' && e <= '7'))) {
-      const octal = e !== 'x';
-      const from = octal ? i : i + 1;
-      let j = from;
-      while (j < raw.length && (octal ? j < i + 3 && raw[j] >= '0' && raw[j] <= '7' : /[0-9A-Fa-f]/.test(raw[j]))) j++;
-      if (j === from) return null;
-      out += String.fromCodePoint(Math.min(parseInt(raw.slice(from, j), octal ? 8 : 16), 0x10ffff));
-      i = j - 1;
-    } else if (hex[e]) {
+    if (hex[e]) {
       const digits = raw.slice(i + 1, i + 1 + hex[e]);
       if (!/^[0-9A-Fa-f]+$/.test(digits) || digits.length !== hex[e]) return null;
       out += String.fromCodePoint(Math.min(parseInt(digits, 16), 0x10ffff));
       i += hex[e];
     } else if (Object.prototype.hasOwnProperty.call(simple, e)) {
       out += simple[e];
-    } else if (format === 'properties') {
+    } else if (keep) {
       out += e;
     } else {
       return null;
@@ -1443,8 +1253,8 @@ function unescapeValue(raw, simple, hex, format) {
 /**
  * Rule 4 (message catalogue) — the value as the program reads it: a JSON string through
  * `JSON.parse`, a YAML double-quoted value through YAML's escapes (single-quoted: `''` is
- * `'`), a Gettext value through C's, a properties value through its own (a backslash before
- * any other character is that character); null for an escape the format refuses.
+ * `'`), a properties value through its own (a backslash before any other character is that
+ * character); null for an escape the format refuses.
  * @param {{value: string, quote?: string}} entry @param {string} ext @returns {string|null}
  */
 function decodeValue(entry, ext) {
@@ -1455,9 +1265,8 @@ function decodeValue(entry, ext) {
       return null;
     }
   }
-  if (ext === '.properties') return unescapeValue(entry.value, PROPERTIES_ESCAPES, { u: 4 }, 'properties');
-  if (ext === '.po') return unescapeValue(entry.value, C_ESCAPES, {}, 'c');
-  if (entry.quote === '"') return unescapeValue(entry.value, YAML_ESCAPES, { x: 2, u: 4, U: 8 }, 'yaml');
+  if (ext === '.properties') return unescapeValue(entry.value, PROPERTIES_ESCAPES, { u: 4 }, true);
+  if (entry.quote === '"') return unescapeValue(entry.value, YAML_ESCAPES, { x: 2, u: 4, U: 8 }, false);
   return entry.quote === "'" ? entry.value.replace(/''/g, "'") : entry.value;
 }
 
@@ -1495,13 +1304,12 @@ function catalogueWording(entry, ext) {
 const placeholders = (value) => (value.match(PLACEHOLDER) || []).sort().join('\u0000');
 
 /**
- * Rule 4 (colour) — the stylesheet with every string, every `/* … *\/` comment (and in
- * SCSS, Sass and Less every `//` comment) and every unquoted `url(…)` replaced by a filler
- * character of the same length (line breaks kept), so neither a `;`, `{` or `}` nor a
- * colour inside them counts. One pass.
- * @param {string} s @param {boolean} lineComments @returns {string}
+ * Rule 4 (colour) — the stylesheet with every string, every `/* … *\/` comment and every
+ * unquoted `url(…)` replaced by a filler character of the same length (line breaks kept),
+ * so neither a `;`, `{` or `}` nor a colour inside them counts. One pass.
+ * @param {string} s @returns {string}
  */
-function blankCss(s, lineComments) {
+function blankCss(s) {
   const parts = [];
   const n = s.length;
   let at = 0;
@@ -1513,9 +1321,6 @@ function blankCss(s, lineComments) {
       const e = s.indexOf('*/', i + 2);
       if (e < 0) fault('open');
       end = e < 0 ? n : e + 2;
-    } else if (c === '/' && s[i + 1] === '/' && lineComments) {
-      const e = s.indexOf('\n', i);
-      end = e < 0 ? n : e;
     } else if (c === '"' || c === "'") {
       end = Math.min(skipString(s, i), n);
     } else if ((c === 'u' || c === 'U') && s.slice(i, i + 4).toLowerCase() === 'url(' && !/[\w-]/.test(s[i - 1] || '')) {
@@ -1541,27 +1346,12 @@ function blankCss(s, lineComments) {
 
 /**
  * Rule 4 (colour) — the statements of a blanked stylesheet: each runs to the `{`, `;` or
- * `}` that ends it (`term`), at the brace depth it starts in. In Sass's indented syntax a
- * line is a statement; it opens a block (`{`) when the next line that is not blank is
- * indented further, and its depth is 1 when it is indented at all.
- * @param {string} blank @param {boolean} sass
+ * `}` that ends it (`term`), at the brace depth it starts in.
+ * @param {string} blank
  * @returns {Array<{start: number, end: number, term: string, depth: number}>}
  */
-function cssStatements(blank, sass) {
+function cssStatements(blank) {
   const out = [];
-  if (sass) {
-    const lines = blank.split('\n');
-    const indent = (l) => l.length - l.trimStart().length;
-    const starts = [];
-    for (let i = 0, at = 0; i < lines.length; at += lines[i].length + 1, i++) starts.push(at);
-    let nextIndent = -1;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const own = indent(lines[i]);
-      out.push({ start: starts[i], end: starts[i] + lines[i].length, term: nextIndent > own ? '{' : ';', depth: own > 0 ? 1 : 0 });
-      if (lines[i].trim() !== '') nextIndent = own;
-    }
-    return out.reverse();
-  }
   let depth = 0;
   let start = 0;
   for (let i = 0; i < blank.length; i++) {
@@ -1585,16 +1375,16 @@ function cssStatements(blank, sass) {
  * fragment address such as `url(#fade)` is never a colour. Whether text is a selector or a
  * declaration is read from the whole file ({@link cssStatements}): a statement that ends in
  * `{` is a selector or a rule's head, wherever its `{` stands; a declaration starts with
- * `name:`, and at depth 0 only a variable or custom property (`$x`, `@x`, `--x`) is one.
- * The property's name must stand on the token's own line. A colour function is read only
- * in its two written forms ({@link colourFunction}). One forward pass.
- * @param {string} text @param {string} ext
+ * `name:`, and at depth 0 only a custom property (`--x`) is one. The property's name must
+ * stand on the token's own line. A colour function is read only in its written forms
+ * ({@link colourFunction}). One forward pass.
+ * @param {string} text
  * @returns {Array<{t: string, i: number, j: number, prop: (string|null)}>}
  */
-function colourSlots(text, ext) {
-  const blank = blankCss(text, ext !== '.css');
-  const statements = cssStatements(blank, ext === '.sass');
-  const head = /\s*(--[\w-]+|\$[\w-]+|@[\w-]+|[A-Za-z-]+)\s*:/y;
+function colourSlots(text) {
+  const blank = blankCss(text);
+  const statements = cssStatements(blank);
+  const head = /\s*(--[\w-]+|[A-Za-z-]+)\s*:/y;
   const re = /#[0-9A-Fa-f]+|(?:rgba?|hsla?)\([^()]*\)|[A-Za-z]+/g;
   const out = [];
   let si = 0;
@@ -1618,7 +1408,7 @@ function colourSlots(text, ext) {
     if (st.decl === undefined) {
       head.lastIndex = st.start;
       const h = st.term === '{' ? null : head.exec(blank);
-      st.decl = h && (st.depth > 0 || /^[-$@]/.test(h[1]))
+      st.decl = h && (st.depth > 0 || h[1].startsWith('--'))
         ? { name: h[1], at: st.start + h[0].length - h[0].trimStart().length, valueAt: head.lastIndex }
         : null;
     }
@@ -1647,53 +1437,109 @@ function colourNumber(x) {
   return digits > 0 && ['', '%', 'deg', 'rad', 'grad', 'turn'].includes(x.slice(i).toLowerCase());
 }
 
+/** The colour functions that may also be written with commas. */
+const COMMA_COLOURS = new Set(['rgb', 'rgba', 'hsl', 'hsla']);
+/** The colour functions written with spaces only; `color(…)` names a colour space first. */
+const SPACE_COLOURS = new Set(['hwb', 'lab', 'lch', 'oklab', 'oklch', 'color']);
+
 /**
- * Rule 4 (colour) — a colour function in one of its two written forms: three or four
- * comma-separated numbers, or three space-separated numbers with an optional `/ alpha`
- * ({@link colourNumber} each), so `rgb(<11, 94, 215)` is no colour.
- * @param {string} t @returns {boolean}
+ * Rule 4 (colour) — a colour function in one of its written forms: for `rgb`, `rgba`, `hsl`
+ * and `hsla`, three or four comma-separated numbers; for those and for `hwb`, `lab`, `lch`,
+ * `oklab`, `oklch` and `color` (after its colour space's name), three space-separated
+ * numbers with an optional `/ alpha` ({@link colourNumber} each). So `rgb(<11, 94, 215)`
+ * and `rgb(var(--x))` are no colour.
+ * @param {string} t `name(…)`, no bracket inside @returns {boolean}
  */
 function colourFunction(t) {
+  const name = t.slice(0, t.indexOf('(')).toLowerCase();
   const inner = t.slice(t.indexOf('(') + 1, -1).trim();
-  if (inner.includes(',')) {
+  if (COMMA_COLOURS.has(name) && inner.includes(',')) {
     const parts = inner.split(',');
     return (parts.length === 3 || parts.length === 4) && parts.every((x) => colourNumber(x.trim()));
   }
+  if (!COMMA_COLOURS.has(name) && !SPACE_COLOURS.has(name)) return false;
   const [main, alpha, extra] = inner.split('/');
   const parts = main.trim().split(/\s+/);
+  if (name === 'color' && !/^[A-Za-z][A-Za-z0-9-]*$/.test(/** @type {string} */ (parts.shift()))) return false;
   return extra === undefined && parts.length === 3 && parts.every((x) => colourNumber(x))
     && (alpha === undefined || colourNumber(alpha.trim()));
 }
 
-/** A custom property (`--x`), a Sass variable (`$x`) or a Less variable (`@x`). */
-const VARIABLE = /^(?:--|\$|@)/;
+/**
+ * @param {string} v a custom property's whole value, trimmed @returns {boolean} it is
+ * exactly one colour: a hexadecimal colour, a named colour, or one colour function
+ * ({@link colourFunction}); nothing beside it, so no `var()`, no `url()`, no second token,
+ * no comment and no `!important`
+ */
+function oneColour(v) {
+  if (v[0] === '#') return [4, 5, 7, 9].includes(v.length) && /^#[0-9A-Fa-f]+$/.test(v);
+  return NAMED_COLOURS.has(v.toLowerCase()) || (/^[A-Za-z]+\([^()]*\)$/.test(v) && colourFunction(v));
+}
 
 /**
  * @param {(string|null)} prop @returns {boolean} a real CSS property whose value is a colour:
  * a name ending in `color` (`color`, `background-color`, `border-color`, `outline-color`,
- * ...) or one of {@link COLOUR_SHORTHANDS}; never a variable or custom property
+ * ...) or one of {@link COLOUR_SHORTHANDS}; never a custom property
  */
-const colourMayStand = (prop) => prop !== null && !VARIABLE.test(prop)
+const colourMayStand = (prop) => prop !== null && !prop.startsWith('--')
   && (/(?:^|-)color$/i.test(prop) || COLOUR_SHORTHANDS.has(prop.toLowerCase()));
 
 /**
- * Rule 4 (colour) — every variable and custom property declaration of a whole stylesheet,
- * `name:value` as written (comments and strings in the value included), in order. A
- * script reads a custom property (`getComputedStyle`), and a Sass or Less variable feeds
- * whatever the build makes of it, so any change to one is a setting, whatever it holds.
- * @param {string} text @param {string} ext @returns {string}
+ * Rule 4 (colour) — every custom property declaration of a whole stylesheet, in order: its
+ * name, its value as written (comments and strings included, trimmed) and where that value
+ * stands. A script reads a custom property (`getComputedStyle`), so a change to one is a
+ * setting unless it is a colour by {@link colourNamedEdit}. A custom property whose value
+ * opens a block (`--x: { … }`) cannot be followed: its inside would read as declarations.
+ * @param {string} text @returns {Array<{name: string, value: string, from: number, to: number}>}
  */
-function variableDeclarations(text, ext) {
-  const blank = blankCss(text, ext !== '.css');
-  const head = /\s*(--[\w-]+|\$[\w-]+|@[\w-]+)\s*:/y;
+function customProperties(text) {
+  const blank = blankCss(text);
+  const head = /\s*(--[\w-]+)\s*:/y;
   const out = [];
-  for (const st of cssStatements(blank, ext === '.sass')) {
-    if (st.term === '{') continue;
+  for (const st of cssStatements(blank)) {
     head.lastIndex = st.start;
     const h = head.exec(blank);
-    if (h && head.lastIndex <= st.end) out.push(`${h[1]}:${text.slice(head.lastIndex, st.end).trim()}`);
+    if (!h || head.lastIndex > st.end) continue;
+    if (st.term === '{') fault('lost');
+    const raw = text.slice(head.lastIndex, st.end);
+    const from = head.lastIndex + raw.length - raw.trimStart().length;
+    out.push({ name: h[1], value: raw.trim(), from, to: from + raw.trim().length });
   }
-  return out.join('\u0000');
+  return out;
+}
+
+/**
+ * Rule 4 (colour) — a change to custom properties that is a colour change (the session's
+ * decision of 2026-10-09, on the owner's instruction): the same properties in the same
+ * order, and every one whose value changed has `color` or `colour` in its name and holds
+ * exactly one colour before and after ({@link oneColour}). Returns the two stylesheets
+ * with each such value replaced by one same colour, for the rest of the comparison (every
+ * other character must still be identical, or a colour in a real colour property), or null:
+ * any other custom-property change is a setting.
+ * @param {string} o @param {string} n @returns {[string, string]|null}
+ */
+function colourNamedEdit(o, n) {
+  const a = customProperties(o);
+  const b = customProperties(n);
+  if (a.length !== b.length) return null;
+  const changed = [];
+  for (let k = 0; k < a.length; k++) {
+    if (a[k].name !== b[k].name) return null;
+    if (a[k].value === b[k].value) continue;
+    if (!/colou?r/i.test(a[k].name) || !oneColour(a[k].value) || !oneColour(b[k].value)) return null;
+    changed.push(k);
+  }
+  const levelled = (text, list) => {
+    const parts = [];
+    let at = 0;
+    for (const k of changed) {
+      parts.push(text.slice(at, list[k].from));
+      at = list[k].to;
+    }
+    parts.push(text.slice(at));
+    return parts.join('red');
+  };
+  return [levelled(o, a), levelled(n, b)];
 }
 
 /** @param {string} text @param {Array<{i: number, j: number}>} toks @returns {string} the text with each token replaced by one marker, built in one pass */
@@ -1715,11 +1561,11 @@ function masked(text, toks) {
  * token stands, on both sides, in the value of a real colour property
  * ({@link colourSlots}, {@link colourMayStand}), so `animation: red 2s` and `width: #fff`
  * are never a colour. Linear in the files' length.
- * @param {string} o @param {string} n @param {string} ext @returns {boolean}
+ * @param {string} o @param {string} n @returns {boolean}
  */
-function colourEdit(o, n, ext) {
-  const a = colourSlots(o, ext);
-  const b = colourSlots(n, ext);
+function colourEdit(o, n) {
+  const a = colourSlots(o);
+  const b = colourSlots(n);
   if (a.length !== b.length || masked(o, a) !== masked(n, b)) return false;
   let changed = 0;
   for (let k = 0; k < a.length; k++) {
@@ -1785,17 +1631,20 @@ function indentWidth(line) {
 /** A doctest line, `>>> ` (or `>>>` alone): it and the lines after it up to a blank line are code. */
 const DOCTEST = /^[ \t]*>>>(?:[ \t]|$)/;
 /**
+ * A line that starts `import ` or `export `: where the Markdown is built as MDX it and the
+ * lines after it up to a blank line are JavaScript, so they are code.
+ */
+const MDX_SCRIPT = /^(?:import|export) /;
+/**
  * @param {string} line @returns {boolean} a Markdown thematic break (`* * *`, `---`), which
- * is no list item: at most three spaces, then three or more of one of `-`, `*`, `_` with
- * only spaces and tabs between. Read by hand, one pass.
+ * is no list item: three or more of one of `-`, `*`, `_` with only spaces and tabs between.
+ * Read by hand, one pass.
  */
 function thematicBreak(line) {
-  let i = 0;
-  while (i < 3 && line[i] === ' ') i++;
-  const c = line[i];
+  const c = line[0];
   if (c !== '-' && c !== '*' && c !== '_') return false;
   let count = 0;
-  for (; i < line.length; i++) {
+  for (let i = 0; i < line.length; i++) {
     if (line[i] === c) count++;
     else if (line[i] !== ' ' && line[i] !== '\t') return false;
   }
@@ -1803,25 +1652,46 @@ function thematicBreak(line) {
 }
 /** A Markdown list item's marker and the white space after it; the item must hold text. */
 const LIST_ITEM = /^([ \t]*)([-+*]|\d{1,9}[.)])([ \t]+)\S/;
+/** How deep block quotes, and list markers on one line, are followed; deeper is read as code. */
+const NESTING_DEPTH = 16;
 
 /**
- * Rule 4 (documentation) — each line of a Markdown file: `settings` (front matter), `code`
- * or `prose`. Code is a fenced block of either fence kind (its fences included, unclosed to
- * the end), an indented block (four columns beyond the list item it stands in, after a
- * blank line or another such line), a list item whose text starts five or more columns
- * after its marker, and a doctest ({@link DOCTEST}), also where an item's text opens a
- * fence or a doctest. The list items are read after CommonMark's rules, so a paragraph
- * indented to an item's content column is prose; any line indented less than an item's
- * content column ends that item (a lazy continuation line is read as ending it too, which
- * only makes more lines code); a thematic break and an item with no text are no items; an
- * ordered item not numbered 1 starts an item only after a blank line or another item; and
- * a fence closes only at its own item's column.
- * @param {string} text line feeds only @returns {string[]}
+ * Rule 4 (documentation) — the lines of a Markdown file from line `top` on: each one's
+ * class (`code` or `prose`), and where its blocks start and end, which is where a run of
+ * inline text (a code span) can neither continue from the line above (`starts`) nor into
+ * the line below (`ends`).
+ * Code is a fenced block of either fence kind (its fences included, unclosed to the end),
+ * an indented block (four columns beyond the list item it stands in, after a blank line or
+ * another such line), a doctest ({@link DOCTEST}) and an `import` or `export` block
+ * ({@link MDX_SCRIPT}, where a block starts). The list items are read after CommonMark's rules: an item's own
+ * text is read as a line of its own at the item's content column, so it may open a fence,
+ * a doctest, a block quote or another item, or be indented code; a paragraph indented to an
+ * item's content column is prose; any line indented less than an item's content column
+ * ends that item (a lazy continuation line is read as ending it too, which only makes more
+ * lines code, while its text still continues the paragraph above); a thematic break and an
+ * item with no text are no items; an ordered item not numbered 1 starts an item only after
+ * a blank line or another ordered item; and a fence closes only at its own item's column.
+ * A block quote is read like the document it quotes: the marker (`>` after at most three
+ * spaces, and one space) is taken off each line of a run of quoted lines, the rest is
+ * classified by this same function, and the classes are copied back. A quote whose marker
+ * holds a tab, or one nested deeper than {@link NESTING_DEPTH}, is code whole, and so is a
+ * line with more list markers than that.
+ * A heading (`# …`, or a paragraph underlined with `===` or `---`) and a thematic break end
+ * the block they stand in, and an indented line right after one of them, after a closed
+ * fence or after a quote that did not end in a paragraph is code. A paragraph may run on
+ * past the end of a list item or a quote (a lazy continuation line); such a paragraph takes
+ * no underline.
+ * @param {string[]} lines
+ * @param {number} top the number of front matter lines, classed `settings`
+ * @param {number} depth how many block quotes enclose these lines
+ * @returns {{cls: string[], starts: boolean[], ends: boolean[], paragraph: boolean}}
+ * `paragraph`: the last line is a paragraph's text, which the next line may continue
  */
-function markdownLines(text) {
-  const lines = text.split('\n');
-  const cls = new Array(lines.length).fill('prose');
-  const top = frontMatterLines(lines);
+function markdownBlocks(lines, top, depth) {
+  const n = lines.length;
+  const cls = new Array(n).fill('prose');
+  const starts = new Array(n).fill(false);
+  const ends = new Array(n).fill(false);
   for (let i = 0; i < top; i++) cls[i] = 'settings';
   /** @type {{mark: string, col: number}|null} */
   let fence = null;
@@ -1829,155 +1699,118 @@ function markdownLines(text) {
   const cols = [];
   let prevBlank = true;
   let prevIndented = false;
-  let prevItem = false;
-  let doctest = false;
-  for (let i = top; i < lines.length; i++) {
-    const line = lines[i];
+  let prevItem = '';
+  /** @type {''|'own'|'lazy'} whether the line above is a paragraph's text, and one that ran on lazily */
+  let prevParagraph = '';
+  let block = false; // inside a doctest or an `import` / `export` block
+  for (let i = top; i < n; i++) {
     if (fence) {
       cls[i] = 'code';
-      const close = /^[ \t]*(`+|~+)[ \t]*$/.exec(line);
-      const w = indentWidth(line);
-      if (close && w >= fence.col && w - fence.col <= 3 && close[1][0] === fence.mark[0] && close[1].length >= fence.mark.length) fence = null;
-      continue;
-    }
-    if (line.trim() === '') {
-      prevBlank = true;
-      doctest = false;
-      continue;
-    }
-    const w = indentWidth(line);
-    while (cols.length > 0 && cols[cols.length - 1] > w) cols.pop();
-    const rel = w - (cols.length > 0 ? cols[cols.length - 1] : 0);
-    const indented = rel >= 4 && (prevBlank || prevIndented);
-    const afterBlank = prevBlank;
-    const afterItem = prevItem;
-    prevIndented = indented;
-    prevBlank = false;
-    prevItem = false;
-    if (indented) { cls[i] = 'code'; continue; }
-    const body = line.trimStart();
-    const open = /^(`{3,}|~{3,})/.exec(body);
-    if (rel <= 3 && open && !(open[1][0] === '`' && body.slice(open[0].length).includes('`'))) {
-      fence = { mark: open[1], col: w - rel };
-      cls[i] = 'code';
-      continue;
-    }
-    if (doctest || DOCTEST.test(line)) {
-      doctest = true;
-      cls[i] = 'code';
-      continue;
-    }
-    let item = rel <= 3 && !thematicBreak(line) ? LIST_ITEM.exec(line) : null;
-    // An ordered item that does not start at 1 cannot interrupt a paragraph: it is the
-    // paragraph's text, unless a blank line or another item stands right before it.
-    if (item && /^\d/.test(item[2]) && Number.parseInt(item[2], 10) !== 1 && !afterBlank && !afterItem) item = null;
-    if (item) {
-      prevItem = true;
-      const after = indentWidth(line.slice(item[1].length + item[2].length).replace(/\S[\s\S]*$/, ''));
-      const col = w + item[2].length + (after >= 5 ? 1 : after);
-      cols.push(col);
-      // The item's own text may open a fence or a doctest, or be indented code.
-      const content = line.slice(item[0].length - 1);
-      const inner = /^(`{3,}|~{3,})/.exec(content);
-      if (after >= 5) cls[i] = 'code';
-      else if (inner && !(inner[1][0] === '`' && content.slice(inner[0].length).includes('`'))) {
-        fence = { mark: inner[1], col };
-        cls[i] = 'code';
-      } else if (DOCTEST.test(content)) {
-        doctest = true;
-        cls[i] = 'code';
+      const close = /^[ \t]*(`+|~+)[ \t]*$/.exec(lines[i]);
+      const w = indentWidth(lines[i]);
+      if (close && w >= fence.col && w - fence.col <= 3 && close[1][0] === fence.mark[0] && close[1].length >= fence.mark.length) {
+        fence = null;
+        prevIndented = true;
       }
+      continue;
     }
+    if (lines[i].trim() === '') {
+      prevBlank = true;
+      prevParagraph = '';
+      block = false;
+      continue;
+    }
+    let line = lines[i];
+    let lazy = prevParagraph === 'lazy';
+    let item = '';
+    /** @type {''|'own'|'lazy'} */
+    let paragraph = '';
+    // The line is read once, and once more for each list marker taken off its start.
+    for (let markers = 0; ; markers++) {
+      const inItem = markers > 0;
+      const w = indentWidth(line);
+      while (!inItem && cols.length > 0 && cols[cols.length - 1] > w) {
+        cols.pop();
+        lazy = lazy || !prevBlank;
+      }
+      const base = cols.length > 0 ? cols[cols.length - 1] : 0;
+      const rel = w - base;
+      const afterBlank = prevBlank || inItem;
+      const indented = rel >= 4 && (afterBlank || prevIndented);
+      prevIndented = indented;
+      prevBlank = false;
+      if (indented || markers > NESTING_DEPTH) { cls[i] = 'code'; break; }
+      const body = line.trimStart();
+      const open = /^(`{3,}|~{3,})/.exec(body);
+      if (rel <= 3 && open && !(open[1][0] === '`' && body.slice(open[0].length).includes('`'))) {
+        fence = { mark: open[1], col: base };
+        cls[i] = 'code';
+        break;
+      }
+      if (block || DOCTEST.test(line) || (afterBlank && MDX_SCRIPT.test(line))) {
+        block = true;
+        cls[i] = 'code';
+        break;
+      }
+      if (rel <= 3 && body[0] === '>') {
+        const run = [line];
+        let j = i + 1;
+        while (j < n && lines[j].trimStart()[0] === '>' && !DOCTEST.test(lines[j])
+          && indentWidth(lines[j]) >= base && indentWidth(lines[j]) - base <= 3) run.push(lines[j++]);
+        let followed = depth < NESTING_DEPTH;
+        const quoted = run.map((l) => {
+          const marker = /** @type {RegExpExecArray} */ (/^[ \t]*>[ \t]?/.exec(l))[0];
+          if (marker.includes('\t')) followed = false;
+          return l.slice(marker.length);
+        });
+        const inner = followed ? markdownBlocks(quoted, 0, depth + 1) : null;
+        for (let k = 0; k < run.length; k++) {
+          cls[i + k] = inner ? inner.cls[k] : 'code';
+          starts[i + k] = k === 0 || Boolean(inner && inner.starts[k]);
+          ends[i + k] = Boolean(inner && inner.ends[k]);
+        }
+        i = j - 1;
+        // A quote that ends in a paragraph may run on in the next line; any other ends here.
+        if (inner && inner.paragraph) paragraph = 'lazy';
+        else {
+          ends[i] = true;
+          prevIndented = true;
+        }
+        break;
+      }
+      // A heading, a setext underline (it closes the paragraph above as a heading, and is
+      // never a lazy line) and a thematic break each end the block they stand in.
+      const heading = /^#{1,6}(?:[ \t]|$)/.test(body);
+      const underline = prevParagraph === 'own' && !inItem && !lazy && /^(?:=+|-+)[ \t]*$/.test(body);
+      if (rel <= 3 && (heading || underline || thematicBreak(body))) {
+        starts[i] = !underline;
+        ends[i] = true;
+        prevIndented = true;
+        break;
+      }
+      const m = rel <= 3 ? LIST_ITEM.exec(line) : null;
+      const ordered = m !== null && /^\d/.test(m[2]);
+      // An ordered item that does not start at 1 cannot interrupt a paragraph: it is the
+      // paragraph's text, unless a blank line or another ordered item stands right before it.
+      if (!m || (ordered && Number.parseInt(m[2], 10) !== 1 && !afterBlank && prevItem !== 'ordered')) {
+        paragraph = lazy ? 'lazy' : 'own';
+        break;
+      }
+      item = ordered ? 'ordered' : 'bullet';
+      starts[i] = true;
+      lazy = false;
+      const after = indentWidth(line.slice(m[1].length + m[2].length).replace(/\S[\s\S]*$/, ''));
+      // The item's text starts its content column; five or more columns after the marker,
+      // the column is one after the marker and the text is indented code.
+      const col = w + m[2].length + (after >= 5 ? 1 : after);
+      cols.push(col);
+      line = ' '.repeat(after >= 5 ? col + after - 1 : col) + line.slice(m[0].length - 1);
+    }
+    prevItem = item;
+    prevParagraph = paragraph;
   }
   if (fence) fault('open');
-  return cls;
-}
-
-/** The start of a reStructuredText explicit markup block: a directive, a target, a substitution, a footnote or a comment. */
-const RST_DIRECTIVE = /^([ \t]*)\.\.[ \t]/;
-/** A directive's name and its `::`, domains included (`py:function::`). */
-const RST_DIRECTIVE_NAME = /^([A-Za-z0-9][\w:.+-]*?)::(?:[ \t]|$)/;
-/**
- * The directives whose body is prose: the admonitions, `seealso`, `topic`, `sidebar` and
- * `rubric`. Every other directive is code, its line and its indented body.
- */
-const RST_PROSE_DIRECTIVES = new Set(['note', 'warning', 'tip', 'important', 'caution', 'danger', 'error', 'hint',
-  'attention', 'seealso', 'admonition', 'topic', 'sidebar', 'rubric']);
-/** A directive option, `:name:` at the start of the body. */
-const RST_OPTION = /^[ \t]+:[^:\s][^:]*:(?:[ \t]|$)/;
-
-/**
- * Rule 4 (documentation) — each line of a reStructuredText file: `code` or `prose`. Code is
- * every directive but the prose ones ({@link RST_PROSE_DIRECTIVES}), with its indented body;
- * a prose directive's options (its body's leading `:name:` lines), and the whole of one
- * whose own line ends in `::` (a literal block follows); a link target
- * `.. _name:` and its indented lines; a literal block, the indented (or quoted, each line
- * starting with the same punctuation) block after a paragraph ending in `::` or a line `::`
- * alone, after a blank line; and a doctest ({@link DOCTEST}). A prose directive's line and
- * body stay prose, read line by line, so a code directive nested in one is code.
- * @param {string} text line feeds only @returns {string[]}
- */
-function rstLines(text) {
-  const lines = text.split('\n');
-  const cls = new Array(lines.length).fill('prose');
-  const blank = (k) => lines[k].trim() === '';
-  const indent = (k) => lines[k].length - lines[k].trimStart().length;
-  /** the last line of the block indented deeper than `col` after line `i` (blank lines between included), or `i` */
-  const body = (i, col) => {
-    let last = i;
-    for (let j = i + 1; j < lines.length; j++) {
-      if (blank(j)) continue;
-      if (indent(j) <= col) break;
-      last = j;
-    }
-    return last;
-  };
-  const mark = (from, to) => { for (let k = from; k <= to; k++) cls[k] = 'code'; };
-  for (let i = 0; i < lines.length; i++) {
-    if (blank(i)) continue;
-    const m = RST_DIRECTIVE.exec(lines[i]);
-    if (m) {
-      let rest = lines[i].slice(m[0].length).trimStart();
-      if (rest[0] === '|') rest = rest.slice(rest.indexOf('|', 1) + 1).trimStart(); // a substitution: `.. |name| raw:: html`
-      const d = RST_DIRECTIVE_NAME.exec(rest);
-      if (d && RST_PROSE_DIRECTIVES.has(d[1].toLowerCase()) && !rest.slice(d[0].length).trimEnd().endsWith('::')) {
-        let j = i + 1;
-        while (j < lines.length && RST_OPTION.test(lines[j]) && indent(j) > m[1].length) cls[j++] = 'code';
-        i = j - 1;
-        continue;
-      }
-      if (d || rest[0] === '_') { // `_`: a link target, `.. _name: address`
-        const last = body(i, m[1].length);
-        mark(i, last);
-        i = last;
-      }
-      continue;
-    }
-    if (DOCTEST.test(lines[i])) {
-      let j = i;
-      while (j + 1 < lines.length && !blank(j + 1)) j++;
-      mark(i, j);
-      i = j;
-      continue;
-    }
-    if (!lines[i].trimEnd().endsWith('::') || (i + 1 < lines.length && !blank(i + 1))) continue;
-    let j = i + 1;
-    while (j < lines.length && blank(j)) j++;
-    if (j >= lines.length) continue;
-    const col = indent(i);
-    if (indent(j) > col) {
-      const last = body(i, col);
-      mark(j, last);
-      i = last;
-    } else if (indent(j) === col && /^[!-/:-@[-`{-~]/.test(lines[j].trimStart())) {
-      const q = lines[j].trimStart()[0];
-      let last = j;
-      while (last + 1 < lines.length && indent(last + 1) === col && lines[last + 1].trimStart()[0] === q) last++;
-      mark(j, last);
-      i = last;
-    }
-  }
-  return cls;
+  return { cls, starts, ends, paragraph: prevParagraph !== '' };
 }
 
 /**
@@ -2021,33 +1854,11 @@ function lineClassChange(hunks, oldCls, newCls) {
 }
 
 /**
- * Rule 4 (Markdown) — the inline code spans of the prose: a run of backticks closed by the
- * next run of the same length. Returns the spans' contents, joined, and the prose with each
- * span's content blanked (same length, line breaks kept), so that no tag or link inside one
- * counts. Each run is visited once.
- * @param {string} s @returns {{blanked: string, spans: string}}
+ * Every pair of backtick runs in one run of inline text: a run closed by the next run of
+ * the same length, as CommonMark pairs them. Each run is visited once.
+ * @param {string} s @returns {Array<{from: number, to: number}>} the ends of each pair's content
  */
-function codeSpans(s) {
-  const spans = [];
-  const parts = [];
-  let at = 0;
-  for (const { from, to } of backtickPairs(s)) {
-    spans.push(s.slice(from, to));
-    parts.push(s.slice(at, from), s.slice(from, to).replace(/[^\n]/g, '\u0002'));
-    at = to;
-  }
-  parts.push(s.slice(at));
-  return { blanked: parts.join(''), spans: spans.join('\u0000') };
-}
-
-/**
- * Every pair of backtick runs in the text: a run closed by the next run of the same length.
- * Each run is visited once. With `strict` (reStructuredText, where a run left unpaired is an
- * inline span left open), a run that pairs with none is an `open` fault.
- * @param {string} s @returns {Array<{open: number, from: number, to: number, len: number}>}
- * `open` is the opening run's start, `from` and `to` the content's ends, `len` the run length
- */
-function backtickPairs(s, strict = false) {
+function backtickPairs(s) {
   /** @type {Array<[number, number]>} */
   const runs = [];
   for (let i = 0; i < s.length;) {
@@ -2065,73 +1876,73 @@ function backtickPairs(s, strict = false) {
   });
   const next = new Map();
   const pairs = [];
-  let unpaired = 0;
   for (let r = 0; r < runs.length;) {
     const [start, len] = runs[r];
     const list = /** @type {number[]} */ (byLength.get(len));
     let p = next.get(len) || 0;
     while (p < list.length && list[p] <= r) p++;
     next.set(len, p);
-    if (p === list.length) { unpaired++; r++; continue; }
+    if (p === list.length) { r++; continue; }
     const close = list[p];
-    pairs.push({ open: start, from: start + len, to: runs[close][0], len });
+    pairs.push({ from: start + len, to: runs[close][0] });
     r = close + 1;
   }
-  if (strict && unpaired > 0) fault('open');
   return pairs;
 }
 
 /**
- * @param {string} t one word, its surrounding punctuation removed @returns {boolean} a
- * reStructuredText simple reference (`guide_`, `guide__`), which links to the target of
- * that name, or a footnote or citation reference (`[1]_`)
+ * Where backticks may pair otherwise than {@link backtickPairs} reads them: a table cell
+ * ends at `|`, a backslash escapes a backtick, and a tag or an autolink takes its backticks
+ * out of the pairing.
  */
-function rstReference(t) {
-  if (/^\[[^\]]+\]_$/.test(t)) return true;
-  let end = t.length;
-  if (t[end - 1] !== '_') return false;
-  end--;
-  if (t[end - 1] === '_') end--;
-  const name = t.slice(0, end);
-  return /^[A-Za-z0-9][\w.+:-]*$/.test(name) && /[A-Za-z0-9]$/.test(name);
+const PAIRING_UNSURE = /[|<]|\\`/;
+
+/**
+ * Rule 4 (Markdown) — the inline code spans of the prose. Backticks pair inside one run of
+ * inline text: one paragraph, heading, list item or table row, never across a blank line, a
+ * code line or the start or end of a block ({@link markdownBlocks}), so a lone backtick in
+ * one paragraph cannot open a span that swallows the next paragraph's opening backtick and
+ * leaves that span's code as prose. Where the pairing is not sure ({@link PAIRING_UNSURE}),
+ * everything from the run's first backtick to its last is one span. Returns the spans'
+ * contents, joined, and the prose with each span's content blanked (same length, line
+ * breaks kept), so that no tag or link inside one counts.
+ * @param {string[]} lines the prose lines, every other line empty
+ * @param {{starts: boolean[], ends: boolean[]}} blocks
+ * @returns {{blanked: string, spans: string}}
+ */
+function codeSpans(lines, blocks) {
+  const spans = [];
+  const parts = [];
+  for (let i = 0; i < lines.length;) {
+    let j = i + 1;
+    while (j < lines.length && lines[j].trim() !== '' && lines[i].trim() !== '' && !blocks.starts[j] && !blocks.ends[j - 1]) j++;
+    const s = lines.slice(i, j).join('\n');
+    let pairs = backtickPairs(s);
+    if (PAIRING_UNSURE.test(s)) {
+      let from = s.indexOf('`');
+      let to = s.lastIndexOf('`');
+      while (s[from] === '`') from++;
+      while (to > from && s[to - 1] === '`') to--;
+      pairs = from >= 0 && from < to ? [{ from, to }] : [];
+    }
+    let at = 0;
+    for (const { from, to } of pairs) {
+      spans.push(s.slice(from, to));
+      parts.push(s.slice(at, from), s.slice(from, to).replace(/[^\n]/g, '\u0002'));
+      at = to;
+    }
+    parts.push(s.slice(at), '\n');
+    i = j;
+  }
+  parts.pop();
+  return { blanked: parts.join(''), spans: spans.join('\u0000') };
 }
 
 /**
- * Rule 4 (reStructuredText) — the inline spans that are never wording, in order: every role
- * span, `:name:` before or after the backquoted text (a role may be defined as `raw` and
- * carry HTML), with its name; every interpreted text without a role (a `default-role` may
- * make it one); every inline literal; the target `<…>` of every hyperlink reference,
- * or its whole text when that text names the target; and then every simple reference
- * (`guide_`, which links to the target `guide`) and footnote reference (`[1]_`).
- * @param {string} s the prose, code lines blanked @returns {string}
+ * @param {string} label @returns {string} a link label as CommonMark matches it: white
+ * space collapsed and the case folded, so `[ẞ]` names the definition `[SS]`
  */
-function rstSpans(s) {
-  const out = [];
-  for (const { open, from, to, len } of backtickPairs(s, true)) {
-    const text = s.slice(from, to);
-    if (len !== 1) {
-      out.push(`\`\`${text}`);
-      continue;
-    }
-    const before = /:[A-Za-z][\w.+-]*:$/.exec(s.slice(Math.max(0, open - 64), open));
-    const after = /^:[A-Za-z][\w.+-]*:/.exec(s.slice(to + 1, to + 65));
-    if (before || after) out.push(`${before ? before[0] : ''}\`${text}\`${after ? after[0] : ''}`);
-    else if (s[to + 1] === '_') out.push(text.slice(Math.max(0, text.lastIndexOf('<'))));
-    else out.push(`\`${text}\``);
-  }
-  for (const word of s.split(/\s+/)) {
-    let from = 0;
-    let to = word.length;
-    while (from < to && '(<{\'"'.includes(word[from])) from++;
-    while (to > from && ')>}\'".,;:!?'.includes(word[to - 1])) to--; // by hand: a trailing pattern would rescan
-    const t = word.slice(from, to);
-    if (rstReference(t)) out.push(t);
-  }
-  return out.join('\u0000');
-}
-
-/** @param {string} label @returns {string} a link label as Markdown matches it */
-const labelKey = (label) => label.trim().toLowerCase().replace(/\s+/g, ' ');
+const labelKey = (label) => label.trim().replace(/\s+/g, ' ').toLowerCase().toUpperCase().toLowerCase();
 
 /**
  * Rule 4 (Markdown) — every link and image target of the prose, in order: the `(…)` after
@@ -2163,7 +1974,8 @@ function linkTargets(s) {
   }
   const defined = new Set();
   const lines = s.split('\n');
-  const definition = /^ {0,3}\[([^\]\n]*)\]:/;
+  // Also behind the markers of a block quote or a list item, where a definition may stand.
+  const definition = /^[ \t>*+.)\d-]*\[([^\]\n]*)\]:/;
   for (let i = 0; i < lines.length; i++) {
     const m = definition.exec(lines[i]);
     if (!m) continue;
@@ -2204,46 +2016,31 @@ function linkTargets(s) {
 
 /**
  * Rule 4 (Markdown) — the cause word of a Markdown change that is not wording, or null.
- * Front matter is settings; a fenced or indented code block is code, and so is an
+ * Front matter is settings; a code line is code ({@link markdownBlocks}), and so is an
  * unchanged line whose class the change moved. The rest is read whole, code spans blanked:
  * the code spans and the link targets must be identical, and the HTML scanner's tokens
- * ({@link scanMarkup}, `md` mode) identical but changed prose text, never inside raw text,
- * a template, an `<option>` with no `value` or template braces `{{…}}` / `{%…%}`.
+ * ({@link scanMarkup}) identical but changed prose text, never inside an element that holds
+ * its text, an `<option>` with no `value` or template braces `{{…}}` / `{%…%}`, and never
+ * with a `{` or `}` in it: where the Markdown is built as MDX a brace starts an expression.
  * @param {ChangedFile} f @returns {('settings'|'code'|null)}
  */
 function markdownRefusal(f) {
-  const o = lineFeeds(/** @type {string} */ (f.oldText));
-  const n = lineFeeds(/** @type {string} */ (f.newText));
-  const oc = markdownLines(o);
-  const nc = markdownLines(n);
-  const moved = lineClassChange(/** @type {Hunk[]} */ (f.hunks), oc, nc);
-  if (moved) return /** @type {'settings'|'code'} */ (moved);
-  const prose = (text, cls) => {
-    const { blanked, spans } = codeSpans(text.split('\n').map((l, i) => (cls[i] === 'prose' ? l : '')).join('\n'));
-    return { tokens: scanMarkup(blanked, 'md'), fixed: `${spans}\u0001${linkTargets(blanked)}` };
+  const read = (text) => {
+    const lines = lineFeeds(/** @type {string} */ (text)).split('\n');
+    return { lines, blocks: markdownBlocks(lines, frontMatterLines(lines), 0) };
   };
-  const a = prose(o, oc);
-  const b = prose(n, nc);
+  const o = read(f.oldText);
+  const n = read(f.newText);
+  const moved = lineClassChange(/** @type {Hunk[]} */ (f.hunks), o.blocks.cls, n.blocks.cls);
+  if (moved) return /** @type {'settings'|'code'} */ (moved);
+  const prose = ({ lines, blocks }) => {
+    const { blanked, spans } = codeSpans(lines.map((l, i) => (blocks.cls[i] === 'prose' ? l : '')), blocks);
+    return { tokens: scanMarkup(blanked, true), fixed: `${spans}\u0001${linkTargets(blanked)}` };
+  };
+  const a = prose(o);
+  const b = prose(n);
   if (a.fixed !== b.fixed) return 'code';
-  return changedTexts(a.tokens, b.tokens, (toks, k) => !toks[k].quiet) ? null : 'code';
-}
-
-/**
- * Rule 4 (reStructuredText) — `code` when a changed line, or an unchanged line whose class
- * moved, lies in a code, include or role directive or a link target ({@link rstLines}),
- * when the inline spans that are never wording differ ({@link rstSpans}), or when a changed
- * line holds template braces `{{` or `{%`; else null. Plain text outside them is wording.
- * @param {ChangedFile} f @returns {('code'|null)}
- */
-function rstRefusal(f) {
-  const hunks = /** @type {Hunk[]} */ (f.hunks);
-  const sides = [f.oldText, f.newText].map((t) => {
-    const text = lineFeeds(/** @type {string} */ (t));
-    const cls = rstLines(text);
-    return { cls, spans: rstSpans(text.split('\n').map((l, i) => (cls[i] === 'prose' ? l : '')).join('\n')) };
-  });
-  if (lineClassChange(hunks, sides[0].cls, sides[1].cls) || sides[0].spans !== sides[1].spans) return 'code';
-  return hunks.some((h) => [...h.removed, ...h.added].some((l) => l.includes('{{') || l.includes('{%'))) ? 'code' : null;
+  return changedTexts(a.tokens, b.tokens, (toks, k) => !toks[k].quiet && !/[{}]/.test(toks[k].v)) ? null : 'code';
 }
 
 /**
@@ -2304,7 +2101,7 @@ function kindOf(f) {
   if (DOC_EXT.has(ext) && !isDependency && !buildText && !settingsText) kind = 'documentation';
   else if (MARKUP_EXT.has(ext)) kind = 'markup';
   else if (CATALOGUE_EXT.has(ext) && folders.some((p) => CATALOGUE_FOLDERS.has(p))) kind = 'catalogue';
-  else if (COLOUR_EXT.has(ext)) kind = 'colour';
+  else if (ext === '.css') kind = 'colour';
   if (kind !== null && governing) return unrecognised;
   // A side emptied, or filled from empty, holds the content of a removal or an addition.
   if (kind !== null && (f.oldText === '') !== (f.newText === '')) return unrecognised;
@@ -2313,16 +2110,14 @@ function kindOf(f) {
 
   if (kind === 'documentation') {
     // Rule 2 has already refused a file with a missing side, so both texts are present.
-    const refused = ext === '.md' ? markdownRefusal(f) : ext === '.rst' ? rstRefusal(f) : textRefusal(f);
+    const refused = ext === '.md' ? markdownRefusal(f) : textRefusal(f);
     if (refused) return refused === 'settings' ? setting : unrecognised;
     return { kind, runs: changedWords(f.hunks) };
   }
   if (kind === 'markup') {
     if (!equalHunks(f.hunks)) return unrecognised;
-    const jsx = ext === '.jsx' || ext === '.tsx';
-    const mode = jsx ? 'jsx' : ext === '.vue' ? 'vue' : ext === '.svelte' ? 'svelte' : 'html';
-    const runs = changedTexts(scanMarkup(lineFeeds(/** @type {string} */ (f.oldText)), mode),
-      scanMarkup(lineFeeds(/** @type {string} */ (f.newText)), mode), (toks, k) => markupWording(toks, k, jsx));
+    const runs = changedTexts(scanMarkup(lineFeeds(/** @type {string} */ (f.oldText)), false),
+      scanMarkup(lineFeeds(/** @type {string} */ (f.newText)), false), markupWording);
     return runs ? { kind, runs } : unrecognised;
   }
   if (kind === 'catalogue') {
@@ -2348,8 +2143,13 @@ function kindOf(f) {
   if (kind === 'colour') {
     const o = lineFeeds(/** @type {string} */ (f.oldText));
     const n = lineFeeds(/** @type {string} */ (f.newText));
-    if (variableDeclarations(o, ext) !== variableDeclarations(n, ext)) return setting;
-    return equalHunks(f.hunks) && colourEdit(o, n, ext) ? { kind, runs: [] } : unrecognised;
+    // A custom property's change is a setting, unless the property is named for a colour and
+    // holds exactly one colour before and after; those values are then levelled, and what
+    // is left must be identical or a colour in a real colour property.
+    const levelled = colourNamedEdit(o, n);
+    if (!levelled) return setting;
+    const [a, b] = levelled;
+    return equalHunks(f.hunks) && ((a === b && o !== n) || colourEdit(a, b)) ? { kind, runs: [] } : unrecognised;
   }
 
   if (isDependency) return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
@@ -2379,7 +2179,8 @@ function sensitiveWord(part) {
 
 /**
  * Rule 5 — not in a sensitive area: no letter run of the path from the repository top is a
- * sensitive word (also in the plural; a stylesheet's own file name aside); the path is no
+ * sensitive word (also in the plural, but not in a stylesheet's own file name: `tokens.css`
+ * holds design tokens, while `login.css` and `payment.css` still name their area); the path is no
  * secret-bearing file by CTOC's own secret-file guard (`isSecretTarget`: the word
  * `secret`), and, in CTOC's own repository only, no part of CTOC's enforcement by its
  * protected-paths list (`isProtectedEnforcementPath`: the word `enforcement`), which names
@@ -2389,14 +2190,17 @@ function sensitiveWord(part) {
  * @returns {Refusal|null}
  */
 function ruleSensitiveArea(f, ctoc) {
-  // A stylesheet's own name is no area: `tokens.css` and `design-tokens.css` hold design
-  // tokens, not secrets. Its folders still count.
-  const named = COLOUR_EXT.has(nameParts(f).ext) ? f.topRel.slice(0, f.topRel.lastIndexOf('/') + 1) : f.topRel;
-  let word = null;
-  for (const part of named.split(/[^A-Za-z]+/)) {
-    word = sensitiveWord(part.toLowerCase());
-    if (word) break;
-  }
+  const nameAt = f.topRel.lastIndexOf('/') + 1;
+  /** @param {string} text @param {boolean} plural @returns {string|null} the first sensitive word among its letter runs */
+  const wordIn = (text, plural) => {
+    for (const run of text.split(/[^A-Za-z]+/)) {
+      const part = run.toLowerCase();
+      const found = plural ? sensitiveWord(part) : SENSITIVE_WORDS.has(part) ? part : null;
+      if (found) return found;
+    }
+    return null;
+  };
+  let word = wordIn(f.topRel.slice(0, nameAt), true) || wordIn(f.topRel.slice(nameAt), nameParts(f).ext !== '.css');
   if (!word && isSecretTarget(f.topRel)) word = 'secret';
   if (!word && ctoc && isProtectedEnforcementPath(f.topRel)) word = 'enforcement';
   return word ? { clause: `${f.display} sits in an area named ${word}, and such areas are never a hotfix`, cause: 'sensitive-area' } : null;

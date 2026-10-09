@@ -1718,7 +1718,9 @@ test('round 4: components, code elements, conditional templates, variables, lite
     ['src/pages/inside.html', '<MyAction><b>charge</b></MyAction>\n', '<MyAction><b>refund</b></MyAction>\n', un('src/pages/inside.html')],
     ['src/pages/after.html', '<my-widget>x</my-widget>\n<p>Save</p>\n', '<my-widget>x</my-widget>\n<p>Store</p>\n', null],
     // Code elements: in JSX too, and an end tag of another element does not leave one.
-    ['src/pages/pre.html', '<pre></code>pip install requests</pre>\n', '<pre></code>pip install reqests</pre>\n', un('src/pages/pre.html')],
+    // The fifth round (2026-10-09): an end tag that does not close the element on top while a
+    // code element is open cannot be followed; the refusal is now the "could not read" one.
+    ['src/pages/pre.html', '<pre></code>pip install requests</pre>\n', '<pre></code>pip install reqests</pre>\n', 'I could not read the change (src/pages/pre.html holds something I cannot follow)'],
     ['src/pages/after-code.html', '<p><code>x</code> Save</p>\n', '<p><code>x</code> Store</p>\n', null],
     ['src/pages/after-code-tag.html', '<p><code>x</code><b>Save</b></p>\n', '<p><code>x</code><b>Store</b></p>\n', null],
     // Vue's conditional templates render; a loop or a slot template does not count as one.
@@ -1881,7 +1883,6 @@ test('round 4: CTOC\'s enforcement list applies only in CTOC\'s own repository',
 test('round 3: the whole-file scanners read strings, templates, escapes, comments, Sass and code spans', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
-  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   // Every scanner fails closed (2026-10-09): a file that ends inside an unclosed string,
   // template literal, regular expression, script, front matter or fence is unreadable.
   const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
@@ -2008,6 +2009,7 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(2, 'src/pages/stray.html', '<p>@</p></b></p>\n', ['Save', 'Store'], null),
     row(2, 'src/pages/held-implied.html', '<my-card><p>one<p>two</my-card>\n<p>@</p>\n', ['Save', 'Store'], lost('src/pages/held-implied.html')),
     row(2, 'src/pages/self-closed.html', '<my-widget/>\n<p>@</p>\n', ['Save', 'Store'], un('src/pages/self-closed.html')),
+    row(2, 'src/pages/braced.html', '<p data-x={a} data-y={`b`}>@</p>\n', ['Save', 'Store'], null),
     row(2, 'src/pages/after-held.html', '<my-card><p>one</p></my-card>\n<p>@</p>\n', ['Save', 'Store'], null),
     // 3. Markdown that may be built as MDX: a brace in the changed prose and an `import` or
     // `export` block are code.
@@ -2030,10 +2032,20 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(4, 'docs/tick-quote.md', 'A lone ` here\n> Run `@` now.\n', rm, un('docs/tick-quote.md')),
     row(4, 'docs/tick-cell.md', '| ` | `@` |\n', rm, un('docs/tick-cell.md')),
     row(4, 'docs/tick-escape.md', 'A \\` then `@` now.\n', rm, un('docs/tick-escape.md')),
-    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, un('docs/tick-tag.md')),
+    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, 'I could not read the change (docs/tick-tag.md leaves a tag, quote, comment, block, fence or span open)'),
     row(4, 'docs/tick-lazy.md', '> a `@\nc` d\n', ['b', 'x'], un('docs/tick-lazy.md')),
-    row(4, 'docs/tick-second.md', '2. a `@\n3. b` c\n', ['b', 'x'], un('docs/tick-second.md')),
+    // An ordered item not numbered 1 after a bullet item starts no item: the span runs on.
+    // After another ordered item it does, and each item's lone backtick pairs with nothing.
+    row(4, 'docs/tick-second.md', '- a `@\n2. b` c\n', ['b', 'x'], un('docs/tick-second.md')),
+    row(4, 'docs/tick-third.md', '2. a `@\n3. b` c\n', ['b', 'x'], null),
     row(4, 'docs/tick-wrapped.md', 'Run `rm -rf\n@` now.\n', ['build', 'dist'], un('docs/tick-wrapped.md')),
+    row(4, 'docs/tick-indent.md', '> a `@\n    c` d\n', ['b', 'x'], un('docs/tick-indent.md')),
+    row(4, 'docs/tick-lazy-rule.md', '- a `@\nb\n===\ny` z\n', ['x', 'w'], un('docs/tick-lazy-rule.md')),
+    row(4, 'docs/tick-item-rule.md', '> a\n- b `\n  ===\n  run `@` now\n', rm, un('docs/tick-item-rule.md')),
+    row(4, 'docs/tick-import.md', 'a `@\nimport `c` d\n', ['b', 'x'], un('docs/tick-import.md')),
+    row(4, 'docs/tick-after-fence.md', '```\ncode\n```\n    @\n', pip, un('docs/tick-after-fence.md')),
+    row(4, 'docs/tick-after-heading.md', '# Title\n    @\n', pip, un('docs/tick-after-heading.md')),
+    row(4, 'docs/tick-after-quote.md', '>     code\n    @\n', pip, un('docs/tick-after-quote.md')),
     row(4, 'docs/tick-alone.md', 'Run `npm test` first.\n\n@ words with ` alone.\n', ['Old', 'New'], null),
     row(4, 'docs/tick-items.md', '- run `npm test`\n- @ words\n- then `npm start`\n', ['old', 'new'], null),
     // 5. Block quotes are read like the document they quote.
@@ -2045,6 +2057,9 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(5, 'docs/item-quote.md', '- >     @\n', pip, un('docs/item-quote.md')),
     row(5, 'docs/quote-tab.md', '>\t@\n', pip, un('docs/quote-tab.md')),
     row(5, 'docs/quote-deep.md', `${'> '.repeat(40)}@ words.\n`, ['Old', 'New'], un('docs/quote-deep.md')),
+    row(5, 'docs/quote-def.md', 'See [@] now.\n\n> [other]: /u/delete\n', ['guide', 'other'], un('docs/quote-def.md')),
+    row(5, 'docs/item-def.md', 'See [@] now.\n\n- [other]: /u/delete\n', ['guide', 'other'], un('docs/item-def.md')),
+    row(5, 'docs/markers.md', `${'- '.repeat(20)}@ words.\n`, ['Old', 'New'], un('docs/markers.md')),
     row(5, 'docs/quote-prose.md', '> @ words.\n>\n> More words.\n\nAfter.\n', ['Old', 'New'], null),
     row(5, 'docs/quote-after.md', '> ~~~\n> code\n> ~~~\n\n@ words.\n', ['Old', 'New'], null),
     // 6. Link labels fold case as CommonMark does.
@@ -2070,13 +2085,15 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(9, 'src/styles/renamed.css', ':root { --color-@: red; }\n', ['a', 'b'], setting('src/styles/renamed.css')),
     row(9, 'src/styles/bad-function.css', ':root { --color-a: @; }\n', ['red', 'oklch(60% 0.2)'], setting('src/styles/bad-function.css')),
     row(9, 'src/styles/and-more.css', ':root { --color-a: @; }\na { width: 1px; }\n', ['red', 'blue; }\na { width: 2px; }\nb { --x: y'], setting('src/styles/and-more.css')),
+    row(9, 'src/styles/string-open.css', 'a { color: @; }\nb { content: "x', ['red', 'blue'], 'I could not read the change (src/styles/string-open.css leaves a tag, quote, comment, block, fence or span open)'),
     row(9, 'src/styles/ruleset.css', ':root { --color-a: { color: @ } }\n', ['red', 'blue'], lost('src/styles/ruleset.css')),
     row(9, 'src/styles/color-brand.css', ':root {\n  --color-brand: @;\n}\n', ['#0b5ed7', '#1a73e8'], null),
     row(9, 'src/styles/button-colour.css', ':root { --button-colour: @; }\n', ['red', 'blue'], null),
     row(9, 'src/styles/upper.css', ':root { --Brand-COLOR: @; }\n', ['RED', 'Transparent'], null),
     row(9, 'src/styles/functions.css', ':root { --color-a: @; }\n', ['hwb(120 0% 0% / 0.5)', 'oklch(60% 0.2 240)'], null),
     row(9, 'src/styles/spaces.css', ':root { --color-a: @; }\n', ['lab(50% 40 59)', 'color(display-p3 1 0.5 0 / 50%)'], null),
-    row(9, 'src/styles/both.css', ':root { --color-a: @; }\na { color: red; }\n', ['red', 'blue; }\na { color: blue'], null)
+    [9, 'src/styles/both.css', ':root { --color-a: red; }\na { color: red; }\n', ':root { --color-a: blue; }\na { color: blue; }\n', null],
+    [9, 'src/styles/both-bad.css', ':root { --color-a: red; }\na { width: 1px; }\n', ':root { --color-a: blue; }\na { width: 2px; }\n', un('src/styles/both-bad.css')]
   ];
   const base = {};
   for (const [, p, b] of shapes) base[p] = b;

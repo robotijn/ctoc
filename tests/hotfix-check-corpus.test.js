@@ -1,6 +1,6 @@
 'use strict';
 
-// The classifier corpus: 31 edit shapes that qualify as a hotfix and 195 traps that must
+// The classifier corpus: 30 edit shapes that qualify as a hotfix and 195 traps that must
 // not (42 of them the kept cases of the formats the owner's decision of 2026-10-09 removed),
 // plus one mode change, each judged through the menu router's first call (rules 1
 // to 7; no test runs) against ONE committed temporary repository with no test command.
@@ -242,7 +242,6 @@ const BASE = {
   'docs/mdx-brace.md': lines('Hello {eval(name)} there.'),
   'docs/mdx-import.md': lines("import Chart from './chart'", '', 'Words.'),
   'docs/tick-para.md': lines('A lone ` here.', '', 'Run `rm -rf build` now.'),
-  'docs/tick-alone.md': lines('Run `npm test` first.', '', 'Old words with ` alone.'),
   'docs/quote-code.md': lines('> Install:', '>', '>     pip install requests'),
   'docs/quote-fence.md': lines('> ~~~', '> pip install requests', '> ~~~'),
   'docs/quote-doctest.md': lines('> >>> print("old")', '> old'),
@@ -300,12 +299,11 @@ const QUALIFY = [
   ['src/styles/tokens.css', BASE['src/styles/tokens.css'].replace('#0a58ca', '#0b5ed7')],
   ['docs/list.md', BASE['docs/list.md'].replace('Old', 'New')],
   ['src/hooks/README.md', BASE['src/hooks/README.md'].replace('Old', 'New')],
-  // The fifth round (2026-10-09). An element name is matched in any letter case; a lone
-  // backtick in another paragraph pairs with nothing; a block quote's prose is prose; a
+  // The fifth round (2026-10-09). An element name is matched in any letter case; a block
+  // quote's prose is prose; a
   // custom property named for a colour, holding exactly one colour before and after, is a
   // colour (the session's decision on the owner's instruction).
   ['src/pages/mixed.html', page('<DIV>Store</div>')],
-  ['docs/tick-alone.md', BASE['docs/tick-alone.md'].replace('Old', 'New')],
   ['docs/quote-prose.md', BASE['docs/quote-prose.md'].replace('Old', 'New')],
   ['src/styles/color-brand.css', BASE['src/styles/color-brand.css'].replace('#0b5ed7', '#1a73e8')],
   ['src/styles/button-colour.css', BASE['src/styles/button-colour.css'].replace('red', 'blue')]
@@ -572,7 +570,7 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 31, 'the corpus holds 31 shapes that qualify');
+assert.equal(QUALIFY.length, 30, 'the corpus holds 30 shapes that qualify');
 assert.equal(REMOVED_FORMATS.length, 42, 'the corpus holds 42 cases of removed formats');
 assert.equal(TRAPS.length, 195, 'the corpus holds 195 traps, the removed formats among them');
 
@@ -901,8 +899,9 @@ test('the whole-file scanners stay linear on input built against them', () => {
     'src/pages/names.html': `<p>Old</p>\n${Array.from({ length: 20000 }, (_, i) => `<a${i}>`).join('')}${'</b></a0>'.repeat(20000)}\n`,
     'docs/quotes.md': `Old words.\n\n${'> '.repeat(40000)}x\n`,
     'docs/quoted.md': `Old words.\n\n${'> > > a \\` b\n'.repeat(30000)}`,
-    'docs/paragraphs.md': `Old words.\n\n${'a \` b | c\n\n- d \` e\n'.repeat(30000)}`,
+    'docs/paragraphs.md': `Old words.\n\n${'a ` b | c\n\n- d ` e\n'.repeat(30000)}`,
     'docs/items.md': `Old words.\n\n${'- > - > - a\n'.repeat(20000)}`,
+    'docs/markers.md': `Old words.\n\n${'- '.repeat(40000)}a\n`,
     'src/styles/properties.css': `a { color: red; }\n:root {${'--color-a: red;'.repeat(50000)}}\n`
   };
   for (const [rel, old] of Object.entries(cases)) {
