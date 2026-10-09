@@ -63,16 +63,25 @@
  *                                          HTML by a token stream after the HTML tokenizer, in a
  *                                          STRICT SUBSET in which the reader agrees with a browser's
  *                                          parser by construction (the session's decision of
- *                                          2026-10-09); a file that holds anything outside it is
- *                                          refused whole: a brace inside a tag, a `<!…` that is no
- *                                          `<!DOCTYPE html>` and no standard comment, `<?`, a tag
- *                                          inside `<select>` that is no option, an end tag that does
- *                                          not close the top of the stack while an element that
- *                                          holds its text is open, an element never closed. Tags
+ *                                          2026-10-09), held to the HTML standard's parser by a
+ *                                          differential test (the decision at review of that day:
+ *                                          `tests/hotfix-check-differential.test.js`, parse5 with
+ *                                          scripting on and off); a file that holds anything outside
+ *                                          it is refused whole: a brace inside a tag, a `<!…` that is
+ *                                          no `<!DOCTYPE html>` and no standard comment, `<?`, a tag
+ *                                          inside `<select>` that is no option, `<frameset>` and
+ *                                          `<frame>`, an end tag that closes neither the element on
+ *                                          top of the stack nor one that may leave its end tag out
+ *                                          before it, a start tag for which a browser would close
+ *                                          an element that is not on top, anything but white space
+ *                                          and comments after `</body>`, `<noscript>` content that
+ *                                          is not itself such markup, an element never closed. Tags
  *                                          with every attribute, raw text and comments are compared
  *                                          exactly, `<svg>` and `<math>` each as one opaque piece;
- *                                          only text between two tags may change, on one line, never
- *                                          inside raw text, an `<option>` with no `value`, or an
+ *                                          only text between two tags or comments may change (over
+ *                                          line breaks too; a `&` only as one of a few plain
+ *                                          character references), never inside raw text, a
+ *                                          `<select>` outside an `<option>` with a `value`, or an
  *                                          element that holds its text: a code element, a
  *                                          `<template>`, an element with an `is` attribute, a custom
  *                                          element and every name outside the fixed list of 111 HTML
@@ -82,16 +91,19 @@
  *                                          colour property on its line, and a change to a custom
  *                                          property a setting unless the property is named for a
  *                                          colour and holds exactly one colour before and after;
- *                                          Markdown by lines (front matter in three forms is
- *                                          settings; fenced and indented code, read inside list
- *                                          items and block quotes, doctests, `import` / `export`
- *                                          blocks and any changed line that starts so are code; the
- *                                          headings' generated anchors must stay the same) and by
- *                                          the HTML scanner for the prose, with code spans (paired
- *                                          inside one paragraph, heading or list item), autolinks
- *                                          and link targets (a reference definition's next lines
- *                                          too, labels matched as CommonMark folds them) compared
- *                                          exactly, and no brace in the changed paragraph or left
+ *                                          Markdown block by block as a Markdown reader renders it
+ *                                          (held to markdown-it by the same differential test):
+ *                                          front matter in three forms is settings; fenced and
+ *                                          indented code, doctests, `import` / `export` blocks, a
+ *                                          quote line with a tab after its marker and any changed
+ *                                          line that starts `import ` or `export ` are code; the
+ *                                          headings' generated anchors must stay the same; the tags
+ *                                          the reader makes and the file's own HTML go through the
+ *                                          HTML scanner as one document, with code spans, autolinks,
+ *                                          link destinations, titles and labels, image text, list
+ *                                          markers and definitions compared exactly; a lazy
+ *                                          continuation line is followed where every reader agrees
+ *                                          on it; and no brace in the changed paragraph or left
  *                                          open above it (the file may be built as MDX); doctests in
  *                                          plain text are code; a
  *                                          catalogue value is decoded as its format reads it and
@@ -773,23 +785,29 @@ function commonEnds(o, n) {
 }
 
 /*
- * THE MARKUP SCANNER (rule 4: HTML, and Markdown's inline HTML). THE STRICT SUBSET (the
- * session's design decision of 2026-10-09, after the owner's decision that the check keeps
- * only what it can read exactly): the scanner reads only the part of HTML in which it agrees
- * with a browser's parser by construction, and refuses the whole file for anything outside
- * it; it never copies the browser's recovery rules. One pass, after the HTML tokenizer:
- * data; a tag (its name, attribute names, unquoted, single- and double-quoted values,
- * `/>`); `<!DOCTYPE html>` and a standard comment; raw text after `<script>` (with the
- * script-data escape states), `<style>`, `<textarea>`, `<title>`, `<xmp>`, `<iframe>`,
+ * THE MARKUP SCANNER (rule 4: HTML, and the HTML a Markdown file holds). THE STRICT SUBSET
+ * (the session's design decision of 2026-10-09, after the owner's decision that the check
+ * keeps only what it can read exactly): the scanner reads only the part of HTML in which it
+ * agrees with a browser's parser by construction, and refuses the whole file for anything
+ * outside it; it never copies the browser's recovery rules. HELD TO REAL PARSERS (the
+ * decision at review of 2026-10-09): `tests/hotfix-check-differential.test.js` generates
+ * documents and one-word edits, and for every edit the check passes requires that parse5,
+ * the HTML standard's parser, with scripting on and off, reads the same tree on both sides
+ * but for one text node outside every element that holds its text. One pass, after the HTML
+ * tokenizer: data; a tag (its name, attribute names, unquoted, single- and double-quoted
+ * values, `/>`); `<!DOCTYPE html>` and a standard comment; raw text after `<script>` (with
+ * the script-data escape states), `<style>`, `<textarea>`, `<title>`, `<xmp>`, `<iframe>`,
  * `<noembed>`, `<noframes>`, `<noscript>` and `<plaintext>`; `<svg>` and `<math>` from their
  * start tag to their matching end tag as one opaque piece. Character references stay part
- * of their token. A browser knows no braces: in text they are plain characters.
+ * of their token. A browser knows no braces: in text they are plain characters. Names are
+ * lower-cased as HTML does it, the ASCII letters only.
  * OUTSIDE THE SUBSET, each refusing the whole file ({@link outside}):
  *   - a `{` or `}` anywhere inside a tag;
- *   - anything that starts `<!` but `<!DOCTYPE html>` (any letter case) and a standard
- *     comment (`<!--`, not followed at once by `>` or `->`, holding no `<!--` and no `--!>`,
- *     not ending in `<!-`, closed by the first `-->`); `<![CDATA[`, `<?` and `</` before
- *     anything but a letter; the same comment rule inside a script block;
+ *   - anything that starts `<!` but `<!DOCTYPE html>` (any letter case; any other doctype
+ *     puts a browser in quirks mode, where a table nests otherwise) and a standard comment
+ *     (`<!--`, not followed at once by `>` or `->`, holding no `<!--` and no `--!>`, not
+ *     ending in `<!-`, closed by the first `-->`); `<![CDATA[`, `<?` and `</` before anything
+ *     but a letter; the same comment rule inside a script block;
  *   - an unfinished tag, attribute quote, comment or raw-text element; an attribute name
  *     that starts with `<`, `"`, `'` or `=`;
  *   - inside `<svg>` or `<math>`: an end tag that does not close the element on top, any
@@ -799,14 +817,29 @@ function commonEnds(o, n) {
  *     many of them), and an `<svg>` or `<math>` that is never closed;
  *   - inside `<select>`: any tag but `<option>`, `<optgroup>`, `<hr>` and their end tags
  *     (older parsers ignore every other tag there, a `<style>` among them, newer ones do not);
- *   - an end tag that does not close the element on top of the stack while an element that
- *     holds its text is open;
- *   - in an HTML file, an element that is never closed.
+ *   - `<frameset>` and `<frame>`; an `is` attribute on `<html>` or `<body>`;
+ *   - an end tag that closes neither the element on top of the stack nor one above which
+ *     only elements stand that may leave their end tag out before it ({@link IMPLIED_END});
+ *   - a start tag for which a browser closes an open element that is not on top of the
+ *     stack ({@link P_CLOSERS}), a part of a table where no table has it, a `<form>` in a
+ *     `<form>`;
+ *   - content of `<noscript>` that is not itself markup of the subset with every element
+ *     closed;
+ *   - in an HTML file, anything but white space, comments and `</body>` or `</html>` after
+ *     one of those two, and text directly inside `<colgroup>`;
+ *   - an element that is never closed.
  * Every token is a slice of the text, and the slices cover it, so two token sequences that
  * are identical are two identical texts. No pattern backtracks: each scanner moves forward.
  */
 
 /** @typedef {{k: string, v: string, name?: string, end?: boolean, attrs?: string[], self?: boolean, quiet?: boolean, inexact?: boolean}} Tok */
+/**
+ * One piece of a file for {@link scanMarkup}: `raw` (HTML as written: a whole HTML file, or
+ * one HTML block of a Markdown file), `inline` (one run of Markdown's inline text), `open`
+ * and `close` (a tag the Markdown reader makes, `name` its element, `maybe` when the reader
+ * may leave it out), `fixed` (text compared exactly).
+ * @typedef {{k: string, v: string, name?: string, maybe?: boolean}} Piece
+ */
 
 /*
  * EVERY SCANNER FAILS CLOSED. A scanner that ends inside an unfinished construct (a string,
@@ -886,6 +919,12 @@ const RAW_CLOSE = {
 /** The marks that move a script block between the script-data states (a tag name ends at HTML's white space, `/` or `>`). */
 const SCRIPT_MARKS = /<!--|--!?>|<(\/?)script(?=[\t\n\f\r />]|$)/gi;
 
+/**
+ * @param {string} s @returns {string} lower case as HTML reads a name: the ASCII letters
+ * only. The Kelvin sign and the long s, which Unicode folds to `k` and `s`, stay what they
+ * are, so `lin` with the Kelvin sign is no `link`.
+ */
+const asciiLower = (s) => s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
 /** @param {string} c @returns {boolean} */
 const isLetter = (c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 /** @param {string} c @returns {boolean} white space as the HTML tokenizer reads it */
@@ -915,7 +954,8 @@ function skipString(s, i) {
  * `/` or `>`; an attribute name to white space, `/`, `>` or `=`; a value is single- or
  * double-quoted (to the same quote, whatever lies between) or unquoted (to white space or
  * `>`, a `/` included). `self`: the tag ends in `/>` as the tokenizer reads it (never after
- * an unquoted value); HTML ignores that, foreign content honours it. A brace anywhere in the
+ * an unquoted value); HTML ignores that, foreign content honours it. The name and the
+ * attribute names are returned in lower case ({@link asciiLower}). A brace anywhere in the
  * tag, an attribute name that cannot start so, and a tag or quote that never ends are
  * outside the subset.
  * @param {string} s
@@ -928,7 +968,7 @@ function scanTag(s, i, isEnd) {
   let j = i + (isEnd ? 2 : 1);
   const nameStart = j;
   while (j < n && !isSpace(s[j]) && s[j] !== '/' && s[j] !== '>') j++;
-  const name = s.slice(nameStart, j);
+  const name = asciiLower(s.slice(nameStart, j));
   const attrs = [];
   let slash = false; // the last character read was a `/` between attributes
   let self = false;
@@ -940,7 +980,7 @@ function scanTag(s, i, isEnd) {
     if (c === '<' || c === '"' || c === "'" || c === '=') outside(); // no attribute name starts so
     const attrStart = j++;
     while (j < n && !isSpace(s[j]) && s[j] !== '/' && s[j] !== '>' && s[j] !== '=') j++;
-    attrs.push(s.slice(attrStart, j).toLowerCase());
+    attrs.push(asciiLower(s.slice(attrStart, j)));
     while (j < n && isSpace(s[j])) j++;
     if (s[j] !== '=') continue;
     j++;
@@ -957,19 +997,6 @@ function scanTag(s, i, isEnd) {
   const v = s.slice(i, j);
   if (v[v.length - 1] !== '>' || v.includes('{') || v.includes('}')) outside(); // never ended, or a brace in it
   return { k: 'tag', v, name, end: isEnd, attrs, self };
-}
-
-/**
- * Whether the text that follows `tag` is inside an `<option>` with no `value` attribute,
- * whose text is the value the form sends: from such an `<option>` until `</option>`, the
- * next `<option>` or `</select>`, whatever tags sit inside it.
- * @param {Tok} tag @param {boolean} open the state before it @returns {boolean} the state after it
- */
-function optionState(tag, open) {
-  const name = /** @type {string} */ (tag.name).toLowerCase();
-  if (tag.end) return name === 'option' || name === 'select' ? false : open;
-  if (name === 'option') return !(/** @type {string[]} */ (tag.attrs)).includes('value');
-  return open;
 }
 
 /**
@@ -1022,7 +1049,7 @@ function declarationEnd(s, i) {
       || inner.endsWith('<!-')) outside();
     return e < 0 ? s.length : e + 3;
   }
-  if (s.slice(i, i + 15).toLowerCase() === '<!doctype html>') return i + 15;
+  if (asciiLower(s.slice(i, i + 15)) === '<!doctype html>') return i + 15;
   outside();
   const e = s.indexOf('>', i + 2);
   return e < 0 ? s.length : e + 1;
@@ -1052,7 +1079,7 @@ function foreignEnd(s, from) {
     if (isLetter(d) || (d === '/' && isLetter(s[lt + 2] || ''))) {
       const tag = scanTag(s, lt, d === '/');
       i = lt + tag.v.length;
-      const name = /** @type {string} */ (tag.name).toLowerCase();
+      const name = /** @type {string} */ (tag.name);
       if (tag.end) {
         if (stack.pop() !== name) outside();
       } else {
@@ -1071,22 +1098,33 @@ function foreignEnd(s, from) {
   return s.length;
 }
 
-/** A Markdown autolink with a scheme: `<http://…>`, `<https://…>` or `<mailto:…>`, no white space, `<` or control character inside. */
-const AUTOLINK = /<(?:https?:\/\/|mailto:)[^\s<>\u0000-\u001f\u007f]*>/iy;
+/*
+ * MARKDOWN'S INLINE GRAMMAR, as CommonMark defines it and markdown-it reads it (compared
+ * with markdown-it 15.0.2 on 2026-10-09; the differential test holds the reader to that
+ * version). Each pattern is anchored where it is tried (`y`) and holds no quantifier inside
+ * a quantifier; what repeats is repeated by a loop that only moves forward.
+ */
+/** An autolink with a scheme: `<scheme:…>`, the scheme 2 to 32 characters, no white space, `<` or control character inside. */
+const AUTOLINK = /<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^<>\u0000-\u0020]*>/y;
+/** The schemes a Markdown reader refuses to link; such a piece is then no autolink and no tag: outside the subset. */
+const BAD_SCHEME = /^<?(?:vbscript|javascript|file|data):/i;
 /** The characters of an e-mail address's local part, as CommonMark's e-mail autolink reads them. */
 const EMAIL_LOCAL = /[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]/;
-
+/** @param {string} s @param {RegExp} re a sticky pattern @param {number} from @returns {number} the index after its match at `from`, or -1 */
+function after(s, re, from) {
+  re.lastIndex = from;
+  const m = re.exec(s);
+  return m ? from + m[0].length : -1;
+}
 /**
- * Rule 4 (Markdown) — the end of an autolink that starts at this `<`, or -1: one with a
- * scheme ({@link AUTOLINK}), or an e-mail address `<name@host>` as CommonMark reads it (the
- * host: labels of letters, digits and inner hyphens, at most 63 characters each, joined by
- * dots). An autolink is no tag: it is one opaque piece, compared exactly.
- * @param {string} s @param {number} i @returns {number}
+ * @param {string} s @param {number} i the index of a `<`
+ * @returns {number} the end of the autolink that starts there, or -1: one with a scheme
+ * ({@link AUTOLINK}), or an e-mail address `<name@host>` (the host: labels of letters,
+ * digits and inner hyphens, at most 63 characters each, joined by dots)
  */
 function autolinkEnd(s, i) {
-  AUTOLINK.lastIndex = i;
-  const m = AUTOLINK.exec(s);
-  if (m) return i + m[0].length;
+  const end = after(s, AUTOLINK, i);
+  if (end > 0) return end;
   let j = i + 1;
   while (j < s.length && EMAIL_LOCAL.test(s[j])) j++;
   if (j === i + 1 || s[j] !== '@') return -1;
@@ -1096,136 +1134,442 @@ function autolinkEnd(s, i) {
   const labels = s.slice(hostStart, j).split('.');
   return labels.every((l) => l.length > 0 && l.length <= 63 && l[0] !== '-' && l[l.length - 1] !== '-') ? j + 1 : -1;
 }
+/** An HTML tag as Markdown passes one on: its name, each attribute, an attribute's value, and its end. */
+const MD_TAG_NAME = /<\/?[A-Za-z][A-Za-z0-9-]*/y;
+const MD_ATTRIBUTE = /\s+[a-zA-Z_:][a-zA-Z0-9:._-]*/y;
+const MD_VALUE = /\s*=\s*(?:[^"'=<>`\u0000-\u0020]+|'[^']*'|"[^"]*")/y;
+const MD_OPEN_END = /\s*\/?>/y;
+const MD_CLOSE_END = /\s*>/y;
+/** @param {string} s @param {number} i the index of a `<` @returns {number} the end of the start or end tag Markdown's own grammar reads there, or -1 */
+function markdownTagEnd(s, i) {
+  let j = after(s, MD_TAG_NAME, i);
+  if (j < 0 || s[i + 1] === '/') return j < 0 ? -1 : after(s, MD_CLOSE_END, j);
+  for (let next = after(s, MD_ATTRIBUTE, j); next >= 0; next = after(s, MD_ATTRIBUTE, j)) {
+    const value = after(s, MD_VALUE, next);
+    j = value < 0 ? next : value;
+  }
+  return after(s, MD_OPEN_END, j);
+}
+/** A character of a link destination in its plain form: no white space, `<`, `>`, round bracket, backslash or backtick. */
+const DESTINATION = /[^\s<>()\\`]/;
+/** A link title in its plain form, after the white space before it: in quotes or round brackets, without a backslash, a backtick or `<`. */
+const TARGET_TITLE = /[ \n]+(?:"[^"\\`<]*"|'[^'\\`<]*'|\([^()\\`<]*\))/y;
+const TARGET_END = /[ \n]*\)/y;
+/**
+ * @param {string} s @param {number} i the index of `](`
+ * @returns {number} the end of what follows a link's or an image's text there, in its plain
+ * form, or -1: a destination ({@link DESTINATION}, a backslash with the character it takes,
+ * round brackets one deep), an optional title ({@link TARGET_TITLE}), and `)`
+ */
+function linkTargetEnd(s, i) {
+  let j = i + 2;
+  while (s[j] === ' ' || s[j] === '\n') j++;
+  for (;;) {
+    if (j < s.length && DESTINATION.test(s[j])) j++;
+    else if (s[j] === '\\' && j + 1 < s.length && !/\s/.test(s[j + 1])) j += 2; // a backslash takes the next character
+    else if (s[j] === '(') {
+      let k = j + 1;
+      while (k < s.length && DESTINATION.test(s[k])) k++;
+      if (s[k] !== ')') return -1;
+      j = k + 1;
+    } else break;
+  }
+  const title = after(s, TARGET_TITLE, j);
+  return after(s, TARGET_END, title < 0 ? j : title);
+}
+
+/** No names: the end tags that close an element which never leaves its end tag out. */
+const NO_NAMES = new Set();
+/** A character that is no white space for the HTML parser. */
+const NOT_HTML_SPACE = /[^ \t\n\f\r]/;
+/**
+ * THE END TAGS THAT MAY BE LEFT OUT (the decision at review of 2026-10-09). In an HTML file
+ * an end tag closes the element on top of the stack; any other end tag is outside the
+ * subset, with these exceptions only, each held to the HTML standard's parser by the
+ * differential test (`tests/hotfix-check-differential.test.js`): for each element name, the
+ * end tags that also close it while it stands above their own element.
+ *   p                           the end tag of its parent: address, article, aside, blockquote,
+ *                               details, dialog, div, dl, fieldset, figcaption, figure, footer,
+ *                               header, hgroup, main, menu, nav, ol, section, summary, ul, li,
+ *                               dd, dt, td, th, body, html
+ *   li                          ul, ol, menu
+ *   dt, dd                      dl
+ *   rt, rp                      ruby
+ *   option                      select, datalist, optgroup
+ *   optgroup                    select, datalist
+ *   caption, colgroup, thead,
+ *   tbody, tfoot                table
+ *   tr                          table, thead, tbody, tfoot
+ *   td, th                      tr, table, thead, tbody, tfoot
+ *   head, body                  html
+ * Nothing is closed at the end of the file: an element still open there is outside the subset.
+ * @type {Map<string, Set<string>>}
+ */
+const IMPLIED_END = new Map(Object.entries({
+  p: ['address', 'article', 'aside', 'blockquote', 'details', 'dialog', 'div', 'dl', 'fieldset', 'figcaption', 'figure',
+    'footer', 'header', 'hgroup', 'main', 'menu', 'nav', 'ol', 'section', 'summary', 'ul', 'li', 'dd', 'dt', 'td', 'th',
+    'body', 'html'],
+  li: ['ul', 'ol', 'menu'],
+  dt: ['dl'],
+  dd: ['dl'],
+  rt: ['ruby'],
+  rp: ['ruby'],
+  option: ['select', 'datalist', 'optgroup'],
+  optgroup: ['select', 'datalist'],
+  caption: ['table'],
+  colgroup: ['table'],
+  thead: ['table'],
+  tbody: ['table'],
+  tfoot: ['table'],
+  tr: ['table', 'thead', 'tbody', 'tfoot'],
+  td: ['tr', 'table', 'thead', 'tbody', 'tfoot'],
+  th: ['tr', 'table', 'thead', 'tbody', 'tfoot'],
+  head: ['html'],
+  body: ['html']
+}).map(([name, ends]) => [name, new Set(ends)]));
 
 /**
- * Rule 4 — the tokens of a whole HTML file, or of Markdown prose (`breaks` given). The open
- * elements are kept on a stack, their names in lower case. Text is `quiet`, never wording,
- * while an element that holds its text is open (a code element, a `<template>`, a component
- * or custom element: {@link isComponent}, then also `inexact`) or inside an `<option>` with
- * no `value`. An end tag that closes the element on top of the stack pops it. Any other end
- * tag, while an element that holds text is open, is outside the subset: HTML itself ignores
- * such an end tag or closes several elements with it, by rules this scanner does not copy.
- * With no such element open the same end tag closes the nearest open element of its name,
- * or nothing. A void element never opens, and `/>` closes nothing. The text of `<title>` is
- * read to its closing tag as one text token. `<svg>` and `<math>` are one `foreign` token
- * each ({@link foreignEnd}). Inside `<select>` only options are followed. In an HTML file an
- * element still open at the end is outside the subset.
- * IN MARKDOWN an autolink is one `link` token ({@link autolinkEnd}), and an element may stay
- * open, as a placeholder such as `<file>` does. `breaks` holds the blank lines: at one whose
- * `reset` is set (no line of the paragraph before it starts with `<`, so no HTML block
- * starts there and the paragraph is rendered inside an element of its own, whose end tag a
- * browser closes everything inside it with), the elements opened in that paragraph and
- * still open are closed, when every tag of the paragraph was the start tag of a name the
- * HTML parser does not know, or the end tag of such an element opened in the same
- * paragraph. In every other case the element stays open to the end of the file, as before.
- * @param {string} s the text, line feeds only
- * @param {(Array<{at: number, reset: boolean}>|null)} breaks Markdown's blank lines in order, or null for an HTML file
+ * THE START TAGS THAT CLOSE AN OPEN ELEMENT (the decision at review of 2026-10-09). The HTML
+ * parser closes some elements when certain start tags arrive, and where the element to
+ * close is not the one on top it closes everything above it too, by rules of scope this
+ * scanner does not copy. So each such start tag is followed only in its plain form, where
+ * the element it closes is on top of the stack (it is then closed, exactly as a browser
+ * does), and is outside the subset in every other form:
+ *   - a tag that ends a paragraph ({@link P_CLOSERS}) while a `<p>` is open: the `<p>` on top;
+ *   - `<li>` while an `<li>` is open in the same list: that `<li>` on top, or under a `<p>`
+ *     on top; `<dd>` and `<dt>` likewise within their `<dl>`;
+ *   - a heading on top of the stack is closed by the next heading's start tag;
+ *   - `<a>` while an `<a>` is open, `<button>` while a `<button>` is open, `<nobr>` likewise:
+ *     that element on top;
+ *   - `<rt>` and `<rp>` inside a `<ruby>`: an `<rt>` or `<rp>` on top;
+ *   - `<option>`, `<optgroup>` and, inside a `<select>`, `<hr>`: an `<option>` on top, and
+ *     inside a `<select>` for the last two an `<optgroup>` on top after it;
+ *   - the parts of a table, each only where a table has it ({@link tableStart}).
+ * A `<form>` inside a `<form>` is ignored by a browser, and its end tag then closes the
+ * outer one: outside the subset.
+ */
+const P_CLOSERS = new Set(['address', 'article', 'aside', 'blockquote', 'center', 'details', 'dialog', 'dir', 'div', 'dl',
+  'fieldset', 'figcaption', 'figure', 'footer', 'header', 'hgroup', 'main', 'menu', 'nav', 'ol', 'p', 'search', 'section',
+  'summary', 'ul', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'listing', 'form', 'li', 'dd', 'dt', 'plaintext', 'table',
+  'hr', 'xmp']);
+const HEADINGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
+/** The elements a list item belongs to, and the items themselves: `<li>` in a list, `<dd>` and `<dt>` in a `<dl>`. */
+const ITEM_HOLDERS = new Map([['ul', 0], ['ol', 0], ['menu', 0], ['dl', 1]]);
+const ITEMS = new Map([['li', 0], ['dd', 1], ['dt', 1]]);
+/** The start tags that close an open element of their own name when it is on top, and are outside the subset when it is not. */
+const CLOSES_OWN = new Set(['a', 'button', 'nobr']);
+/** The end tags the parser adds by itself before an `<rt>` or `<rp>`; `rt` and `rp` are followed, the others are outside the subset. */
+const RUBY_IMPLIED = new Set(['p', 'li', 'dd', 'dt', 'option', 'optgroup', 'rb', 'rtc']);
+/**
+ * The parts of a table: for each, the open parts its start tag closes while they are on
+ * top, and the elements it may then stand in. A browser puts a part in its place whatever
+ * stands between, by closing that; here anything else between is outside the subset, and so
+ * is a part with no table around it (a browser ignores its start tag). Directly inside a
+ * `<template>` every part may stand.
+ */
+const TABLE_ROWS = ['table', 'thead', 'tbody', 'tfoot'];
+const TABLE_SECTION_CLOSES = ['td', 'th', 'tr', 'thead', 'tbody', 'tfoot', 'caption', 'colgroup'];
+const TABLE_PARTS = new Map(Object.entries({
+  caption: [TABLE_SECTION_CLOSES, ['table']],
+  colgroup: [TABLE_SECTION_CLOSES, ['table']],
+  thead: [TABLE_SECTION_CLOSES, ['table']],
+  tbody: [TABLE_SECTION_CLOSES, ['table']],
+  tfoot: [TABLE_SECTION_CLOSES, ['table']],
+  col: [[], ['table', 'colgroup']],
+  tr: [['td', 'th', 'tr', 'caption', 'colgroup'], TABLE_ROWS],
+  td: [['td', 'th', 'caption', 'colgroup'], ['tr', ...TABLE_ROWS]],
+  th: [['td', 'th', 'caption', 'colgroup'], ['tr', ...TABLE_ROWS]]
+}));
+
+/**
+ * Rule 4 — the tokens of a whole HTML file (`file`: one raw piece), or of a Markdown file as
+ * its reader renders it ({@link markdownBlocks}: the tags the reader makes, raw HTML blocks,
+ * runs of inline text, and pieces compared exactly). The open elements are kept on a stack,
+ * their names in lower case ({@link asciiLower}). Text is `quiet`, never wording, while an
+ * element that holds its text is open (a code element, a `<template>`, an `<option>` with no
+ * `value`, a component or custom element: {@link isComponent}, then also `inexact`), and
+ * inside a `<select>` anywhere but directly in an `<option>` with a `value`. A void element
+ * never opens, and `/>` closes nothing. The text of `<title>` is read to its closing tag as
+ * one text token. `<svg>` and `<math>` are one `foreign` token each ({@link foreignEnd}).
+ * Inside `<select>` only options are followed. The content of `<noscript>` is one raw piece,
+ * as a browser with scripting reads it, and must itself be markup of the subset with every
+ * element closed, as a browser without scripting reads it. `<frameset>` and `<frame>` are
+ * outside the subset (a browser may drop the whole body for them), and so is an `is`
+ * attribute on `<html>` or `<body>` (a browser adds the attributes of a second such tag to
+ * the element that holds everything). A start tag closes what a browser closes for it only
+ * where that is on top of the stack ({@link P_CLOSERS}). An end tag closes the element on
+ * top of the stack, or the elements that may leave their end tag out before it
+ * ({@link IMPLIED_END}); every other end tag is outside the subset: HTML itself ignores such
+ * an end tag or moves elements for it, by rules this scanner does not copy. An element still
+ * open at the end is outside the subset.
+ * IN AN HTML FILE, after `</body>` or `</html>` only white space, comments and those two end
+ * tags may follow (a browser puts anything else back into the body, inside whatever is still
+ * open there), and a `<table>` leaves a `<p>` open when no `<!DOCTYPE html>` leads the file.
+ * IN MARKDOWN every piece is read by itself: a tag, a comment, an element with raw text and
+ * `<svg>` or `<math>` end inside the piece they start in, or are outside the subset. A tag
+ * the reader makes is followed as a tag of the file would be (and is a token itself); its end tag
+ * also closes what stands open above its element, as a browser does, but only placeholders
+ * opened in inline text (`<file>`: names the HTML parser does not know); anything else left
+ * open there is outside the subset. A paragraph in a list item may or may not get a `<p>`
+ * (`maybe`), which makes no difference unless a `<p>` is open: outside the subset. In inline
+ * text the pieces are read in the order a Markdown reader takes them: a backslash takes the
+ * next character; a code span (a run of backticks to the next run of the same length) is one
+ * `code` token; a link's destination and title after `](` and a link label that follows `]`
+ * or names a definition are `fixed` tokens (a destination or title the scanner cannot read
+ * as one plain piece fixes the rest of the text, which must then hold no `<` and no
+ * backtick); an image's own text, after `![`, is fixed and holds no `<`, backtick, backslash
+ * or `[`; an autolink is one `link` token; a tag is followed only when Markdown's own grammar
+ * reads it as the HTML tokenizer does, and never one that holds raw text or foreign content.
+ * @param {Piece[]} pieces
+ * @param {boolean} file an HTML file
+ * @param {Set<string>} defined the link labels the Markdown file defines ({@link labelKey})
  * @returns {Tok[]}
  */
-function scanMarkup(s, breaks) {
+function scanMarkup(pieces, file, defined) {
   /** @type {Tok[]} */
   const out = [];
-  const n = s.length;
-  let i = 0;
-  let start = 0;
-  /** @type {Array<{name: string, holds: boolean, component: boolean}>} the open elements, the innermost last */
+  /** @type {Array<{name: string, holds: boolean, component: boolean, placeholder: boolean, made: boolean}>} the open elements, the innermost last */
   const stack = [];
   /** @type {Map<string, number>} how many open elements carry each name */
   const open = new Map();
   let held = 0;
   let components = 0;
-  let option = false;
-  let b = 0; // the next of Markdown's blank lines
-  let mark = 0; // the stack's depth where the current paragraph began
-  let plain = true; // every tag of the current paragraph is a placeholder's
-  let tokenEnd = 0; // where the last token that is no text ended
-  const text = (end) => {
-    if (end > start) out.push({ k: 'text', v: s.slice(start, end), quiet: held > 0 || option, inexact: components > 0 });
-  };
-  const take = (k, end) => {
-    text(i);
-    out.push({ k, v: s.slice(i, end) });
-    i = end;
-    start = end;
-    tokenEnd = end;
-  };
+  let ended = false; // HTML file: `</body>` or `</html>` has been read
+  let initial = true; // nothing but white space and comments has been read
+  let quirks = true; // no `<!DOCTYPE html>` leads the file: a browser then leaves a `<p>` open at a `<table>`
+  /** For lists and for `<dl>`: how many items are open in each open one, the innermost last. */
+  const items = [[0], [0]];
+  let own = 0; // how many open elements are the file's own, not made by the Markdown reader
+  const top = () => (stack.length > 0 ? stack[stack.length - 1] : null);
   const pop = () => {
-    const el = /** @type {{name: string, holds: boolean, component: boolean}} */ (stack.pop());
+    const el = /** @type {{name: string, holds: boolean, component: boolean, made: boolean}} */ (stack.pop());
     open.set(el.name, /** @type {number} */ (open.get(el.name)) - 1);
+    if (!el.made) own--;
     if (el.holds) held--;
     if (el.component) components--;
-    return el.name;
+    if (ITEM_HOLDERS.has(el.name)) items[/** @type {number} */ (ITEM_HOLDERS.get(el.name))].pop();
+    else if (ITEMS.has(el.name)) { const of = items[/** @type {number} */ (ITEMS.get(el.name))]; of[of.length - 1]--; }
   };
-  while (i < n) {
-    if (breaks && b < breaks.length && i >= breaks[b].at) {
-      if (breaks[b].reset && plain && tokenEnd <= breaks[b].at && stack.length > mark) {
-        text(i);
-        start = i;
-        while (stack.length > mark) pop();
+  /** @param {string} name @param {boolean} holds @param {boolean} component @param {boolean} placeholder @param {boolean} [byReader] */
+  const push = (name, holds, component, placeholder, byReader = false) => {
+    stack.push({ name, holds, component, placeholder, made: byReader });
+    open.set(name, (open.get(name) || 0) + 1);
+    if (!byReader) own++;
+    if (holds) held++;
+    if (component) components++;
+    if (ITEM_HOLDERS.has(name)) items[/** @type {number} */ (ITEM_HOLDERS.get(name))].push(0);
+    else if (ITEMS.has(name)) { const of = items[/** @type {number} */ (ITEMS.get(name))]; of[of.length - 1]++; }
+  };
+  /** @param {number} back @returns {string} the name of the element `back` places under the top, or '' */
+  const nameAt = (back) => (stack.length > back ? stack[stack.length - 1 - back].name : '');
+  /** An end tag that does not close the element on top closes the elements above its own that may leave their end tag out before it, or is outside the subset. */
+  const closeImplied = (name) => {
+    let k = stack.length - 1;
+    while (k >= 0 && stack[k].name !== name && (IMPLIED_END.get(stack[k].name) || NO_NAMES).has(name)) k--;
+    if (k < 0 || stack[k].name !== name) outside();
+    else while (stack.length > k) pop();
+  };
+  /**
+   * The open elements a start tag closes ({@link P_CLOSERS} and what follows it), each only
+   * where it is on top; where a browser would close through other elements, the start tag is
+   * outside the subset.
+   * @param {string} name @param {boolean} selects inside a `<select>`
+   */
+  const closeBefore = (name, selects) => {
+    if (ITEMS.has(name)) {
+      const of = items[/** @type {number} */ (ITEMS.get(name))];
+      if (of[of.length - 1] > 0) {
+        if (nameAt(0) === 'p' && ITEMS.get(nameAt(1)) === ITEMS.get(name)) pop();
+        if (ITEMS.get(nameAt(0)) === ITEMS.get(name)) pop();
+        else outside();
       }
-      b++;
-      mark = stack.length;
-      plain = true;
-      continue;
     }
-    if (s[i] !== '<') { i++; continue; }
-    const d = s[i + 1] || '';
-    const linkEnd = breaks ? autolinkEnd(s, i) : -1;
-    if (linkEnd > 0) {
-      take('link', linkEnd);
-    } else if (isLetter(d) || (d === '/' && isLetter(s[i + 2] || ''))) {
-      const tag = scanTag(s, i, d === '/');
-      const name = /** @type {string} */ (tag.name).toLowerCase();
-      const attrs = /** @type {string[]} */ (tag.attrs);
-      if (open.get('select') && !['option', 'optgroup', tag.end ? 'select' : 'hr'].includes(name)) outside();
-      if (!tag.end && (name === 'svg' || name === 'math')) {
-        plain = false;
-        take('foreign', foreignEnd(s, i));
+    if (P_CLOSERS.has(name) && open.get('p')) {
+      // A table: in an HTML file it closes the paragraph only under `<!DOCTYPE html>`; in Markdown the page's doctype is not known.
+      if (name === 'table' && (!file || quirks)) { if (!file) outside(); } else if (nameAt(0) === 'p') pop();
+      else outside();
+    }
+    if (HEADINGS.has(name) && HEADINGS.has(nameAt(0))) pop();
+    if (CLOSES_OWN.has(name) && open.get(name)) {
+      if (nameAt(0) === name) pop();
+      else outside();
+    }
+    if (name === 'form' && open.get('form')) outside();
+    if ((name === 'rt' || name === 'rp' || name === 'rb' || name === 'rtc') && open.get('ruby')) {
+      if (RUBY_IMPLIED.has(nameAt(0)) || name === 'rb' || name === 'rtc') outside();
+      else if (nameAt(0) === 'rt' || nameAt(0) === 'rp') pop();
+    }
+    if (name === 'option' || name === 'optgroup' || (name === 'hr' && selects)) {
+      if (nameAt(0) === 'option') pop();
+      if (name !== 'option' && selects && nameAt(0) === 'optgroup') pop();
+    }
+    const part = TABLE_PARTS.get(name);
+    if (part && nameAt(0) !== 'template') {
+      while (part[0].includes(nameAt(0))) pop();
+      if (!part[1].includes(nameAt(0))) outside();
+    }
+    // A table directly inside a table's rows ends that table; in a column group only columns stand.
+    if (name === 'table' && (nameAt(0) === 'table' || (TABLE_PARTS.has(nameAt(0)) && !['td', 'th', 'caption'].includes(nameAt(0))))) outside();
+    if (nameAt(0) === 'colgroup' && name !== 'col' && name !== 'template') outside();
+  };
+  /** A tag the Markdown reader makes: its start tag as any start tag, its end tag closing the placeholders left open above its element. */
+  const made = (piece) => {
+    const name = /** @type {string} */ (piece.name);
+    out.push(piece);
+    if (own === 0) { // only the reader's own tags are open, and those it nests itself
+      if (piece.k === 'open') { if (!VOID_ELEMENTS.has(name)) push(name, false, false, false, true); } else if (nameAt(0) === name) pop();
+      return;
+    }
+    if (open.get('select') || (piece.k === 'open' && piece.maybe && open.get('p'))) outside();
+    if (piece.k === 'open') {
+      closeBefore(name, false);
+      if (!VOID_ELEMENTS.has(name)) push(name, false, false, false, true);
+    } else if (open.get(name)) {
+      // A `<p>` the reader may have left out closes nothing but itself.
+      while (!piece.maybe && nameAt(0) !== name && /** @type {{placeholder: boolean}} */ (top()).placeholder) pop();
+      if (nameAt(0) === name && (!piece.maybe || /** @type {{made: boolean}} */ (top()).made)) pop();
+      else outside();
+    }
+  };
+  /**
+   * One piece of text: an HTML file, a raw HTML block, or (`inline`) a run of Markdown's
+   * inline text.
+   * @param {string} s @param {boolean} inline
+   */
+  const scan = (s, inline) => {
+    const n = s.length;
+    let i = 0;
+    let start = 0;
+    let close = -1; // the next `]` at or after the last `[` looked at; `n` when there is none
+    const text = (end) => {
+      if (end <= start) return;
+      const v = s.slice(start, end);
+      const el = top();
+      const blank = !NOT_HTML_SPACE.test(v);
+      if (!blank) initial = false;
+      // After the body's end, and directly inside a `<colgroup>`, a browser moves text elsewhere.
+      if ((ended || (el !== null && el.name === 'colgroup')) && !blank) outside();
+      const unsent = Boolean(open.get('select')) && !(el !== null && el.name === 'option' && !el.holds);
+      out.push({ k: 'text', v, quiet: held > 0 || unsent, inexact: components > 0 });
+    };
+    const take = (k, end) => {
+      text(i);
+      out.push({ k, v: s.slice(i, end) });
+      i = end;
+      start = end;
+    };
+    while (i < n && scanFault === null) {
+      const c = s[i];
+      if (inline && c === '\\') { i += 2; continue; }
+      if (inline && c === '!' && s[i + 1] === '[') { // an image: its text becomes an attribute, and a reader drops the tags in it
+        const end = s.indexOf(']', i + 2);
+        if (end < 0 || /[<`\\[]/.test(s.slice(i + 2, end))) outside();
+        take('fixed', end < 0 ? n : end);
         continue;
       }
-      text(i);
-      out.push(tag);
-      i += tag.v.length;
-      start = i;
-      tokenEnd = i;
-      option = optionState(tag, option);
-      if (tag.end) {
-        if (stack.length > 0 && stack[stack.length - 1].name === name) {
-          if (stack.length <= mark) plain = false;
-          pop();
+      if (inline && c === '`') {
+        let e = i + 1;
+        while (s[e] === '`') e++;
+        let end = -1; // the end of the next run of the same length
+        for (let from = e; end < 0;) {
+          const a = s.indexOf('`', from);
+          if (a < 0) break;
+          from = a + 1;
+          while (s[from] === '`') from++;
+          if (from - a === e - i) end = from;
+        }
+        if (end < 0) i = e;
+        else take('code', end);
+        continue;
+      }
+      if (inline && c === ']' && s[i + 1] === '(') {
+        const end = linkTargetEnd(s, i);
+        if (end < 0 && /[<`]/.test(s.slice(i))) outside();
+        take('fixed', end < 0 ? n : end);
+        continue;
+      }
+      if (inline && c === '[') {
+        const after = s.indexOf('[', i + 1);
+        if (close <= i) { close = s.indexOf(']', i + 1); if (close < 0) close = n; }
+        // The label's own `]` is left for a destination that may follow it in brackets.
+        if (close < n && (after < 0 || after > close) && (s[i - 1] === ']' || defined.has(labelKey(s.slice(i + 1, close))))) take('fixed', close);
+        else i++;
+        continue;
+      }
+      if (c !== '<') { i++; continue; }
+      const d = s[i + 1] || '';
+      if (inline) {
+        const link = autolinkEnd(s, i);
+        if (link > 0) {
+          if (BAD_SCHEME.test(s.slice(i, i + 12))) outside();
+          take('link', link);
           continue;
         }
-        plain = false;
-        if (held > 0) outside(); // where the held text ends is not known
-        else if (open.get(name)) while (pop() !== name);
-        continue;
       }
-      if (HOST_ELEMENTS.has(name) || PARSER_KNOWN.has(name)) plain = false;
-      if (!VOID_ELEMENTS.has(name)) {
-        const code = CODE_ELEMENTS.has(name) || name === 'template';
-        const component = !code && isComponent(name, attrs);
-        stack.push({ name, holds: code || component, component });
-        open.set(name, (open.get(name) || 0) + 1);
-        if (code || component) held++;
-        if (component) components++;
-      }
-      if (name === 'title') {
-        i = rawEnd(s, i, name);
+      if (isLetter(d) || (d === '/' && isLetter(s[i + 2] || ''))) {
+        const tag = scanTag(s, i, d === '/');
+        const name = /** @type {string} */ (tag.name);
+        const attrs = /** @type {string[]} */ (tag.attrs);
+        initial = false;
+        if (inline) { // Markdown's own grammar must read the tag, and read it as the HTML tokenizer does
+          if (markdownTagEnd(s, i) !== i + tag.v.length || RAW_TEXT.has(name) || name === 'title' || name === 'svg' || name === 'math') outside();
+        }
+        const selects = Boolean(open.get('select'));
+        if (selects && !['option', 'optgroup', tag.end ? 'select' : 'hr'].includes(name)) outside();
+        if (ended && !(tag.end && (name === 'body' || name === 'html'))) outside();
+        if (!tag.end && (name === 'svg' || name === 'math')) {
+          take('foreign', foreignEnd(s, i));
+          continue;
+        }
         text(i);
+        out.push(tag);
+        i += tag.v.length;
         start = i;
-        tokenEnd = i;
-      } else if (RAW_TEXT.has(name)) {
-        const end = rawEnd(s, i, name);
-        if (end > i) take('raw', end);
+        if (scanFault !== null) break; // already refused: nothing more is followed
+        if (tag.end) {
+          if (nameAt(0) === name) pop();
+          else closeImplied(name);
+          if (file && (name === 'body' || name === 'html')) ended = true;
+          continue;
+        }
+        if (name === 'frameset' || name === 'frame' || ((name === 'html' || name === 'body') && attrs.includes('is'))) outside();
+        closeBefore(name, selects);
+        if (!VOID_ELEMENTS.has(name)) {
+          const code = CODE_ELEMENTS.has(name) || name === 'template';
+          const component = !code && isComponent(name, attrs);
+          push(name, code || component || (name === 'option' && !attrs.includes('value')), component,
+            inline && !HOST_ELEMENTS.has(name) && !PARSER_KNOWN.has(name));
+        }
+        if (name === 'title') {
+          i = rawEnd(s, i, name);
+          text(i);
+          start = i;
+        } else if (RAW_TEXT.has(name)) {
+          const end = rawEnd(s, i, name);
+          // Without scripting a browser reads this content as markup; then it must close what it opens.
+          if (name === 'noscript' && scanFault === null) scanMarkup([{ k: 'raw', v: s.slice(i, end) }], true, defined);
+          if (end > i) take('raw', end);
+        }
+      } else if (d === '!' || d === '?' || d === '/') {
+        const end = declarationEnd(s, i);
+        if (!s.startsWith('<!--', i)) { // the doctype: it counts only before everything else
+          if (initial) quirks = false;
+          initial = false;
+        }
+        take('comment', end);
+      } else {
+        i++;
       }
-    } else if (d === '!' || d === '?' || d === '/') {
-      take('comment', declarationEnd(s, i));
-    } else {
-      i++;
     }
+    text(n);
+  };
+  for (const piece of pieces) {
+    if (scanFault !== null) break;
+    if (piece.k === 'open' || piece.k === 'close') made(piece);
+    else if (piece.k === 'fixed') out.push(piece);
+    else scan(piece.v, piece.k === 'inline');
   }
-  if (breaks ? open.get('template') : stack.length > 0) outside(); // an element never closed
-  text(n);
+  if (stack.length > 0) outside(); // an element never closed
   return out;
 }
 
@@ -1245,7 +1589,8 @@ function changedTexts(a, b, wording) {
   for (let k = 0; k < a.length; k++) {
     if (a[k].k !== b[k].k) return { runs: null, inexact: false };
     if (a[k].v === b[k].v) continue;
-    if (a[k].k !== 'text' || !wording(a, k) || !wording(b, k)) {
+    // Text that comes or goes whole is no reworded text: a browser may then build another tree.
+    if (a[k].k !== 'text' || !wording(a, k) || !wording(b, k) || NOT_HTML_SPACE.test(a[k].v) !== NOT_HTML_SPACE.test(b[k].v)) {
       return { runs: null, inexact: a[k].k === 'foreign' || Boolean(a[k].inexact || b[k].inexact) };
     }
     runs.push(a[k].v, b[k].v);
@@ -1253,20 +1598,28 @@ function changedTexts(a, b, wording) {
   return { runs, inexact: false };
 }
 
-/** Characters a markup text token never holds when it changes (template, script or entity starts, a line break). */
-const MARKUP_TEXT_BAD = /[{}$`&<\n]/;
+/** Characters a markup text token never holds when it changes (template and script starts, a lone `<`). */
+const MARKUP_TEXT_BAD = /[{}$`<]/;
+/**
+ * The character references a changed markup text token may hold, each written in full with
+ * its semicolon: punctuation and spacing a sentence is written with. Any other `&` refuses,
+ * because rule 6 reads the text as written and a reference can spell a digit, a currency
+ * sign, an `@` or a `/` that it would not see.
+ */
+const PLAIN_REFERENCE = /&(?:amp|nbsp|quot|apos|copy|reg|trade|hellip|mdash|ndash|lsquo|rsquo|ldquo|rdquo|laquo|raquo|middot|bull|shy);/g;
 
 /**
- * Rule 4 (markup) — a changed text token is visible text: not quiet, on one line, without
- * template, script or entity characters, between two tags.
+ * Rule 4 (markup) — a changed text token is visible text: not quiet, without template or
+ * script characters, every `&` in it one of the plain references ({@link PLAIN_REFERENCE}),
+ * between two tags or comments. It may run over several lines (the decision at review of
+ * 2026-10-09: a text node is one node however many lines it is written on).
  * @param {Tok[]} toks @param {number} k @returns {boolean}
  */
 function markupWording(toks, k) {
   const t = toks[k];
-  if (t.quiet || MARKUP_TEXT_BAD.test(t.v)) return false;
-  const prev = toks[k - 1];
-  const next = toks[k + 1];
-  return Boolean(prev && next) && prev.k === 'tag' && next.k === 'tag';
+  if (t.quiet || MARKUP_TEXT_BAD.test(t.v) || t.v.replace(PLAIN_REFERENCE, '').includes('&')) return false;
+  const beside = (x) => Boolean(x) && (x.k === 'tag' || x.k === 'comment');
+  return beside(toks[k - 1]) && beside(toks[k + 1]);
 }
 
 /**
@@ -1786,17 +2139,6 @@ function frontMatterLines(lines) {
   return lines.length;
 }
 
-/** @param {string} line @returns {number} the width of its leading white space, a tab to the next multiple of 4 */
-function indentWidth(line) {
-  let w = 0;
-  for (let i = 0; i < line.length; i++) {
-    if (line[i] === ' ') w++;
-    else if (line[i] === '\t') w += 4 - (w % 4);
-    else break;
-  }
-  return w;
-}
-
 /** A doctest line, `>>> ` (or `>>>` alone): it and the lines after it up to a blank line are code. */
 const DOCTEST = /^[ \t]*>>>(?:[ \t]|$)/;
 /**
@@ -1826,176 +2168,476 @@ function thematicBreak(line) {
   }
   return count >= 3;
 }
-/** A Markdown list item's marker and the white space after it; the item must hold text. */
-const LIST_ITEM = /^([ \t]*)([-+*]|\d{1,9}[.)])([ \t]+)\S/;
-/** How deep block quotes, and list markers on one line, are followed; deeper is read as code. */
+/** How deep block quotes and list items are followed; deeper is outside the subset. */
 const NESTING_DEPTH = 16;
+/** @param {string} t @returns {boolean} a line a Markdown reader takes as empty: spaces and tabs only */
+function isBlank(t) {
+  for (let k = 0; k < t.length; k++) if (t[k] !== ' ' && t[k] !== '\t') return false;
+  return true;
+}
+/** The characters a line's markers are written with; the tabs among them count as columns. */
+const LEAD = /[ >*+\-.)0-9]/;
+/**
+ * @param {string} line @returns {string} the line with every tab among its leading markers
+ * and spaces replaced by spaces up to the next multiple of four columns, which is how a
+ * Markdown reader counts a tab where it decides what a line is
+ */
+function expandLead(line) {
+  if (!line.includes('\t')) return line;
+  let out = '';
+  for (let k = 0; k < line.length; k++) {
+    const c = line[k];
+    if (c === '\t') out += ' '.repeat(4 - (out.length % 4));
+    else if (LEAD.test(c)) out += c;
+    else return out + line.slice(k);
+  }
+  return out;
+}
+/** @param {string} t @returns {number} the number of spaces the line starts with */
+function indentOf(t) {
+  let k = 0;
+  while (t[k] === ' ') k++;
+  return k;
+}
+/** @param {string} body a line from its first character @returns {(string|null)} the fence it opens: three or more backticks (no backtick after them) or tildes */
+function fenceOf(body) {
+  if (body[0] !== '`' && body[0] !== '~') return null;
+  const m = /^(`{3,}|~{3,})(.*)$/.exec(body);
+  return m && !(m[1][0] === '`' && m[2].includes('`')) ? m[1] : null;
+}
+/** An ATX heading: one to six `#`, then a space, a tab or the end of the line. */
+const ATX = /^#{1,6}(?:[ \t]|$)/;
+/**
+ * @param {string} body a line from its first character
+ * @returns {({width: number, ordered: boolean, mark: string, first: boolean, rest: string}|null)}
+ * the list marker it starts with: a bullet, or up to nine digits and `.` or `)`, before a
+ * space or the end of the line; `mark` the bullet or the delimiter, `first` an ordered
+ * marker numbered 1, `rest` what follows the marker
+ */
+function markerOf(body) {
+  const c = body.charCodeAt(0);
+  if (c !== 45 && c !== 43 && c !== 42 && !(c >= 48 && c <= 57)) return null; // no `-`, `+`, `*` and no digit
+  const m = /^(?:[-+*]|(\d{1,9})[.)])(?=[ \t]|$)/.exec(body);
+  if (!m) return null;
+  return { width: m[0].length, ordered: m[1] !== undefined, mark: m[0][m[0].length - 1], first: Number(m[1]) === 1, rest: body.slice(m[0].length) };
+}
+/*
+ * WHERE AN HTML BLOCK STARTS AND ENDS, after CommonMark's seven start conditions as
+ * markdown-it reads them (compared with markdown-it 15.0.2 on 2026-10-09): 1 `<script`,
+ * `<pre`, `<style` or `<textarea`, to the line that holds one of their end tags; 2 `<!--` to
+ * `-->`; 3 `<?` to `?>`; 4 `<!` and a letter to `>`; 5 `<![CDATA[` to `]]>`; 6 the start or
+ * end tag of a block-level name, to a blank line; 7 any one complete tag alone on its line,
+ * to a blank line. Only 1 to 6 can interrupt a paragraph.
+ */
+const HTML_STARTS = [
+  /^<(?:script|pre|style|textarea)(?=\s|>|$)/i,
+  /^<!--/,
+  /^<\?/,
+  /^<![A-Za-z]/,
+  /^<!\[CDATA\[/,
+  /^<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?=\s|\/?>|$)/i,
+];
+const HTML_ENDS = [/<\/(?:script|pre|style|textarea)>/i, /-->/, /\?>/, />/, /\]\]>/];
+/** @param {string} body a line from its first character @returns {number} the HTML block start condition it meets (1 to 7), or 0 */
+function htmlStart(body) {
+  if (body[0] !== '<') return 0;
+  const kind = HTML_STARTS.findIndex((re) => re.test(body)) + 1;
+  if (kind > 0) return kind;
+  const end = markdownTagEnd(body, 0);
+  return end > 0 && body.slice(end).trim() === '' ? 7 : 0;
+}
+/** A link reference definition's title in its plain form: in quotes or round brackets, without a backslash. */
+const DEFINITION_TITLE = /^(?:"[^"\\]*"|'[^'\\]*'|\([^()\\]*\))$/;
+/**
+ * @param {string} body a line that starts with `[`
+ * @returns {(string|null)} the label of the link reference definition the line is, in its
+ * plain form on one line, or null: `[label]:`, a destination in `<…>` or without white
+ * space, round brackets or a backslash, and an optional title ({@link DEFINITION_TITLE}).
+ * The label holds text, and no bracket, backslash, backtick, `<` or `>`; the destination's
+ * scheme is one a Markdown reader links ({@link BAD_SCHEME}).
+ */
+function definitionLabel(body) {
+  const close = body.indexOf(']:');
+  const label = close < 0 ? '' : body.slice(1, close);
+  if (label.trim() === '' || /[[\]\\`<>]/.test(label)) return null;
+  const rest = body.slice(close + 2).replace(/^[ \t]+/, '').replace(/[ \t]+$/, '');
+  const end = rest[0] === '<' ? rest.indexOf('>') + 1 : rest.search(/[ \t]|$/);
+  const destination = rest.slice(0, end);
+  if (end === 0 || BAD_SCHEME.test(destination)
+    || (rest[0] === '<' ? /[<\\]/.test(destination.slice(1)) : /[\s<>()\\\u0000-\u001f\u007f]/.test(destination))) return null;
+  const title = rest.slice(end);
+  return title === '' || (/^[ \t]/.test(title) && DEFINITION_TITLE.test(title.replace(/^[ \t]+/, ''))) ? label : null;
+}
+/** A table's delimiter row: `|`, `-`, `:` and spaces only, as markdown-it tests it before it splits the row. */
+const DELIMITER_ROW = /^(?:[|:][|:\- \t]|-[|:-])[|:\- \t]*$/;
 
 /**
- * Rule 4 (documentation) — the lines of a Markdown file from line `top` on: each one's
- * class (`code` or `prose`), and where its blocks start and end, which is where a run of
- * inline text (a code span) can neither continue from the line above (`starts`) nor into
- * the line below (`ends`).
- * Code is a fenced block of either fence kind (its fences included, unclosed to the end),
- * an indented block (four columns beyond the list item it stands in, after a blank line or
- * another such line), a doctest ({@link DOCTEST}) and an `import` or `export` block
- * ({@link MDX_SCRIPT}, where a block starts: after a blank line, a heading, a closed fence
- * or any other line that is no paragraph's text). The list items are read after CommonMark's rules: an item's own
- * text is read as a line of its own at the item's content column, so it may open a fence,
- * a doctest, a block quote or another item, or be indented code; a paragraph indented to an
- * item's content column is prose; any line indented less than an item's content column
- * ends that item (a lazy continuation line is read as ending it too, which only makes more
- * lines code, while its text still continues the paragraph above); a thematic break and an
- * item with no text are no items; an ordered item not numbered 1 starts an item only after
- * a blank line or another ordered item; and a fence closes only at its own item's column.
- * A block quote is read like the document it quotes: the marker (`>` after at most three
- * spaces, and one space) is taken off each line of a run of quoted lines, the rest is
- * classified by this same function, and the classes are copied back. A quote whose marker
- * holds a tab, or one nested deeper than {@link NESTING_DEPTH}, is code whole, and so is a
- * line with more list markers than that.
- * A heading (`# …`, or a paragraph underlined with `===` or `---`) and a thematic break end
- * the block they stand in, and an indented line right after one of them, after a closed
- * fence or after a quote that did not end in a paragraph is code. A paragraph may run on
- * past the end of a list item or a quote (a lazy continuation line); such a paragraph takes
- * no underline.
- * @param {string[]} lines
- * @param {number} top the number of front matter lines, classed `settings`
- * @param {number} depth how many block quotes enclose these lines
- * @returns {{cls: string[], starts: boolean[], ends: boolean[], paragraph: boolean, anchors: string[]}}
- * `paragraph`: the last line is a paragraph's text, which the next line may continue;
- * `anchors`: the generated anchor of every heading, in order ({@link anchorOf})
+ * @param {string} row a table row, trimmed @returns {string[]} its cells: split at every
+ * `|` that no backslash stands right before (the backslash is then dropped), the empty
+ * piece before a leading `|` and after a trailing one left out
  */
-function markdownBlocks(lines, top, depth) {
-  const n = lines.length;
-  const cls = new Array(n).fill('prose');
-  const starts = new Array(n).fill(false);
-  const ends = new Array(n).fill(false);
-  for (let i = 0; i < top; i++) cls[i] = 'settings';
-  /** @type {{mark: string, col: number}|null} */
-  let fence = null;
-  /** @type {number[]} the content columns of the open list items */
-  const cols = [];
-  let prevBlank = true;
-  let prevIndented = false;
-  let prevItem = '';
-  /** @type {''|'own'|'lazy'} whether the line above is a paragraph's text, and one that ran on lazily */
-  let prevParagraph = '';
-  let block = false; // inside a doctest or an `import` / `export` block
+function cellsOf(row) {
+  const cells = [];
+  let cell = '';
+  for (let k = 0; k < row.length; k++) {
+    if (row[k] !== '|') cell += row[k];
+    else if (row[k - 1] === '\\') cell = `${cell.slice(0, -1)}|`;
+    else { cells.push(cell); cell = ''; }
+  }
+  cells.push(cell);
+  if (cells[0] === '') cells.shift();
+  if (cells.length > 0 && cells[cells.length - 1] === '') cells.pop();
+  return cells;
+}
+
+/**
+ * Rule 4 (documentation) — a Markdown file as a Markdown reader renders it, read block by
+ * block after CommonMark's rules as markdown-it applies them (the differential test holds
+ * this reader to markdown-it): for each line its class (`code` or `prose`), the generated
+ * anchor of every heading, the link labels the file defines, and the pieces
+ * {@link scanMarkup} reads: every tag the reader makes (`<p>`, `<blockquote>`, `<ul>`, `<li>`,
+ * `<h2>`, `<pre>` for a code block with its text left out, `<hr>`, a table's tags), each run
+ * of inline text, each raw HTML block as written, and what is compared exactly (a
+ * definition, a list marker, a table's delimiter row, a row's cells beyond its columns).
+ * READ, at the start of a block, in this order: a table (a row with `|` above a delimiter
+ * row with as many columns); indented code (four columns, with the blank lines inside it);
+ * a fenced code block (to its closing fence; one never closed is unreadable); a block quote
+ * (the `>` lines that follow each other, read like the document they quote); a thematic
+ * break; a list (its items of one marker kind; an item holds the lines indented to its
+ * content column and the blank lines between them, read like a document of their own); link
+ * reference definitions in their plain form ({@link definitionLabel}); an HTML block
+ * ({@link HTML_STARTS}); an ATX heading; and a paragraph, which runs to a blank line or to a
+ * line that interrupts it, and is a heading when a line of `=` or `-` underlines it.
+ * A LAZY CONTINUATION LINE (a line right under a block quote or a list item, without its
+ * marker or indentation) continues the paragraph that stands open there; where none does,
+ * the block quote or list item ends above it, and the line is read after it.
+ * OUTSIDE THE SUBSET, each refusing the whole file ({@link outside}): such a line where
+ * readers disagree whether it is lazy (a list marker that is no bullet and not number 1, or
+ * has no text, or stands four columns in; the header row of what may be a table; a `>` line
+ * four columns in right under a quote); a definition in any other than its plain form (a
+ * label, destination or title on a line of its own, an escape), or one the line below may
+ * add a title to; block quotes and list items nested deeper than {@link NESTING_DEPTH}.
+ * A doctest ({@link DOCTEST}) and an `import` or `export` block ({@link MDX_SCRIPT}) are
+ * read as the Markdown they are, and their lines are classed `code` besides: a change to one
+ * is a change to code, wherever the file is built that way.
+ * @param {string[]} lines
+ * @returns {{cls: string[], anchors: string[], defined: Set<string>, pieces: Piece[]}}
+ */
+function markdownBlocks(lines) {
+  const count = lines.length;
+  const cls = new Array(count).fill('prose');
+  /**
+   * Each line's text inside the block quotes and list items around it: the file's lines
+   * (the tabs among their leading markers as columns), and as a block quote or a list item
+   * is entered, its lines without its marker and indentation.
+   * @type {string[]}
+   */
+  const T = lines.map(expandLead);
+  /** @type {boolean[]} whether each line is a paragraph's text */
+  const inParagraph = new Array(count).fill(false);
+  /** @type {number[]} how many block quotes and list items each line has been read into so far */
+  const level = new Array(count).fill(0);
+  /** @type {boolean[]} whether each line starts a doctest, at any depth */
+  const doctest = new Array(count).fill(false);
+  /**
+   * Whether each line is, for the block quote or list item being read, a lazy continuation
+   * line: one right under it without its marker or indentation. It continues the paragraph
+   * that stands open there; where none does, the block quote or list item ends above it.
+   * @type {boolean[]}
+   */
+  const lazy = new Array(count).fill(false);
   /** @type {string[]} */
   const anchors = [];
-  let paragraphFrom = 0; // the first line of the paragraph the line above belongs to
-  for (let i = top; i < n; i++) {
-    if (fence) {
-      cls[i] = 'code';
-      const close = /^[ \t]*(`+|~+)[ \t]*$/.exec(lines[i]);
-      const w = indentWidth(lines[i]);
-      if (close && w >= fence.col && w - fence.col <= 3 && close[1][0] === fence.mark[0] && close[1].length >= fence.mark.length) {
-        fence = null;
-        prevIndented = true;
-      }
-      continue;
+  /** @type {Set<string>} */
+  const defined = new Set();
+  /** @type {Piece[]} */
+  const pieces = [];
+  /** @type {Map<string, Piece>} the tags the reader makes, one piece for each */
+  const tags = new Map();
+  const tag = (k, v, name, maybe) => {
+    let piece = tags.get(v);
+    if (piece === undefined) tags.set(v, piece = { k, v: v.replace('?', ''), name, maybe });
+    pieces.push(piece);
+  };
+  const open = (name, maybe = false) => tag('open', maybe ? `<${name}>?` : `<${name}>`, name, maybe);
+  const close = (name, maybe = false) => tag('close', maybe ? `</${name}>?` : `</${name}>`, name, maybe);
+  const inline = (v) => pieces.push({ k: 'inline', v });
+  const fixed = (v) => pieces.push({ k: 'fixed', v });
+  /** @param {string} text a heading's text; one that holds a character reference is kept whole, because a reference may spell a letter */
+  const anchor = (text) => anchors.push(text.includes('&') ? text : anchorOf(text));
+  /** @param {number} from @param {number} to the lines of a code block */
+  const code = (from, to) => {
+    for (let k = from; k < to; k++) cls[k] = 'code';
+    open('pre');
+    close('pre');
+  };
+  /**
+   * @param {number} j @param {number} to
+   * @returns {number} the number of columns of the table that starts at line `j` (its header
+   * row, the delimiter row below it), or 0
+   */
+  const tableAt = (j, to) => {
+    if (j + 1 >= to || !T[j].includes('|') || lazy[j + 1] || indentOf(T[j]) > 3 || indentOf(T[j + 1]) > 3) return 0;
+    const rule = T[j + 1].trim();
+    if (!DELIMITER_ROW.test(rule)) return 0;
+    const columns = rule.split('|');
+    let width = 0;
+    for (let k = 0; k < columns.length; k++) {
+      const column = columns[k].trim();
+      if (column === '' && (k === 0 || k === columns.length - 1)) continue;
+      if (!/^:?-+:?$/.test(column)) return 0;
+      width++;
     }
-    if (lines[i].trim() === '') {
-      prevBlank = true;
-      prevParagraph = '';
-      block = false;
-      continue;
+    return cellsOf(T[j].trim()).length === width ? width : 0;
+  };
+  /** @param {string} body @returns {boolean} the line starts a block that ends whatever block stands open above it, a paragraph too */
+  const startsBlock = (body) => fenceOf(body) !== null || thematicBreak(body) || (body[0] === '#' && ATX.test(body)) || [1, 2, 3, 4, 5, 6].includes(htmlStart(body));
+  /** @param {string} body @returns {boolean} a list marker every reader lets interrupt a paragraph: a bullet, or number 1, with text after it */
+  const interruptingMarker = (body) => {
+    const m = markerOf(body);
+    return m !== null && (!m.ordered || m.first) && !isBlank(m.rest);
+  };
+  /** @param {number} j @param {number} to @returns {boolean} line `j` interrupts the paragraph above it */
+  const interrupts = (j, to) => {
+    const body = T[j].slice(indentOf(T[j]));
+    return startsBlock(body) || body[0] === '>' || interruptingMarker(body) || tableAt(j, to) > 0;
+  };
+  /**
+   * The line right under a block quote's or a list item's last line, without the marker or
+   * the indentation that would make it part of it: whether a Markdown reader may take it as
+   * a lazy continuation line. A line that starts a block of its own is none. A list marker
+   * is taken as a block only where every reader does (a bullet, or number 1, with text; under
+   * a list item also that list's next item), and where readers disagree, or a table may
+   * start, the file is outside the subset.
+   * @param {number} k the line @param {number} to
+   * @param {({ordered: boolean, mark: string}|null)} list the list whose item it stands under (a block starts there at any indentation), or null under a block quote (only within three columns)
+   * @returns {boolean}
+   */
+  const mayBeLazy = (k, to, list) => {
+    const at = indentOf(T[k]);
+    const body = T[k].slice(at);
+    if ((list !== null || at < 4) && (startsBlock(body) || body[0] === '>')) return false;
+    const m = markerOf(body);
+    if (m !== null && (list !== null || at < 4)) {
+      if (at > 3 || !((list !== null && m.ordered === list.ordered && m.mark === list.mark) || interruptingMarker(body))) outside();
+      return false;
     }
-    let line = lines[i];
-    let lazy = prevParagraph === 'lazy';
-    let item = '';
-    /** @type {''|'own'|'lazy'} */
-    let paragraph = '';
-    // The line is read once, and once more for each list marker taken off its start.
-    for (let markers = 0; ; markers++) {
-      const inItem = markers > 0;
-      const w = indentWidth(line);
-      while (!inItem && cols.length > 0 && cols[cols.length - 1] > w) {
-        cols.pop();
-        lazy = lazy || !prevBlank;
-      }
-      const base = cols.length > 0 ? cols[cols.length - 1] : 0;
-      const rel = w - base;
-      const afterBlank = prevBlank || inItem;
-      const indented = rel >= 4 && (afterBlank || prevIndented);
-      prevIndented = indented;
-      prevBlank = false;
-      if (indented || markers > NESTING_DEPTH) { cls[i] = 'code'; break; }
-      const body = line.trimStart();
-      const open = /^(`{3,}|~{3,})/.exec(body);
-      if (rel <= 3 && open && !(open[1][0] === '`' && body.slice(open[0].length).includes('`'))) {
-        fence = { mark: open[1], col: base };
-        cls[i] = 'code';
-        break;
-      }
-      if (block || DOCTEST.test(line) || ((afterBlank || prevParagraph === '') && MDX_SCRIPT.test(line))) {
-        block = true;
-        cls[i] = 'code';
-        break;
-      }
-      if (rel <= 3 && body[0] === '>') {
-        const run = [line];
-        let j = i + 1;
-        while (j < n && lines[j].trimStart()[0] === '>' && !DOCTEST.test(lines[j])
-          && indentWidth(lines[j]) >= base && indentWidth(lines[j]) - base <= 3) run.push(lines[j++]);
-        let followed = depth < NESTING_DEPTH;
-        const quoted = run.map((l) => {
-          const marker = /** @type {RegExpExecArray} */ (/^[ \t]*>[ \t]?/.exec(l))[0];
-          if (marker.includes('\t')) followed = false;
-          return l.slice(marker.length);
-        });
-        const inner = followed ? markdownBlocks(quoted, 0, depth + 1) : null;
-        if (inner) anchors.push(...inner.anchors);
-        for (let k = 0; k < run.length; k++) {
-          cls[i + k] = inner ? inner.cls[k] : 'code';
-          starts[i + k] = k === 0 || Boolean(inner && inner.starts[k]);
-          ends[i + k] = Boolean(inner && inner.ends[k]);
+    if (list !== null && T[k].includes('|') && k + 1 < to && DELIMITER_ROW.test(T[k + 1].trim())) outside();
+    return true;
+  };
+  /**
+   * @param {number} from @param {number} to the lines of one document, block quote or list item
+   * @param {number} depth how many block quotes and list items enclose them
+   * @param {boolean} item they are a list item's
+   * @returns {number} the line it stopped at: `to`, or a lazy line that continues no paragraph, where the block quote or list item is over
+   */
+  const parse = (from, to, depth, item) => {
+    if (depth > NESTING_DEPTH) {
+      for (let k = from; k < to; k++) cls[k] = 'code';
+      outside();
+      return to;
+    }
+    for (let k = from; k < to; k++) if (T[k].includes('>>>') && DOCTEST.test(T[k])) doctest[k] = true;
+    let pos = from;
+    while (pos < to) {
+      const t = T[pos];
+      if (isBlank(t)) { pos++; continue; }
+      if (lazy[pos]) break;
+      const indent = indentOf(t);
+      const body = t.slice(indent);
+      const columns = tableAt(pos, to);
+      if (columns > 0) {
+        open('table');
+        open('thead');
+        fixed(T[pos + 1].trim());
+        let k = pos;
+        for (; k < to; k = k === pos ? pos + 2 : k + 1) {
+          const row = T[k].slice(indentOf(T[k]));
+          if (k > pos && (lazy[k] || isBlank(row) || indentOf(T[k]) > 3 || startsBlock(row) || row[0] === '>' || markerOf(row) !== null)) break;
+          if (k === pos + 2) open('tbody');
+          open('tr');
+          const cells = cellsOf(T[k].trim());
+          for (let c = 0; c < columns; c++) {
+            open(k === pos ? 'th' : 'td');
+            inline((cells[c] || '').trim());
+            close(k === pos ? 'th' : 'td');
+          }
+          if (cells.length > columns) fixed(cells.slice(columns).join('|')); // a reader drops them
+          close('tr');
+          if (k === pos) close('thead');
         }
-        i = j - 1;
-        // A quote that ends in a paragraph may run on in the next line; any other ends here.
-        if (inner && inner.paragraph) paragraph = 'lazy';
-        else {
-          ends[i] = true;
-          prevIndented = true;
+        if (k > pos + 2) close('tbody');
+        close('table');
+        pos = k;
+      } else if (indent > 3) {
+        let end = pos + 1;
+        for (let k = end; k < to && !lazy[k] && (isBlank(T[k]) || indentOf(T[k]) > 3); k++) if (!isBlank(T[k])) end = k + 1;
+        code(pos, end);
+        pos = end;
+      } else if (fenceOf(body) !== null) {
+        const fence = /** @type {string} */ (fenceOf(body));
+        let end = pos + 1;
+        const closes = (line) => indentOf(line) < 4 && line.trim()[0] === fence[0] && /^(`+|~+)$/.test(line.trim()) && line.trim().length >= fence.length;
+        while (end < to && !lazy[end] && !closes(T[end])) end++;
+        if (end === to || lazy[end]) fault('open');
+        else end++;
+        code(pos, end);
+        pos = end;
+      } else if (body[0] === '>') {
+        // The quote's lines: the `>` lines that follow each other, and the lazy lines between and under them.
+        let end = pos;
+        let empty = false; // the last quoted line holds nothing: no lazy line follows it
+        let first = -1; // the first lazy line
+        /** @type {string[]} the lines from the first lazy line on, as they were */
+        const kept = [];
+        /** @type {number[]} */
+        const mine = [];
+        for (; end < to && !isBlank(T[end]); end++) {
+          const at = indentOf(T[end]);
+          const quoted = !lazy[end] && T[end][at] === '>';
+          // A `>` line indented four columns right under the quote: readers disagree whether it is quoted.
+          if (quoted && at > 3) outside();
+          if (!quoted && (empty || (!lazy[end] && !mayBeLazy(end, to, null)))) break;
+          if (!quoted && first < 0) first = end;
+          if (first >= 0) kept.push(T[end]);
+          if (!quoted && !lazy[end]) { lazy[end] = true; mine.push(end); }
+          if (!quoted) continue;
+          T[end] = T[end].slice(T[end][at + 1] === ' ' ? at + 2 : at + 1);
+          level[end] = depth + 1;
+          empty = isBlank(T[end]);
         }
-        break;
+        open('blockquote');
+        const stop = parse(pos, end, depth + 1, false);
+        close('blockquote');
+        for (let k = stop; k < end; k++) { T[k] = kept[k - first]; level[k] = depth; }
+        for (const k of mine) lazy[k] = false;
+        pos = stop;
+      } else if (thematicBreak(body)) {
+        open('hr');
+        pos++;
+      } else if (markerOf(body) !== null) {
+        let m = /** @type {NonNullable<ReturnType<typeof markerOf>>} */ (markerOf(body));
+        const list = m.ordered ? 'ol' : 'ul';
+        const mark = m.mark;
+        open(list);
+        for (;;) {
+          // The item's content column: one to four spaces after the marker; with more, or with nothing after it, one.
+          const blank = isBlank(m.rest);
+          const spaces = indentOf(m.rest);
+          const gap = blank || spaces > 4 ? 1 : spaces;
+          const column = indentOf(T[pos]) + m.width + gap;
+          fixed(T[pos].slice(indentOf(T[pos]), indentOf(T[pos]) + m.width));
+          T[pos] = blank ? '' : m.rest.slice(gap);
+          level[pos] = depth + 1;
+          let end = pos + 1;
+          let first = -1; // the first lazy line
+          /** @type {string[]} the lines from the first lazy line on, as they were */
+          const kept = [];
+          /** @type {number[]} */
+          const mine = [];
+          // An item whose first line is empty and whose next line is blank is empty. Else it
+          // holds the lines indented to its content column, the blank lines between them, and
+          // the lazy lines right under one of its lines.
+          for (let k = end; k < to && !(blank && isBlank(T[pos + 1])); k++) {
+            if (isBlank(T[k])) { if (first >= 0) kept.push(T[k]); continue; }
+            const inside = !lazy[k] && indentOf(T[k]) >= column;
+            if (!inside && !lazy[k] && (isBlank(T[k - 1]) || !mayBeLazy(k, to, m))) break;
+            if (!inside && first < 0) { first = k; kept.length = 0; }
+            if (first >= 0) kept.push(T[k]);
+            if (inside) { T[k] = T[k].slice(column); level[k] = depth + 1; } else if (!lazy[k]) { lazy[k] = true; mine.push(k); }
+            end = k + 1;
+          }
+          open('li');
+          const stop = parse(pos, end, depth + 1, true);
+          close('li');
+          for (let k = stop; k < end; k++) { T[k] = kept[k - first]; level[k] = depth; }
+          for (const k of mine) lazy[k] = false;
+          pos = stop;
+          while (pos < to && isBlank(T[pos])) pos++;
+          if (pos === to || lazy[pos]) break;
+          const next = T[pos].slice(indentOf(T[pos]));
+          const following = indentOf(T[pos]) > 3 || fenceOf(next) !== null || next[0] === '>' || thematicBreak(next) ? null : markerOf(next);
+          if (following === null || following.ordered !== m.ordered || following.mark !== mark) break;
+          m = following;
+        }
+        close(list);
+      } else if (body[0] === '[' && mayDefine(T, pos, to)) {
+        const label = definitionLabel(body);
+        const title = pos + 1 < to ? T[pos + 1][indentOf(T[pos + 1])] : '';
+        if (label === null || title === '"' || title === "'" || title === '(') outside(); // not plain, or the line below may be its title
+        else defined.add(labelKey(label));
+        fixed(body);
+        pos++;
+      } else if (htmlStart(body) > 0) {
+        const kind = htmlStart(body);
+        let end = pos + 1;
+        if (kind > 5) while (end < to && !lazy[end] && !isBlank(T[end])) end++;
+        else if (!HTML_ENDS[kind - 1].test(body)) {
+          while (end < to && !lazy[end] && !HTML_ENDS[kind - 1].test(T[end])) end++;
+          if (end < to && !lazy[end]) end++;
+        }
+        pieces.push({ k: 'raw', v: T.slice(pos, end).join('\n') });
+        pos = end;
+      } else if (body[0] === '#' && ATX.test(body)) {
+        const level = /** @type {RegExpExecArray} */ (/^#+/.exec(body))[0].length;
+        anchor(body);
+        open(`h${level}`);
+        inline(body.slice(level));
+        close(`h${level}`);
+        pos++;
+      } else {
+        let end = pos + 1;
+        let heading = '';
+        for (; end < to && !isBlank(T[end]); end++) {
+          const at = indentOf(T[end]);
+          if (at > 3 || lazy[end]) continue;
+          const under = T[end][at] === '=' || T[end][at] === '-' ? /^(=+|-+)[ \t]*$/.exec(T[end].slice(at)) : null;
+          if (under) heading = under[1][0] === '=' ? 'h1' : 'h2';
+          if (under || interrupts(end, to)) break;
+        }
+        for (let k = pos; k < end; k++) inParagraph[k] = true;
+        if (heading) anchor(T.slice(pos, end).map((l) => l.trim()).join(' '));
+        open(heading || 'p', item && !heading);
+        inline(end === pos + 1 ? t : T.slice(pos, end).join('\n'));
+        close(heading || 'p', item && !heading);
+        pos = heading ? end + 1 : end;
       }
-      // A heading, a setext underline (it closes the paragraph above as a heading, and is
-      // never a lazy line) and a thematic break each end the block they stand in.
-      const heading = /^#{1,6}(?:[ \t]|$)/.test(body);
-      const underline = prevParagraph === 'own' && !inItem && !lazy && /^(?:=+|-+)[ \t]*$/.test(body);
-      if (rel <= 3 && (heading || underline || thematicBreak(body))) {
-        if (heading) anchors.push(anchorOf(body));
-        else if (underline) anchors.push(anchorOf(lines.slice(paragraphFrom, i).map((l) => l.trim()).join(' ')));
-        starts[i] = !underline;
-        ends[i] = true;
-        prevIndented = true;
-        break;
-      }
-      const m = rel <= 3 ? LIST_ITEM.exec(line) : null;
-      const ordered = m !== null && /^\d/.test(m[2]);
-      // An ordered item that does not start at 1 cannot interrupt a paragraph: it is the
-      // paragraph's text, unless a blank line or another ordered item stands right before it.
-      if (!m || (ordered && Number.parseInt(m[2], 10) !== 1 && !afterBlank && prevItem !== 'ordered')) {
-        paragraph = lazy ? 'lazy' : 'own';
-        break;
-      }
-      item = ordered ? 'ordered' : 'bullet';
-      starts[i] = true;
-      lazy = false;
-      const after = indentWidth(line.slice(m[1].length + m[2].length).replace(/\S[\s\S]*$/, ''));
-      // The item's text starts its content column; five or more columns after the marker,
-      // the column is one after the marker and the text is indented code.
-      const col = w + m[2].length + (after >= 5 ? 1 : after);
-      cols.push(col);
-      line = ' '.repeat(after >= 5 ? col + after - 1 : col) + line.slice(m[0].length - 1);
     }
-    prevItem = item;
-    if (paragraph !== '' && prevParagraph === '') paragraphFrom = i;
-    prevParagraph = paragraph;
+    // A doctest and an `import` or `export` block: code as well, up to the next blank line.
+    // A line read into a block quote or a list item is no blank line and starts no such block here.
+    let script = false;
+    for (let k = from; k < pos; k++) {
+      const t = level[k] > depth ? '>' : T[k];
+      if (isBlank(t)) script = false;
+      else if (script || doctest[k]
+        || ((t[0] === 'i' || t[0] === 'e') && MDX_SCRIPT.test(t) && (k === from || (level[k - 1] <= depth && isBlank(T[k - 1])) || !inParagraph[k - 1]))) {
+        script = true;
+        cls[k] = 'code';
+      }
+    }
+    return pos;
+  };
+  parse(0, count, 0, false);
+  // A block quote line whose marker is followed by a tab: read as the Markdown it is, and classed code besides.
+  for (let k = 0; k < count; k++) if (lines[k].includes('\t') && /^[ \t>]*>\t/.test(lines[k])) cls[k] = 'code';
+  return { cls, anchors, defined, pieces };
+}
+
+/**
+ * @param {string[]} T the lines @param {number} j a line that starts with `[` @param {number} to
+ * @returns {boolean} the line may start a link reference definition: its label, which may
+ * run over the lines below, ends in `]:` (a backslash inside it counts as one that may)
+ */
+function mayDefine(T, j, to) {
+  for (let k = j, start = indentOf(T[j]) + 1; k < to && !isBlank(T[k]); k++, start = 0) {
+    const t = T[k];
+    for (let p = start; p < t.length; p++) {
+      if (t[p] === '\\') return true;
+      if (t[p] === '[') return false;
+      if (t[p] === ']') return t[p + 1] === ':';
+    }
   }
-  if (fence) fault('open');
-  return { cls, starts, ends, paragraph: prevParagraph !== '', anchors };
+  return false;
 }
 
 /**
@@ -2039,165 +2681,10 @@ function lineClassChange(hunks, oldCls, newCls) {
 }
 
 /**
- * Every pair of backtick runs in one run of inline text: a run closed by the next run of
- * the same length, as CommonMark pairs them. Each run is visited once.
- * @param {string} s @returns {Array<{from: number, to: number}>} the ends of each pair's content
- */
-function backtickPairs(s) {
-  /** @type {Array<[number, number]>} */
-  const runs = [];
-  for (let i = 0; i < s.length;) {
-    if (s[i] !== '`') { i++; continue; }
-    let j = i;
-    while (j < s.length && s[j] === '`') j++;
-    runs.push([i, j - i]);
-    i = j;
-  }
-  /** @type {Map<number, number[]>} */
-  const byLength = new Map();
-  runs.forEach(([, len], r) => {
-    if (!byLength.has(len)) byLength.set(len, []);
-    /** @type {number[]} */ (byLength.get(len)).push(r);
-  });
-  const next = new Map();
-  const pairs = [];
-  for (let r = 0; r < runs.length;) {
-    const [start, len] = runs[r];
-    const list = /** @type {number[]} */ (byLength.get(len));
-    let p = next.get(len) || 0;
-    while (p < list.length && list[p] <= r) p++;
-    next.set(len, p);
-    if (p === list.length) { r++; continue; }
-    const close = list[p];
-    pairs.push({ from: start + len, to: runs[close][0] });
-    r = close + 1;
-  }
-  return pairs;
-}
-
-/**
- * Where backticks may pair otherwise than {@link backtickPairs} reads them: a table cell
- * ends at `|`, a backslash escapes a backtick, and a tag or an autolink takes its backticks
- * out of the pairing.
- */
-const PAIRING_UNSURE = /[|<]|\\`/;
-
-/**
- * Rule 4 (Markdown) — the inline code spans of the prose. Backticks pair inside one run of
- * inline text: one paragraph, heading, list item or table row, never across a blank line, a
- * code line or the start or end of a block ({@link markdownBlocks}), so a lone backtick in
- * one paragraph cannot open a span that swallows the next paragraph's opening backtick and
- * leaves that span's code as prose. Where the pairing is not sure ({@link PAIRING_UNSURE}),
- * everything from the run's first backtick to its last is one span. Returns the spans'
- * contents, joined, and the prose with each span's content blanked (same length, line
- * breaks kept), so that no tag or link inside one counts.
- * @param {string[]} lines the prose lines, every other line empty
- * @param {{starts: boolean[], ends: boolean[]}} blocks
- * @returns {{blanked: string, spans: string}}
- */
-function codeSpans(lines, blocks) {
-  const spans = [];
-  const parts = [];
-  for (let i = 0; i < lines.length;) {
-    let j = i + 1;
-    while (j < lines.length && lines[j].trim() !== '' && lines[i].trim() !== '' && !blocks.starts[j] && !blocks.ends[j - 1]) j++;
-    const s = lines.slice(i, j).join('\n');
-    let pairs = backtickPairs(s);
-    if (PAIRING_UNSURE.test(s)) {
-      let from = s.indexOf('`');
-      let to = s.lastIndexOf('`');
-      while (s[from] === '`') from++;
-      while (to > from && s[to - 1] === '`') to--;
-      pairs = from >= 0 && from < to ? [{ from, to }] : [];
-    }
-    let at = 0;
-    for (const { from, to } of pairs) {
-      spans.push(s.slice(from, to));
-      parts.push(s.slice(at, from), s.slice(from, to).replace(/[^\n]/g, '\u0002'));
-      at = to;
-    }
-    parts.push(s.slice(at), '\n');
-    i = j;
-  }
-  parts.pop();
-  return { blanked: parts.join(''), spans: spans.join('\u0000') };
-}
-
-/**
  * @param {string} label @returns {string} a link label as CommonMark matches it: white
  * space collapsed and the case folded, so `[ẞ]` names the definition `[SS]`
  */
 const labelKey = (label) => label.trim().replace(/\s+/g, ' ').toLowerCase().toUpperCase().toLowerCase();
-
-/**
- * Rule 4 (Markdown) — every link and image target of the prose, in order: the `(…)` after
- * `]` (to its matching `)` or the line's end), each reference definition line
- * `[label]: …` with its destination and title where they stand on the following lines,
- * each `[label]` after `]`, and each `[label]` that names a definition. Link
- * text is not part of it. Linear: every search moves forward.
- * @param {string} s the prose, code spans blanked @returns {string}
- */
-function linkTargets(s) {
-  const out = [];
-  for (let i = s.indexOf(']('); i >= 0; i = s.indexOf('](', i + 2)) {
-    let j = i + 2;
-    if (s[j] === '<') {
-      while (j < s.length && s[j] !== '>' && s[j] !== '\n') j++;
-    } else {
-      let depth = 1;
-      while (j < s.length && s[j] !== '\n') {
-        if (s[j] === '\\') { j += 2; continue; }
-        if (s[j] === '(') depth++;
-        else if (s[j] === ')' && --depth === 0) break;
-        j++;
-      }
-    }
-    j = Math.min(j, s.length);
-    if (j === s.length || s[j] === '\n') fault('open'); // a destination never closed on its line
-    out.push(s.slice(i + 2, j));
-    i = Math.max(i, j - 2);
-  }
-  const defined = new Set();
-  const lines = s.split('\n');
-  // Also behind the markers of a block quote or a list item, where a definition may stand.
-  const definition = /^[ \t>*+.)\d-]*\[([^\]\n]*)\]:/;
-  for (let i = 0; i < lines.length; i++) {
-    const m = definition.exec(lines[i]);
-    if (!m) continue;
-    out.push(lines[i]);
-    defined.add(labelKey(m[1]));
-    // CommonMark lets the destination and the title each stand on the next line.
-    let rest = lines[i].slice(m[0].length).trim();
-    if (rest === '') {
-      let j = i + 1;
-      while (j < lines.length && lines[j].trim() === '') j++;
-      if (j === lines.length) break;
-      if (definition.test(lines[j])) { i = j - 1; continue; } // read as a definition of its own
-      out.push(lines[j]);
-      rest = lines[j].trim();
-      i = j;
-    }
-    const destination = rest[0] === '<' ? rest.indexOf('>') + 1 || rest.length : rest.search(/\s|$/);
-    if (rest.slice(destination).trim() !== '') continue;
-    // A title on the next line: from a line that opens one to the next blank line (a title
-    // may run over several lines, never over a blank one).
-    if (i + 1 < lines.length && /^\s*["'(]/.test(lines[i + 1])) {
-      while (i + 1 < lines.length && lines[i + 1].trim() !== '') out.push(lines[++i]);
-    }
-  }
-  let close = -1;
-  for (let a = s.indexOf('['); a >= 0;) {
-    const after = s.indexOf('[', a + 1);
-    if (close <= a) close = s.indexOf(']', a + 1);
-    if (close < 0) break;
-    if (after < 0 || after > close) {
-      const label = s.slice(a + 1, close);
-      if (!label.includes('\n') && (s[a - 1] === ']' || defined.has(labelKey(label)))) out.push(`[${label}]`);
-    }
-    a = after;
-  }
-  return out.join('\u0000');
-}
 
 /**
  * Rule 4 (Markdown) — which lines a brace reaches. Where the Markdown is built as MDX a `{`
@@ -2235,57 +2722,50 @@ function braceReach(lines, prose) {
   return reached;
 }
 
-/** A line that starts with `<` behind white space and the markers of a list item or a block quote: an HTML block may start there. */
-const HTML_BLOCK_START = /^[\s>*+.)\d-]*</;
-
 /**
  * Rule 4 (Markdown) — the cause word of a Markdown change that is not wording, or null.
  * Front matter is settings; a code line is code ({@link markdownBlocks}), and so is an
  * unchanged line whose class the change moved, and a changed line that starts `import ` or
  * `export ` wherever it stands ({@link MDX_SCRIPT}). The generated anchors of the headings
- * must be identical (`inexact`: other pages and tools link to them). The rest is read
- * whole, code spans blanked: the code spans and the link targets must be identical, and the
- * HTML scanner's tokens ({@link scanMarkup}) identical but changed prose text, never inside
- * an element that holds its text or an `<option>` with no `value` (`inexact` inside a
- * component or custom element, or `<svg>` or `<math>`), and never on a line a brace reaches
- * ({@link braceReach}).
+ * must be identical (`inexact`: other pages and tools link to them). The rest is read as
+ * its reader renders it ({@link scanMarkup}): every tag the reader makes, every tag,
+ * comment and raw piece of the file's own HTML, every code span, link destination, title
+ * and label must be identical, and only prose text may differ, never inside an element that
+ * holds its text or an `<option>` with no `value` (`inexact` inside a component or custom
+ * element, or `<svg>` or `<math>`), never on a line a brace reaches ({@link braceReach}),
+ * and some prose text must differ: a change to nothing a reader renders as text (a marker,
+ * white space) is no wording. A carriage return on its own is outside the subset (a Markdown
+ * reader takes it as a line break; the lines here are split at line feeds).
  * @param {ChangedFile} f @returns {('settings'|'code'|'inexact'|null)}
  */
 function markdownRefusal(f) {
   const read = (text) => {
     const lines = lineFeeds(/** @type {string} */ (text)).split('\n');
-    return { lines, blocks: markdownBlocks(lines, frontMatterLines(lines), 0) };
+    if (lines.some((l) => l.includes('\r'))) outside();
+    const top = frontMatterLines(lines);
+    const blocks = markdownBlocks(lines);
+    const cls = blocks.cls.map((c, i) => (i < top ? 'settings' : c));
+    return { lines, cls, blocks };
   };
   const o = read(f.oldText);
   const n = read(f.newText);
   const hunks = /** @type {Hunk[]} */ (f.hunks);
-  const moved = lineClassChange(hunks, o.blocks.cls, n.blocks.cls);
-  if (moved) return /** @type {'settings'|'code'} */ (moved);
-  if (hunks.some((h) => h.removed.some((l) => MDX_SCRIPT.test(l)) || h.added.some((l) => MDX_SCRIPT.test(l)))) return 'code';
+  const moved = lineClassChange(hunks, o.cls, n.cls)
+    || (hunks.some((h) => h.removed.some((l) => MDX_SCRIPT.test(l)) || h.added.some((l) => MDX_SCRIPT.test(l))) ? 'code' : null);
+  if (moved) {
+    // A change to code or settings is named as that, whatever else in the file is outside the subset.
+    if (scanFault === 'subset') scanFault = null;
+    return /** @type {'settings'|'code'} */ (moved);
+  }
   if (o.blocks.anchors.join('\n') !== n.blocks.anchors.join('\n')) return 'inexact';
-  const prose = ({ lines, blocks }) => {
-    const { blanked, spans } = codeSpans(lines.map((l, i) => (blocks.cls[i] === 'prose' ? l : '')), blocks);
-    const proseLines = blanked.split('\n');
-    // The blank lines, where a paragraph ends: each one's place in the text, and whether no
-    // line of the paragraph before it could start an HTML block.
-    const breaks = [];
-    let at = 0;
-    let reset = true;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].trim() === '') {
-        breaks.push({ at, reset });
-        reset = true;
-      } else if (HTML_BLOCK_START.test(proseLines[i])) reset = false;
-      at += proseLines[i].length + 1;
-    }
-    return { tokens: scanMarkup(blanked, breaks), fixed: `${spans}\u0001${linkTargets(blanked)}`, reached: braceReach(lines, proseLines) };
-  };
-  const a = prose(o);
-  const b = prose(n);
-  if (a.fixed !== b.fixed) return 'code';
-  const texts = changedTexts(a.tokens, b.tokens, (toks, k) => !toks[k].quiet);
+  const tokens = ({ blocks }) => scanMarkup(blocks.pieces, false, blocks.defined);
+  const texts = changedTexts(tokens(o), tokens(n), (toks, k) => !toks[k].quiet);
   if (!texts.runs) return texts.inexact ? 'inexact' : 'code';
-  const reached = (side, first, count) => side.reached.slice(first - 1, first - 1 + count).includes(true);
+  if (texts.runs.length === 0 && hunks.length > 0) return 'code'; // changed lines, and no text of them changed
+  const reach = ({ lines, cls }) => braceReach(lines, lines.map((l, i) => (cls[i] === 'prose' ? l : '')));
+  const a = reach(o);
+  const b = reach(n);
+  const reached = (side, first, count) => side.slice(first - 1, first - 1 + count).includes(true);
   return hunks.some((h) => reached(a, h.oldStart, h.removed.length) || reached(b, h.newStart, h.added.length)) ? 'code' : null;
 }
 
@@ -2374,8 +2854,8 @@ function kindOf(f) {
   }
   if (kind === 'markup') {
     if (!equalHunks(f.hunks)) return unrecognised;
-    const texts = changedTexts(scanMarkup(lineFeeds(/** @type {string} */ (f.oldText)), null),
-      scanMarkup(lineFeeds(/** @type {string} */ (f.newText)), null), markupWording);
+    const tokens = (text) => scanMarkup([{ k: 'raw', v: lineFeeds(/** @type {string} */ (text)) }], true, NO_NAMES);
+    const texts = changedTexts(tokens(f.oldText), tokens(f.newText), markupWording);
     return texts.runs ? { kind, runs: texts.runs } : texts.inexact ? inexact : unrecognised;
   }
   if (kind === 'catalogue') {
