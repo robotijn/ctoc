@@ -1995,7 +1995,8 @@ const YAML_UNSEEN = /(?!\n)[\p{Cc}\u2028\u2029\ufffe\uffff]/u;
  * escapes decoded), single-quoted (`''` is `'`), or plain. A plain scalar starts with none of
  * YAML's indicators (a tag `!`, an anchor `&`, an alias `*`, a flow collection `[` or `{`, a
  * block scalar `|` or `>`, a complex key `?`, and `-`, `:`, `,`, `#`, `@`, a backtick, `%`,
- * `]`, `}`), holds no ` #` (a comment) and no `: ` (a mapping), and does not end in `:`.
+ * `]`, `}`), holds no ` #` (a comment) and no `: ` (a mapping), does not end in `:`, and is
+ * neither `=` nor `<<`.
  * @param {string} raw the text behind the key or the item marker, with no white space at its end
  * @returns {({text: string, written: string, quote: string}|null)} the scalar as a reader decodes it and as it is written between its quotes; null: no such scalar
  */
@@ -2006,6 +2007,7 @@ function yamlScalar(raw) {
   }
   if (raw[0] === "'") return /^'(?:[^']|'')*'$/.test(raw) ? { text: raw.slice(1, -1).replace(/''/g, "'"), written: raw.slice(1, -1), quote: "'" } : null;
   if ('!&*[]{}|>?-:,#@`%'.includes(raw[0]) || raw.includes(' #') || raw.includes(': ') || raw.endsWith(':')) return null;
+  if (raw === '=' || raw === '<<') return null; // a value and a merge to a reader of the older YAML (PyYAML loads no such file), a string to js-yaml
   return { text: raw, written: raw, quote: '' };
 }
 
@@ -2032,7 +2034,7 @@ function yamlScalar(raw) {
  * stand deeper (a list may also stand as deep as its key); and no key occurs twice in one
  * mapping. js-yaml reads such a file as this reader does: the differential test holds it to
  * that.
- * @param {string} text line feeds only, without a leading byte-order mark
+ * @param {string} text line feeds only
  * @returns {(CatalogueLine[]|null)}
  */
 function yamlEntries(text) {
@@ -2092,7 +2094,7 @@ function yamlEntries(text) {
  * white space at most: where white space alone ends the key, or the key holds an escaped
  * separator, a reader that splits at the first `=` takes another key than Java does, so such
  * a line may stand in the file but may not change.
- * @param {string} text line feeds only, without a leading byte-order mark
+ * @param {string} text line feeds only
  * @returns {(CatalogueLine[]|null)}
  */
 function propertiesEntries(text) {
@@ -2152,11 +2154,14 @@ function lineChanges(a, b) {
  * of the file's format on both whole sides; null when the change is anything but a change to
  * string values that read as wording. A side its reader cannot follow is a fault
  * ({@link fault}): the answer is then never a pass.
- * @param {string} oldText @param {string} newText line feeds only; YAML and properties without a leading byte-order mark
+ * @param {string} oldText @param {string} newText line feeds only
  * @param {string} ext `.json`, `.yaml`, `.yml` or `.properties`
  * @returns {(string[]|null)}
  */
 function catalogueChange(oldText, newText, ext) {
+  // No byte-order mark (the decision at review of 2026-10-09): `JSON.parse` refuses one, Java
+  // reads it into the first key, and Ruby's YAML reader then reads the first entry only.
+  if (oldText[0] === '\uFEFF' || newText[0] === '\uFEFF') return fault('lost');
   let changed;
   if (ext === '.json') {
     const a = jsonSide(oldText);
@@ -3061,10 +3066,7 @@ function readKind(f) {
   }
   if (kind === 'catalogue') {
     if (!equalHunks(f.hunks)) return unrecognised;
-    // JSON.parse takes no byte-order mark, so a JSON file is handed to it as it is; js-yaml
-    // and a properties reader read past one.
-    const whole = ext === '.json' ? lineFeeds : body;
-    const runs = catalogueChange(whole(oldText), whole(newText), ext);
+    const runs = catalogueChange(lineFeeds(oldText), lineFeeds(newText), ext);
     return runs ? { runs } : unrecognised;
   }
   if (kind !== 'colour') throw new Error(`no reader for the kind ${kind}`); // never a fall-back to another reader
