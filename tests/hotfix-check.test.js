@@ -2612,7 +2612,10 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     row('paragraph', '# Title\nThe @ words.\n', words, true),
     row('paragraph', 'The @ words.\n- an item\n', words, null), // a plain list item is prose since the ninth round
     row('paragraph', 'The @ words.\nSee [a link](/x).\n', words, true),
-    row('paragraph', 'Text.\n   \nThe @ words.\n', words, null),
+    // A line of spaces counted as empty until the ninth round. marked 4.3.0 reads on over such a
+    // line to a `---` or `===` below and makes a heading of the whole (found in this round's
+    // sample of passed edits), so only a line that holds nothing bounds a paragraph now.
+    row('paragraph', 'Text.\n   \nThe @ words.\n', words, true),
     row('paragraph', 'Text.\n\t\nThe @ words.\n', words, true),
     row('paragraph', '# Title\n\nThe @ words.\n\n- an item\n', words, null),
     // 3. Position: front matter or a metadata block, from a line of three or more `-`, or `+++`,
@@ -2888,6 +2891,13 @@ test('round 9: Markdown — size before content, a raw start tag anywhere, colon
     // any line of a run that holds an item.
     row('list item, not plain', '- i. the @ words\n', words, true),
     row('list item, not plain', '- the first item\n  a. the @ words\n', words, true),
+    // 6. Only an empty line bounds a paragraph (red): a line of spaces does not. One renderer
+    // (marked 4.3.0) reads on over it to an underline below and makes a heading of the whole,
+    // so the words above would be a heading's, and its generated anchor would change.
+    row('a line of spaces', 'The @ words here.\n \n---\n\nMore.\n', words, true),
+    row('a line of spaces', 'The @ words here.\n  \nMore words.\n\n===\n', words, true),
+    row('a line of spaces', 'More words.\n   \nThe @ words here.\n', words, true),
+    row('a line of spaces', 'The @ words here.\n\n---\n\nMore.\n', words, null),
     // The prefix is identical on both sides.
     ['list item, prefix', 'docs/r9/marker.md', '- the old words\n', '* the new words\n', exact('docs/r9/marker.md')],
     ['list item, prefix', 'docs/r9/marker-space.md', '- the old words\n', '-  the new words\n', exact('docs/r9/marker-space.md')],

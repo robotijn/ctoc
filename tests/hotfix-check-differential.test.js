@@ -1622,7 +1622,9 @@ const BY_HAND = {
     '- alpha item\n===\n', '* alpha\n* * *\n* bravo\n', '- alpha:\n\n      bravo\n', 'Term alpha\n: bravo words\n', '- i. alpha words\n', '(a) alpha words\n',
     'The alpha words here.\n\n> <script>\n> <!--<script>\n> </script>\n>\n> Bravo then.\n>\n</script>\n', 'The alpha words.\n\n<!-- bravo -->\n',
     'Use `<script>` now.\n\nThe alpha words.\n', '1. alpha\n1. bravo\n8. charlie\n', '- alpha\n  - bravo\n    - charlie\n', '-    alpha\n     bravo\n',
-    'Intro alpha\n* bravo words\n* charlie words\n', 'Text.\n\n- alpha: bravo\n- charlie (delta): alpha\n'
+    'Intro alpha\n* bravo words\n* charlie words\n', 'Text.\n\n- alpha: bravo\n- charlie (delta): alpha\n',
+    // A line of spaces between a paragraph and an underline: marked 4.3.0 makes a heading of both.
+    'Alpha words.\nBravo charlie delta\n \n---\nThe alpha words then.\n', 'The alpha words.\n  \nBravo words.\n \n===\n'
   ]
 };
 
