@@ -4175,6 +4175,29 @@ Step 14, in this worktree with its own `node_modules`:
   98.48 | 98.86 | 797`; `[CTOC test-gate] coverage 99.87% (threshold 99%), skipped 0, failed
   0`; `[CTOC test-gate] PASS`. The one line of `hotfix-check.js` not run (797) is the
   "texts differ, no changed-line group" refusal, as before.
+- `npm test` twice on `922990d8`, the commit that holds this record (its code and tests are
+  `55599892`'s); these lines were added after those runs, and `npx eslint . --max-warnings
+  0` and `npx tsc --noEmit` were clean on it too:
+  ```
+  ℹ tests 13203 | ℹ suites 2117 | ℹ pass 13203 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.87 | 93.75 | 99.37 |
+  ℹ hotfix-check.js | 99.97 | 98.48 | 98.86 | 797
+  [CTOC test-gate] coverage 99.87% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
+  ```
+  ℹ tests 13203 | ℹ suites 2117 | ℹ pass 13203 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.86 | 93.70 | 99.37 |
+  ℹ hotfix-check.js | 99.97 | 98.48 | 98.86 | 797
+  [CTOC test-gate] coverage 99.86% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
+  Three full runs in this round (these two and the one on `55599892`), each 2 minutes 24 to
+  29 seconds, no test failing in any. In them the main test file's five timing cases
+  measured 3.1 to 4.2 times as long at four times the size, and the corpus's case printed
+  no input above 5 times (it prints those).
 
 ## Execution Plan (Steps 8-16)
 
