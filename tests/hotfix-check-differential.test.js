@@ -1701,7 +1701,9 @@ const INGREDIENTS = {
   yaml: {
     'a nested mapping': /^[a-z]+:\n {2}[a-z]+: /m, 'a list under a key': /^ *[a-z]+:\n *- /m, 'a list at the top': /^- /, 'a comment': /^ *# /m,
     'a double-quoted value': /: "[^"\n]*"$/m, 'a single-quoted value': /: '[^'\n]*'$/m, 'an escape': /\\[nx"]/, 'a document start': /^\ufeff?---\n/,
-    'an empty line': /\n\n/, 'a placeholder': /\{name\}|%s/, 'a key with no value': /^ *[a-z]+:\n(?! )/m, 'Windows line endings': /\r\n/, 'a byte-order mark': /^\ufeff/
+    // No byte-order mark: the generator writes one in three files of a hundred, and the check
+    // refuses each (Ruby's YAML reader reads only the first entry behind one).
+    'an empty line': /\n\n/, 'a placeholder': /\{name\}|%s/, 'a key with no value': /^ *[a-z]+:\n(?! )/m, 'Windows line endings': /\r\n/
   },
   css: {
     'an at-rule with a block': /@media|@supports|@container/, 'an at-rule without one': /@import|@charset|@layer/, 'a nested rule': /\{[^{}]*\{[^{}]*\{|&/, 'a comment': /\/\*/,
@@ -1993,6 +1995,13 @@ const WITNESSES_9 = [
   ['no key holds __proto__', JSON_FILE, '{\n  "__proto__": {\n    "save": "alpha"\n  }\n}\n'],
   // YAML: the strict subset.
   ...YAML_INDICATORS.map((c) => [`a plain value starts with none of YAML's indicators: ${c}`, YAML_FILE, `save: alpha\nx: ${c}y\n`]),
+  // Found with PyYAML 6.0.3 and Ruby's Psych 3.1.0 on 2026-10-09, in 120,000 edits the check
+  // passed: PyYAML loads no file with a bare `=` or `<<` as a value, and Psych reads only the
+  // first entry of a file that starts with a byte-order mark.
+  ['a plain value is no `=` and no `<<`', YAML_FILE, 'save: alpha\nx: =\n'],
+  ['a plain value is no `=` and no `<<`', YAML_FILE, 'save: alpha\nx: <<\n'],
+  // (In YAML the mark also makes the first line no key, so only the properties file shows this rule alone.)
+  ['a catalogue starts with no byte-order mark', PROPERTIES_FILE, 'BOMsave=alpha\n'],
   ['no comment behind a value', YAML_FILE, 'save: alpha\nx: y # z\n'],
   ['no `: ` inside a plain value', YAML_FILE, 'save: alpha\nx: y: z\n'],
   ['a plain value does not end in a colon', YAML_FILE, 'save: alpha\nx: y:\n'],

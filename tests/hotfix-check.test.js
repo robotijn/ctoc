@@ -3121,7 +3121,9 @@ test('round 9: catalogue files — recognition, JSON by JSON.parse, strict YAML 
     // 6. A byte-order mark on one side only, or another number of carriage returns (red for
     // the YAML file and the stylesheet; an HTML page was let through with every line ending changed).
     ['mark', 'locales/r9/en/mark.yml', 'a: Old\n', '\ufeffa: New\n', un('locales/r9/en/mark.yml')],
-    ['mark', 'locales/r9/en/mark-kept.yml', '\ufeffa: Old\n', '\ufeffa: New\n', null],
+    // A byte-order mark in a catalogue refuses it on both sides too: Ruby's YAML reader reads only
+    // the first entry behind one (found on 2026-10-09 with Psych 3.1.0; until then this row passed).
+    ['mark', 'locales/r9/en/mark-kept.yml', '\ufeffa: Old\n', '\ufeffa: New\n', lost('locales/r9/en/mark-kept.yml')],
     ['mark', 'locales/r9/en/returns.yml', 'a: Old\nb: x\n', 'a: New\nb: x\r\n', un('locales/r9/en/returns.yml')],
     ['mark', 'locales/r9/en/returns-kept.yml', 'a: Old\r\nb: x\r\n', 'a: New\r\nb: x\r\n', null],
     ['mark', 'src/styles/r9-mark.css', 'a { color: red; }\n', '\ufeffa { color: blue; }\n', un('src/styles/r9-mark.css')],
@@ -3265,7 +3267,7 @@ test('round 9: paths and names — governing names and folders, what the instruc
     'Read [the guide](docs/linked.md) and [the rules](./docs/rules.md "Rules") first.',
     'See [spaces](<docs/with space.md>), [encoded](docs/with%20pct.md), [part](docs/frag.md#part), [rooted](/docs/rooted.md),',
     '[brackets](docs/a(b).md), ![image](docs/image.md), [cased](DOCS/Cased.md), [the reference][r] and',
-    'the badge [![badge](docs/badge.md)](docs/behind-badge.md).',
+    'the badge [![badge](docs/badge.md)](docs/behind-badge.md). Half done: [progress](docs/50%done.md).',
     'No file of this repository: [site](https://example.com/docs/free.md), [mail](mailto:a@example.com), [top](#top),',
     '[up](../outside.md) and [the folder](docs/).',
     '',
@@ -3305,6 +3307,7 @@ test('round 9: paths and names — governing names and folders, what the instruc
     ['linked', 'docs/image.md', PROSE, un],
     ['linked', 'docs/cased.md', PROSE, un],
     ['linked', 'docs/ref.md', PROSE, un],
+    ['linked', 'docs/50%done.md', PROSE, un],
     ['linked', 'docs/badge.md', PROSE, un],
     ['linked', 'docs/behind-badge.md', PROSE, un],
     ['linked', 'site/linked page.html', PAGE, un],
@@ -3500,6 +3503,32 @@ test('round 9: the copy is removed whatever the tests leave in it, and a removal
     assertPass(res, ['src/pages/home.html']);
     assert.equal(worktrees(root), before);
   });
+  await t.test('a folder the check cannot open is left to the removal, which names it', async () => {
+    const locking = nodeTest('has a button', "  assert.ok(read('src/pages/home.html').includes('<button>'));", { prelude: [
+      "fs.mkdirSync(path.join(process.cwd(), 'locked'));",
+      "fs.writeFileSync(path.join(process.cwd(), 'locked', 'kept.txt'), 'x');",
+      "fs.chmodSync(path.join(process.cwd(), 'locked'), 0o555);"
+    ].join('\n') });
+    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': locking }, { testScript: SCRIPT });
+    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    const realChmod = fs.chmodSync;
+    t.mock.method(fs, 'chmodSync', (p, mode) => {
+      if (String(p).includes('ctoc-hotfix-')) throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
+      return realChmod(p, mode);
+    });
+    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    t.mock.restoreAll();
+    const left = leftovers();
+    for (const name of left) {
+      realChmod(path.join(PRIVATE_TMP, name, 'tree', 'locked'), 0o700);
+      fs.rmSync(path.join(PRIVATE_TMP, name), { recursive: true, force: true });
+    }
+    git(root, ['worktree', 'prune']);
+    assert.equal(res.verdict, 'hotfix', JSON.stringify(res));
+    // Where a folder's mode is not what lets its owner remove from it, the copy goes all the same.
+    if (left.length > 0) assert.match(res.detail, /^the temporary copy at .+ could not be removed: /);
+    else assert.equal(res.detail, undefined);
+  });
   await t.test('a removal that still fails names the start and the end of its reason', async () => {
     const root = testedProject();
     const probe = probeDir();
@@ -3606,6 +3635,18 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
     });
     try {
       assert.throws(() => ruleRefusal(passing()), /injected fault/, 'rule 5, the sensitive area');
+    } finally {
+      t.mock.restoreAll();
+    }
+    // A name that is one kind as written and another in a folded form is no kind the check
+    // vouches for. No real name does that (the extension of a qualifying name is plain
+    // letters), so the second form's extension is replaced here: a page read as a stylesheet.
+    const extname = path.posix.extname;
+    let asked = 0;
+    t.mock.method(path.posix, 'extname', (name) => (name === 'page.html' && ++asked === 5 ? '.css' : extname(name)));
+    try {
+      assert.equal(ruleRefusal(passing()).clause, 'I do not recognise site/page.html as wording or a colour');
+      assert.equal(asked >= 5, true, 'the kind was asked of the second form of the path');
     } finally {
       t.mock.restoreAll();
     }
@@ -3722,6 +3763,13 @@ test('round 9: a transform only adds reasons to refuse, and the check reads what
     ['catalogue: a key no catalogue holds', 'locales/en/proto.json', ['{\n  "__proto__": {\n    "save": "Save"\n  }\n}\n', '{\n  "__proto__": {\n    "save": "Store"\n  }\n}\n'], lost],
     ['catalogue: a key no catalogue holds', 'locales/en/proto.yml', ['__proto__:\n  save: Save\n', '__proto__:\n  save: Store\n'], lost],
     ['catalogue: a key no catalogue holds', 'lang/en/proto.properties', ['a.__proto__.save=Save\n', 'a.__proto__.save=Store\n'], lost],
+    // What the loaders of the older YAML showed (PyYAML 6.0.3 and Ruby's Psych 3.1.0, run on the
+    // edits the check passed): Psych reads only the first entry of a file behind a byte-order
+    // mark, and PyYAML loads no file that holds a bare `=` or `<<` as a value.
+    ['catalogue: a byte-order mark', 'locales/en/mark.yml', ['BOMsave: Save\nopen: Open\n', 'BOMsave: Save\nopen: Opened\n'], lost],
+    ['catalogue: a byte-order mark', 'lang/en/mark.properties', ['BOMsave=Save\nopen=Open\n', 'BOMsave=Save\nopen=Opened\n'], lost],
+    ['catalogue: a value only one YAML reader takes for a string', 'locales/en/equals.yml', ['save: Save\nsign: =\n', 'save: Store\nsign: =\n'], lost],
+    ['catalogue: a value only one YAML reader takes for a string', 'locales/en/merge.yml', ['save: Save\nsign: <<\n', 'save: Store\nsign: <<\n'], lost],
     // A character reference is read as written and as the character it spells.
     ['markup: a reference decoded', 'src/pages/shy.html', page('Save', 'Sto&shy;re'), marker],
     ['markup: a reference decoded', 'src/pages/amp.html', page('Save', 'Save &amp; close'), null],
@@ -3742,7 +3790,7 @@ test('round 9: a transform only adds reasons to refuse, and the check reads what
     ['character set', 'src/styles/utf.css', ['@charset "UTF-8";\na { color: red; }\n', '@charset "UTF-8";\na { color: blue; }\n'], null]
   ];
   const spelt = (text) => text.replaceAll('ZWSP', '\u200b').replaceAll('ZWNJ', '\u200c').replaceAll('EACUTE', '\u00e9').replaceAll('ACUTE', '\u0301')
-    .replaceAll('KGSIGN', '\u338f').replaceAll('KELVIN', '\u212a').replaceAll('FWAUTH', '\uff21\uff35\uff34\uff28').replaceAll('FWAGENTS', '\uff21\uff27\uff25\uff2e\uff34\uff33').replaceAll('BSLASH', '\\');
+    .replaceAll('KGSIGN', '\u338f').replaceAll('BOM', '\ufeff').replaceAll('KELVIN', '\u212a').replaceAll('FWAUTH', '\uff21\uff35\uff34\uff28').replaceAll('FWAGENTS', '\uff21\uff27\uff25\uff2e\uff34\uff33').replaceAll('BSLASH', '\\');
   const base = {};
   for (const row of rows) {
     row[1] = spelt(row[1]);
