@@ -2364,7 +2364,8 @@ function cellsOf(row) {
  * OUTSIDE THE SUBSET, each refusing the whole file ({@link outside}): such a line where
  * readers disagree whether it is lazy (a list marker that is no bullet and not number 1, or
  * has no text, or stands four columns in; the header row of what may be a table; a `>` line
- * four columns in right under a quote); a definition in any other than its plain form (a
+ * four columns in right under a quote; under a quote inside a quote, a line four columns in
+ * that would start a block); a definition in any other than its plain form (a
  * label, destination or title on a line of its own, an escape), or one the line below may
  * add a title to; block quotes and list items nested deeper than {@link NESTING_DEPTH}.
  * A doctest ({@link DOCTEST}) and an `import` or `export` block ({@link MDX_SCRIPT}) are
@@ -2552,6 +2553,8 @@ function markdownBlocks(lines) {
           // A `>` line indented four columns right under the quote: readers disagree whether it is quoted.
           if (quoted && at > 3) outside();
           if (!quoted && (empty || (!lazy[end] && !mayBeLazy(end, to, null)))) break;
+          // A lazy line of an outer quote, four columns in, that would start a block: readers disagree whether it ends this quote.
+          if (lazy[end] && (startsBlock(T[end].slice(at)) || markerOf(T[end].slice(at)) !== null)) outside();
           if (!quoted && first < 0) { first = end; kept = []; mine = []; }
           if (first >= 0) kept.push(T[end]);
           if (!quoted && !lazy[end]) { lazy[end] = true; mine.push(end); }
