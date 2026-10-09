@@ -22,6 +22,10 @@
 //   YAML      (the ninth round) catalogue files and edits; both sides are loaded by js-yaml,
 //             and the two values must have the same shape, the same keys in the same order
 //             and the same types, and differ only in string values.
+//   CSS       (the ninth round) stylesheets and edits; both sides are parsed by postcss, and
+//             the two trees must be identical except for the value of exactly one
+//             declaration, which postcss-value-parser reads as exactly one colour on both
+//             sides, in a real colour property or a custom property named for a colour.
 // Anything else is a disagreement: the check called a change wording that a real parser
 // reads as something else.
 //
@@ -31,12 +35,12 @@
 // witness then passed, and the copy was thrown away. The plan's Execution Record holds the
 // table of rules, witnesses and results.
 //
-// parse5, markdown-it and js-yaml are test-only dependencies of this file (devDependencies,
-// exact versions); the hotfix check requires none of them. parse5 and markdown-it load
+// parse5, markdown-it, js-yaml, postcss and postcss-value-parser are test-only dependencies
+// of this file (devDependencies, exact versions); the hotfix check requires none of them. parse5 and markdown-it load
 // ECMAScript modules with `require`, which needs Node.js 20.19 or later, or 22.12 or later:
 // the guard below says so in one sentence.
 //
-// Size: by default 50,000 HTML, 12,000 Markdown and 20,000 YAML cases. The long soak (6
+// Size: by default 50,000 HTML, 12,000 Markdown, 20,000 YAML and 20,000 CSS cases. The long soak (6
 // million HTML cases and 1 million of each other kind) runs with HOTFIX_DIFFERENTIAL_SOAK=1.
 // Every case is a pure function of the seed and its index, so a failure names both and
 // reproduces:
@@ -44,6 +48,7 @@
 //   HOTFIX_DIFFERENTIAL_HTML=<count>  another number of HTML cases
 //   HOTFIX_DIFFERENTIAL_MARKDOWN=<count>
 //   HOTFIX_DIFFERENTIAL_YAML=<count>
+//   HOTFIX_DIFFERENTIAL_CSS=<count>
 //   HOTFIX_DIFFERENTIAL_FROM=<index>  the first case index (to run one share of a soak)
 //   HOTFIX_DIFFERENTIAL_SHOW=<count>  also print that many plain visible-text edits the check refuses
 // Plan: plans/todo/ctoc-checks-that-a-hotfix-is-really-small-and-safe-s1-the-hotfix-check.md,
@@ -64,6 +69,8 @@ const { spawnSync } = require('child_process');
 const parse5 = require('parse5');
 const MarkdownIt = require('markdown-it');
 const yaml = require('js-yaml');
+const postcss = require('postcss');
+const valueParser = require('postcss-value-parser');
 
 const { route } = require('../src/lib/menu-screens');
 const { ruleRefusal } = require('../src/lib/hotfix-check');
@@ -75,6 +82,7 @@ const HTML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_HTML || (SOAK ? 600000
 const SHOW = Number(process.env.HOTFIX_DIFFERENTIAL_SHOW || 0);
 const MARKDOWN_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_MARKDOWN || (SOAK ? 1000000 : 12000));
 const YAML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_YAML || (SOAK ? 1000000 : 20000));
+const CSS_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_CSS || (SOAK ? 1000000 : 20000));
 
 /** The Markdown readers of the oracle: markdown-it in four configurations. */
 const MARKDOWN_READERS = [
@@ -1093,6 +1101,106 @@ function yamlDocument(r) {
 }
 
 // ---------------------------------------------------------------------------------------
+// The CSS generator (the ninth round): rules, at-rules, nesting, comments, strings and
+// escapes; custom properties and what reads them; colour functions and keywords;
+// `!important`; shorthands; selectors that look like colours; and, seldom, each thing at
+// which a hand-written reader and a real parser part ways.
+// ---------------------------------------------------------------------------------------
+
+const CSS_COLOURS = ['red', 'blue', '#fff', '#0a58ca', '#ABCDEF80', 'rgb(1, 2, 3)', 'rgba(0, 0, 0, .5)', 'hsl(210 50% 40%)', 'hsla(210, 50%, 40%, 0.9)',
+  'transparent', 'tomato', 'RED', 'rgb(1 2 3 / 50%)'];
+const CSS_NEW_COLOURS = ['green', '#000', 'navy', '#123', 'rgb(4 5 6)'];
+const COLOUR_PROPERTIES = ['color', 'background-color', 'border-color', 'outline-color', 'background', 'border', 'fill', 'stroke', 'caret-color',
+  'border-top-color', 'text-decoration-color', 'box-shadow', 'COLOR'];
+const OTHER_PROPERTIES = ['width', 'margin', 'content', 'animation-name', 'animation', 'font-family', 'display', 'grid-area', 'transition', 'will-change', 'filter', 'mask'];
+const CUSTOM_PROPERTIES = ['--brand-color', '--accent-colour', '--color-text', '--Brand-COLOR', '--mode', '--shape', '--gap', '--enabled'];
+const CSS_SELECTORS = ['a', '.btn', '#fff', '#bad:hover', '.red', 'red', 'nav > a', '.alpha.bravo', 'a::before', 'a:hover', '.btn--brand-color', '[data-x="red"]',
+  'a[href^="#fff"]', ':root', 'h1, h2', '.sm\\:flex', '*', '&:hover', '& .charlie', '.delta'];
+const cssColour = (r) => pick(r, CSS_COLOURS);
+
+/** A declaration's value: for a colour property mostly exactly one colour. */
+function cssValue(r, colourful) {
+  const c = cssColour(r);
+  const w = word(r);
+  if (colourful) {
+    return weighted(r, [
+      [50, () => c], [8, () => `${c} !important`], [5, () => `1px solid ${c}`], [4, () => `var(${pick(r, CUSTOM_PROPERTIES)})`],
+      [3, () => `var(${pick(r, CUSTOM_PROPERTIES)}, ${c})`], [3, () => `linear-gradient(${c}, ${cssColour(r)})`], [3, () => `url(#fff) ${c}`],
+      [2, () => `url("${w}.png") ${c}`], [3, () => `${c} ${cssColour(r)}`], [3, () => pick(r, ['inherit', 'currentColor', 'none'])],
+      [2, () => `${c}!important`], [2, () => `${c} ! important`], [2, () => `${c} !IMPORTANT`],
+      [W(2), () => `\\75 rl(a;color:${c};b)`], [W(2), () => `${c}\\9`], [W(2), () => `(a; color: ${c}; b)`], [W(1), () => `[a; color: ${c}; b]`],
+      [W(2), () => `"${c}"`], [W(2), () => `${c} /* ${cssColour(r)} */`], [W(2), () => `/* ${w} */ ${c}`], [W(1), () => `${c};;`],
+      [W(1), () => `${c} color: ${cssColour(r)}`], [W(1), () => `(b { c; } d) ${c}`], [W(1), () => `(${c}`], [W(1), () => `${c})`], [W(1), () => `"${w}`],
+      [W(1), () => 'rgb(<1, 2, 3)'], [W(1), () => `${c}\\`], [W(1), () => `{ color: ${c} }`], [W(1), () => `:${c}`], [W(1), () => `progid:${w}(a=1)`],
+      [W(1), () => `(]) ${c}`], [W(1), () => `${c} \; ${cssColour(r)}`]
+    ])();
+  }
+  return weighted(r, [
+    [10, () => '1px'], [8, () => 'none'], [8, () => w], [6, () => `"${w} ${word(r)}"`], [5, () => `${c} 2s`], [4, () => c],
+    [4, () => `var(${pick(r, CUSTOM_PROPERTIES)})`], [3, () => `${w} 1s ease`], [3, () => `url(${w}.svg#fff)`], [2, () => `'${w}'`], [2, () => 'calc(1px + (2px * 3))'],
+    [W(1), () => '(a; b)'], [W(1), () => `"${w}\\"; color: ${c}; x: \\""`], [W(1), () => `\\"; color: ${c}; x: \\"`], [W(1), () => `"${w}\r"`]
+  ])();
+}
+
+function cssDeclaration(r) {
+  const c = cssColour(r);
+  const w = word(r);
+  return weighted(r, [
+    [50, () => `${pick(r, COLOUR_PROPERTIES)}: ${cssValue(r, true)}`],
+    [18, () => `${pick(r, CUSTOM_PROPERTIES)}: ${cssValue(r, true)}`],
+    [24, () => `${pick(r, OTHER_PROPERTIES)}: ${cssValue(r, false)}`],
+    [2, () => `color : ${c}`], [2, () => `color:${c}`], [2, () => `@apply ${w}`], [1, () => ''],
+    [W(1), () => `*color: ${c}`], [W(1), () => `_color: ${c}`], [W(1), () => `c\\6f lor: ${c}`], [W(1), () => 'foo'], [W(1), () => `2x: ${c}`],
+    [W(1), () => `a b: ${c}`], [W(1), () => `color:: ${c}`], [W(1), () => `--x: { color: ${c} }`], [W(1), () => `$brand: ${c}`], [W(1), () => `@accent: ${c}`]
+  ])();
+}
+
+/** One rule: a selector and a block of declarations, sometimes a rule nested in it, on one line or on several. */
+function cssRule(r, depth) {
+  const parts = [];
+  for (let n = 1 + int(r, 3); n > 0; n--) parts.push(cssDeclaration(r));
+  if (depth < 2 && chance(r, 0.12)) parts.push(cssRule(r, depth + 1));
+  if (chance(r, 0.1)) parts.push(`/* ${word(r)} ${cssColour(r)} */`);
+  const lines = parts.map((p, i) => (/(?:\}|\*\/)$/.test(p) ? p : `${p}${i === parts.length - 1 && chance(r, 0.3) ? '' : ';'}`));
+  const closing = chance(r, 1 - 0.04 * wild) ? '}' : pick(r, ['', '}}', '} }']);
+  const selector = pick(r, CSS_SELECTORS);
+  return chance(r, 0.5) ? `${selector} {\n${lines.map((l) => `  ${l}`).join('\n')}\n${closing}` : `${selector} { ${lines.join(' ')} ${closing}`;
+}
+
+function cssStatement(r) {
+  const w = word(r);
+  const custom = () => pick(r, CUSTOM_PROPERTIES);
+  return weighted(r, [
+    [60, () => cssRule(r, 0)],
+    [6, () => `@media (min-width: 10px) {\n${cssRule(r, 1)}\n}`],
+    [3, () => `@supports (color: ${cssColour(r)}) { ${cssRule(r, 1)} }`],
+    [3, () => `@font-face { font-family: "${w}"; src: url(${w}.woff) }`],
+    [3, () => `@keyframes ${pick(r, ['red', w])} { from { color: ${cssColour(r)} } to { color: ${cssColour(r)} } }`],
+    [2, () => `@import "${w}.css";`], [2, () => '@charset "utf-8";'], [2, () => `@layer ${w}, base;`],
+    [3, () => `@container style(${custom()}: ${cssColour(r)}) { ${cssRule(r, 1)} }`],
+    [2, () => `@property ${custom()} { syntax: "<color>"; inherits: false; initial-value: ${cssColour(r)} }`],
+    [3, () => `/* ${w}: ${cssColour(r)}; } */`],
+    [8, () => `:root { ${custom()}: ${cssColour(r)}; ${custom()}: ${cssColour(r)} }`],
+    [4, () => `.${w} { color: var(${custom()}); border: 1px solid var(${custom()}, ${cssColour(r)}) }`],
+    [W(1), () => `@media (a; color: ${cssColour(r)}; b) { ${cssRule(r, 1)} }`], [W(1), () => `${pick(r, COLOUR_PROPERTIES)}: ${cssColour(r)};`],
+    [W(1), () => `${custom()}: ${cssColour(r)};`],
+    [W(2), () => pick(r, ['}', '<!--', '-->', w, '@ { }', '/* open', `"${w}`, `{ color: ${cssColour(r)} }`, '(', ')', ']', '@media {'])]
+  ])();
+}
+
+/** One stylesheet: one to five statements. */
+function cssDocument(r) {
+  wild = pick(r, [0.1, 0.35, 1, 1]);
+  const parts = [];
+  for (let n = 1 + int(r, 5); n > 0; n--) parts.push(cssStatement(r));
+  let text = `${parts.join(chance(r, 0.5) ? '\n' : '\n\n')}\n`;
+  if (chance(r, 0.03)) text = `\ufeff${text}`;
+  if (chance(r, 0.03)) text = text.replace(/\n/g, '\r\n');
+  if (chance(r, 0.04)) text = text.replace(/\n$/, '');
+  return text;
+}
+
+// ---------------------------------------------------------------------------------------
 // The edit, of eleven kinds, and the change as the check's rules read it.
 // ---------------------------------------------------------------------------------------
 
@@ -1105,6 +1213,11 @@ const EDIT_WORDS = {
     starts: ['- ', '> ', '# ', '1. ', ' ', '    ', 'a. ', '\t', '* ', '+ ', '[g]: ', ': ', '<', '```', '---', '| ', '! ', 'x', 'import ', 'i. '],
     added: [(r) => plainLine(r), (r) => plainLine(r), () => '', () => '```', () => '---', () => '===', (r) => `- ${word(r)}`,
       (r) => `> ${word(r)}`, (r) => `# ${word(r)}`, () => '<div>', () => '</div>', () => '<!--', () => '-->', (r) => `    ${word(r)}`, (r) => `[g]: /${word(r)}`]
+  },
+  css: {
+    marks: [';', '{', '}', '(', ')', ':', '\\', '"', '/', '*', '!', ',', '#', '-', '[', ']', '@', ' '],
+    starts: ['}', '{', '/* ', '@', '  ', ' ', '\t', 'a { ', '--x: ', '*', '//'],
+    added: [(r) => `a { color: ${cssColour(r)}; }`, () => '}', (r) => `/* ${word(r)} */`, () => '', (r) => `  color: ${cssColour(r)};`, () => '{', () => '@import "x.css";']
   },
   yaml: {
     marks: [':', '#', '"', '\'', '-', '[', ']', '{', '}', '|', '>', '&', '*', '!', '%', '@', '?', ',', '\\', '\t', ' '],
@@ -1211,7 +1324,7 @@ function hunksOf(oldText, newText) {
   return removed.length + added.length === 0 ? [] : [{ oldStart: p + 1, newStart: p + 1, removed, added }];
 }
 
-const FILES = { html: 'site/page.html', markdown: 'docs/page.md', yaml: 'locales/en.yml' };
+const FILES = { html: 'site/page.html', markdown: 'docs/page.md', yaml: 'locales/en.yml', css: 'site/page.css' };
 
 function judge(kind, oldText, newText) {
   const rel = FILES[kind];
@@ -1386,7 +1499,85 @@ function yamlOracle(oldText, newText) {
   return yamlDifference(a, b, state) || (state.strings > 0 ? null : 'no string value differs');
 }
 
-const ORACLES = { html: htmlOracle, markdown: markdownOracle, yaml: yamlOracle };
+/** The oracle's own copy of the named colours of CSS Color Module Level 4, and `transparent`. */
+const ORACLE_COLOUR_NAMES = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood '
+  + 'cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki '
+  + 'darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen darkslateblue darkslategray darkslategrey darkturquoise darkviolet '
+  + 'deeppink deepskyblue dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite gold goldenrod gray green greenyellow '
+  + 'grey honeydew hotpink indianred indigo ivory khaki lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan lightgoldenrodyellow '
+  + 'lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime '
+  + 'limegreen linen magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen mediumslateblue mediumspringgreen '
+  + 'mediumturquoise mediumvioletred midnightblue mintcream mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid '
+  + 'palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum powderblue purple rebeccapurple red rosybrown royalblue '
+  + 'saddlebrown salmon sandybrown seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen steelblue tan teal thistle '
+  + 'tomato turquoise violet wheat white whitesmoke yellow yellowgreen transparent').split(' '));
+assert.equal(ORACLE_COLOUR_NAMES.size, 149);
+const ORACLE_COLOUR_FUNCTIONS = new Set(['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color']);
+const ORACLE_SHORTHANDS = new Set(['background', 'border', 'border-top', 'border-right', 'border-bottom', 'border-left', 'border-block', 'border-block-start',
+  'border-block-end', 'border-inline', 'border-inline-start', 'border-inline-end', 'outline', 'column-rule', 'fill', 'stroke', 'box-shadow', 'text-shadow',
+  'text-decoration', 'text-emphasis']);
+
+/** @returns {boolean} postcss-value-parser reads the value as exactly one colour: a hexadecimal colour, a named colour or one colour function */
+function oneColourValue(value) {
+  const nodes = valueParser(value).nodes;
+  if (nodes.length !== 1) return false;
+  const [node] = nodes;
+  if (node.type === 'function') return ORACLE_COLOUR_FUNCTIONS.has(node.value.toLowerCase());
+  return node.type === 'word' && (/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(node.value) || ORACLE_COLOUR_NAMES.has(node.value.toLowerCase()));
+}
+
+/**
+ * Walk two postcss trees side by side. Returns the first difference that is no declaration's
+ * value, as a sentence, or null; `changed` gains every pair of declarations whose values differ.
+ */
+function cssDifference(a, b, changed) {
+  if (a.type !== b.type) return 'the tree has another shape';
+  if (a.type === 'decl') {
+    if (a.prop !== b.prop || Boolean(a.important) !== Boolean(b.important) || a.raws.between !== b.raws.between || a.raws.important !== b.raws.important) return 'a property, its colon or !important differs';
+    if (a.value !== b.value || JSON.stringify(a.raws.value) !== JSON.stringify(b.raws.value)) changed.push([a, b]);
+    return null;
+  }
+  if (a.type === 'comment') return a.text === b.text ? null : 'a comment differs';
+  if (a.type === 'rule' && a.selector !== b.selector) return 'a selector differs';
+  if (a.type === 'atrule' && (a.name !== b.name || a.params !== b.params)) return 'an at-rule differs';
+  const x = a.nodes || [];
+  const y = b.nodes || [];
+  if (x.length !== y.length || Array.isArray(a.nodes) !== Array.isArray(b.nodes)) return 'the tree has another shape';
+  for (let i = 0; i < x.length; i++) {
+    const found = cssDifference(x[i], y[i], changed);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * What postcss says about one edit of a stylesheet: null when both sides parse, the trees
+ * are identical except for the value of exactly one declaration, that value is exactly one
+ * colour on both sides, and its property is a real colour property or a custom property
+ * named for a colour; or the first reason it is not.
+ */
+function cssOracle(oldText, newText) {
+  let a;
+  let b;
+  try {
+    a = postcss.parse(oldText);
+    b = postcss.parse(newText);
+  } catch (err) {
+    return `a side is no stylesheet for postcss (${err.reason || err.message})`;
+  }
+  const changed = [];
+  const difference = cssDifference(a, b, changed);
+  if (difference) return difference;
+  if (changed.length !== 1) return changed.length === 0 ? 'no declaration value differs' : 'more than one declaration value differs';
+  const [before, after] = changed[0];
+  // postcss keeps the white space behind a custom property's value (`--color:red }`); a browser trims it, so the oracle does too.
+  if (before.raws.value || after.raws.value || !oneColourValue(before.value.trim()) || !oneColourValue(after.value.trim())) return 'the changed value is not exactly one colour';
+  const prop = before.prop;
+  if (prop.startsWith('--') ? !/colou?r/i.test(prop) : !(/(?:^|-)color$/i.test(prop) || ORACLE_SHORTHANDS.has(prop.toLowerCase()))) return `the property ${prop} holds no colour`;
+  return null;
+}
+
+const ORACLES = { html: htmlOracle, markdown: markdownOracle, yaml: yamlOracle, css: cssOracle };
 /** Whether the default reader alone calls the edit a change to plain text and nothing else (for the count of refused plain edits). */
 const PLAIN = {
   html: (o, n) => htmlOracle(o, n) === null,
@@ -1396,7 +1587,8 @@ const PLAIN = {
     return treeDifference(parse5.parse(reader.render(o)), parse5.parse(reader.render(n)), [], changed) === null && changed.length > 0
       && changed.every((ancestors) => ancestors.every((el) => PROSE_ANCESTORS.has(el.tagName)));
   },
-  yaml: (o, n) => yamlOracle(o, n) === null
+  yaml: (o, n) => yamlOracle(o, n) === null,
+  css: (o, n) => cssOracle(o, n) === null
 };
 
 // ---------------------------------------------------------------------------------------
@@ -1404,13 +1596,26 @@ const PLAIN = {
 // ---------------------------------------------------------------------------------------
 
 /** One case: the document, its edit, the kind of edit. */
-const DOCUMENTS = { html: htmlDocument, markdown: markdownDocument, yaml: yamlDocument };
+/** The colours an edit may replace in a stylesheet, wherever they stand: in a value, a selector, a comment or a string. */
+const CSS_COLOUR_TOKEN = /#[0-9a-fA-F]{3,8}\b|\b(?:red|blue|tomato|transparent|RED)\b|(?:rgba?|hsla?)\([^()]*\)/g;
+/** One edit of a stylesheet: mostly one colour replaced by another, else one of the eleven kinds. */
+function cssEdit(r, text) {
+  if (chance(r, 0.6)) {
+    const found = [...text.matchAll(CSS_COLOUR_TOKEN)];
+    if (found.length === 0) return null;
+    const m = pick(r, found);
+    return { newText: text.slice(0, m.index) + pick(r, CSS_NEW_COLOURS) + text.slice(m.index + m[0].length), kind: 'a colour replaced' };
+  }
+  return edit(r, text, EDIT_WORDS.css);
+}
+
+const DOCUMENTS = { html: htmlDocument, markdown: markdownDocument, yaml: yamlDocument, css: cssDocument };
 /** Each kind has a stream of its own (the HTML and Markdown streams are those of the earlier rounds). */
-const SEED_OFFSET = { html: 0, markdown: 7919, yaml: 104729 };
+const SEED_OFFSET = { html: 0, markdown: 7919, yaml: 104729, css: 1299709 };
 function caseOf(kind, index, seed = SEED) {
   const r = stream(seed + SEED_OFFSET[kind], index);
   const oldText = DOCUMENTS[kind](r);
-  const e = edit(r, oldText, EDIT_WORDS[kind]);
+  const e = kind === 'css' ? cssEdit(r, oldText) : edit(r, oldText, EDIT_WORDS[kind]);
   return e === null ? null : { oldText, newText: e.newText, edit: e.kind };
 }
 
@@ -1478,6 +1683,13 @@ const INGREDIENTS = {
     'a nested mapping': /^[a-z]+:\n {2}[a-z]+: /m, 'a list under a key': /^ *[a-z]+:\n *- /m, 'a list at the top': /^- /, 'a comment': /^ *# /m,
     'a double-quoted value': /: "[^"\n]*"$/m, 'a single-quoted value': /: '[^'\n]*'$/m, 'an escape': /\\[nx"]/, 'a document start': /^\ufeff?---\n/,
     'an empty line': /\n\n/, 'a placeholder': /\{name\}|%s/, 'a key with no value': /^ *[a-z]+:\n(?! )/m, 'Windows line endings': /\r\n/, 'a byte-order mark': /^\ufeff/
+  },
+  css: {
+    'an at-rule with a block': /@media|@supports|@container/, 'an at-rule without one': /@import|@charset|@layer/, 'a nested rule': /\{[^{}]*\{[^{}]*\{|&/, 'a comment': /\/\*/,
+    'a string': /"/, 'an escape': /\\/, 'a custom property': /--[a-z-]+: /i, 'a custom property that is read': /var\(/, 'a colour function': /rgb|hsl/,
+    'a colour keyword': /\b(?:red|blue|tomato|transparent)\b/i, '!important': /!\s*important/i, 'a shorthand': /\b(?:background|border|box-shadow|fill|stroke): /,
+    'a selector that looks like a colour': /^(?:#fff|#bad:hover|\.red|red) \{/m, 'a url': /url\(/, 'several declarations on one line': /; [a-z-]+: [^;\n]+;/,
+    'Windows line endings': /\r\n/, 'a byte-order mark': /^\ufeff/, 'a style query': /@container style/
   }
 };
 
@@ -1485,16 +1697,21 @@ const INGREDIENTS = {
 const NEVER_PASSES = {
   html: ['lines joined', 'a line split', 'a line added', 'a line removed'],
   markdown: ['lines joined', 'a line split', 'a line added', 'a line removed', 'leading or trailing spaces changed'],
-  yaml: ['lines joined', 'a line split', 'a line added', 'a line removed', 'leading or trailing spaces changed']
+  yaml: ['lines joined', 'a line split', 'a line added', 'a line removed', 'leading or trailing spaces changed'],
+  // In a stylesheet nothing but a colour may change. Ten of the eleven kinds of edit never
+  // pass; the eleventh, a mark removed, passes where the mark is a space inside a colour
+  // function (`hsla(210, 50%, 40%, 0.9)` to `hsla(210, 50%,40%, 0.9)`): one colour written
+  // another way, for the check and for postcss alike (about 330 of 24,000 such edits).
+  css: EDITS.filter((name) => name !== 'a mark removed')
 };
 /** The kinds of edit of which the check must pass some, per language. */
-const MUST_PASS = { html: EDITS.slice(0, 3), markdown: EDITS.slice(0, 3), yaml: EDITS.slice(0, 3) };
+const MUST_PASS = { html: EDITS.slice(0, 3), markdown: EDITS.slice(0, 3), yaml: EDITS.slice(0, 3), css: ['a colour replaced'] };
 /**
  * The share of the generated edits the check must pass, per language: about half of the
  * share measured on 2026-10-09 (the numbers are beside each test), so that a rule which
  * starts to refuse far more than it did fails here.
  */
-const PASS_FLOOR = { html: 0.03, markdown: 0.05, yaml: 0.05 };
+const PASS_FLOOR = { html: 0.03, markdown: 0.05, yaml: 0.10, css: 0.08 };
 
 function run(kind, count) {
   const started = Date.now();
@@ -1506,7 +1723,7 @@ function run(kind, count) {
   const patterns = Object.entries(INGREDIENTS[kind]);
   const ingredients = new Map(patterns.map(([name]) => [name, 0]));
   /** @type {Map<string, number[]>} for each kind of edit: how many were made, and how many passed */
-  const byEdit = new Map(EDITS.map((name) => [name, [0, 0]]));
+  const byEdit = new Map([...EDITS, ...MUST_PASS[kind]].map((name) => [name, [0, 0]]));
   const shown = [];
   for (let index = FROM; index < FROM + count; index++) {
     const c = caseOf(kind, index);
@@ -1579,6 +1796,10 @@ test('Markdown: every edit the check passes changes only the words of a paragrap
 
 test('YAML: every catalogue edit the check passes changes only string values for js-yaml', (t) => {
   assertRun(t, 'yaml', YAML_CASES);
+});
+
+test('CSS: every stylesheet edit the check passes changes exactly one colour for postcss', (t) => {
+  assertRun(t, 'css', CSS_CASES);
 });
 
 // ---------------------------------------------------------------------------------------

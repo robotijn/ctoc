@@ -387,7 +387,14 @@ const BASE = {
   'locales/en/ordered.json': lines('{', '  "of": "%s of %d"', '}'),
   'locales/en/override.json': lines('{', '  "save": "Save"', '}'),
   'locales/en/marked.yml': lines('title: Old'),
-  'src/styles/endings.css': lines('a { color: red; }', 'b { margin: 0; }')
+  'src/styles/endings.css': lines('a { color: red; }', 'b { margin: 0; }'),
+  // Stylesheets (the ninth round): the brief's traps, and the functional plan's custom property.
+  'src/styles/brand.css': lines(':root {', '  --brand-color: #0a58ca;', '}', '.save {', '  background-color: var(--brand-color);', '}'),
+  'src/styles/shape.css': lines('.box {', '  --shape: (a; color: red; b);', '}'),
+  'src/styles/escaped-url.css': lines('.box { background: \\75 rl(a;color:red;b) }'),
+  'src/styles/animated.css': lines(':root { --brand-color: red; }', '.box { animation-name: var(--brand-color); }'),
+  'src/styles/queried.css': lines(':root { --brand-color: red; }', '@container style(--brand-color: red) {', '  .box { margin: 0; }', '}'),
+  'src/styles/stray-word.css': lines('.box { color: red; foo }')
 };
 
 const QUALIFY = [
@@ -460,7 +467,10 @@ const QUALIFY = [
   // wording bundle with its tag; a YAML file with nested keys and a list.
   ['locales/de/common.json', BASE['locales/de/common.json'].replace('many days', 'several days')],
   ['i18n/messages_fr.properties', BASE['i18n/messages_fr.properties'].replace('Accueil', 'Bienvenue')],
-  ['config/locales/de.yml', BASE['config/locales/de.yml'].replace('Montag', 'Mondtag')]
+  ['config/locales/de.yml', BASE['config/locales/de.yml'].replace('Montag', 'Mondtag')],
+  // The functional plan's scenario: a colour in a custom property named for a colour, which a
+  // colour property reads.
+  ['src/styles/brand.css', BASE['src/styles/brand.css'].replace('#0a58ca', '#0b5ed7')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -854,7 +864,16 @@ TRAPS.push(
   [{ 'locales/en/override.json': BASE['locales/en/override.json'].replace('"Save"', '"Save\u202e"') }, null, riskMarker('locales/en/override.json')],
   // A byte-order mark on one side only, and another number of carriage returns.
   [{ 'locales/en/marked.yml': '\ufefftitle: New\n' }, null, unrecognised('locales/en/marked.yml')],
-  [{ 'src/styles/endings.css': 'a { color: blue; }\r\nb { margin: 0; }\n' }, null, unrecognised('src/styles/endings.css')]
+  [{ 'src/styles/endings.css': 'a { color: blue; }\r\nb { margin: 0; }\n' }, null, unrecognised('src/styles/endings.css')],
+  // Stylesheets (the ninth round), each an answer of `checking` on `4212d9ff`: a `;` inside
+  // brackets ends no statement, so `color: red` is no declaration of its own there; an
+  // escape that spells `url(`; a custom property named for a colour that an animation name
+  // and a style query read; and a stray word, at which a browser and postcss part ways.
+  [{ 'src/styles/shape.css': BASE['src/styles/shape.css'].replace('red', 'blue') }, null, setting('src/styles/shape.css')],
+  [{ 'src/styles/escaped-url.css': BASE['src/styles/escaped-url.css'].replace('red', 'blue') }, null, unrecognised('src/styles/escaped-url.css')],
+  [{ 'src/styles/animated.css': BASE['src/styles/animated.css'].replace('red', 'blue') }, null, setting('src/styles/animated.css')],
+  [{ 'src/styles/queried.css': BASE['src/styles/queried.css'].replace('--brand-color: red;', '--brand-color: blue;') }, null, setting('src/styles/queried.css')],
+  [{ 'src/styles/stray-word.css': BASE['src/styles/stray-word.css'].replace('red', 'blue') }, null, 'I could not read the change (src/styles/stray-word.css holds something I cannot follow)']
 );
 
 // The owner's decision of 2026-10-09 (answer "a"): the hotfix check keeps only the formats
@@ -911,9 +930,9 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 41, 'the corpus holds 41 shapes that qualify');
+assert.equal(QUALIFY.length, 42, 'the corpus holds 42 shapes that qualify');
 assert.equal(REMOVED_FORMATS.length, 44, 'the corpus holds 44 cases of removed formats');
-assert.equal(TRAPS.length, 296, 'the corpus holds 296 traps, the removed formats among them');
+assert.equal(TRAPS.length, 301, 'the corpus holds 301 traps, the removed formats among them');
 
 let root;
 
@@ -1374,7 +1393,14 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     'locales/en/wide.json': (n) => `${JSON.stringify(Object.fromEntries([...Array.from({ length: 40 * n }, (_, i) => [`key${i}`, 'Plain words here']), ['title', 'Old']]), null, 2)}\n`,
     'locales/en/objects.json': (n) => `${JSON.stringify({ items: Array.from({ length: 12 * n }, () => ({ label: 'Plain', hints: ['one', 'two'] })), title: 'Old' }, null, 2)}\n`,
     'locales/en/many.properties': (n) => `${Array.from({ length: 40 * n }, (_, i) => `key${i} = Plain words here`).join('\n')}\ntitle = Old\n`,
-    'locales/en/long.properties': (n) => `title = Old ${'plain words '.repeat(80 * n)}end\n`
+    'locales/en/long.properties': (n) => `title = Old ${'plain words '.repeat(80 * n)}end\n`,
+    // The ninth round's stylesheet reader: many brackets, deep brackets, many reads of a
+    // custom property, many names that only look like one, and many statements.
+    'src/styles/brackets.css': (n) => `a { color: red; }\nb { width: calc(${'(1px + 2px) '.repeat(20 * n)}1px); }\n`,
+    'src/styles/brackets-deep.css': (n) => `a { color: red; }\nb { width: ${'calc('.repeat(40 * n)}1px${')'.repeat(40 * n)}; }\n`,
+    'src/styles/reads.css': (n) => `:root { --brand-color: red; }\n${'a { color: var(--brand-color); }\n'.repeat(8 * n)}`,
+    'src/styles/names.css': (n) => `:root { --brand-color: red; }\n${'.btn--brand-color, .x--y { margin: 0; }\n'.repeat(6 * n)}`,
+    'src/styles/statements.css': (n) => `a { color: red; }\n${'@media (min-width: 1px) { b { margin: 0; padding: 0 } }\n'.repeat(5 * n)}`
   };
   for (const [rel, build] of Object.entries(cases)) {
     const at = (n) => {
@@ -1386,7 +1412,7 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(at(1)().cause, 'unrecognised', rel);
     // The eighth round's inputs that end in a plain paragraph are read to the end and pass.
     // (`docs/comments-many.md` passed until the ninth round; a `<!--` anywhere now refuses the file.)
-    if (/^(?:docs\/(?:prose|fences-many|meta|spans|ticks-open|spaces|def-ends|fence-like|raw-near|items|colons)|NOTES|locales\/en\/)/.test(rel)) assert.equal(at(1)(), null, rel);
+    if (/^(?:docs\/(?:prose|fences-many|meta|spans|ticks-open|spaces|def-ends|fence-like|raw-near|items|colons)|NOTES|locales\/en\/|src\/styles\/(?:brackets|reads|names|statements))/.test(rel)) assert.equal(at(1)(), null, rel);
     // The largest input is about 1.6 million characters, four times the size a quadratic scan took seconds on.
     const { n, small, big, ratio } = growth(at, 16, Math.floor(1600000 / (build(64).length / 64)));
     assert.ok(ratio < 8, `${rel}: size ${n} took ${small.toFixed(1)} ms and size ${4 * n} took ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);

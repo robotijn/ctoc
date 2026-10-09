@@ -498,9 +498,10 @@ test('case 19: Windows line endings do not count as changed lines', async () => 
   const base = Array.from({ length: 30 }, (_, i) => `Line ${String.fromCharCode(97 + (i % 26))} of the guide.`);
   const edited = base.slice();
   edited[3] = 'Line d of the handbook.';
-  // A page whose every line ending changed from LF to CRLF, and one word: 2 changed lines.
   const page = (rows) => rows.map((l) => `<p>${l}</p>`);
-  const root = testedProject({ 'src/pages/guide.html': page(base).join('\n') + '\n', 'docs/guide.md': base.join('\n') + '\n' });
+  // A page with Windows line endings on both sides, and one word changed: 2 changed lines.
+  const root = testedProject({ 'src/pages/guide.html': page(base).join('\r\n') + '\r\n', 'src/pages/unix.html': page(base).join('\n') + '\n',
+    'docs/guide.md': base.join('\n') + '\n' });
   fs.writeFileSync(path.join(root, 'src/pages/guide.html'), page(edited).join('\r\n') + '\r\n');
   assertChecking(await check(root, 'src/pages/guide.html'), ['src/pages/guide.html']);
   assertPass(await check(root, '--run-tests', 'src/pages/guide.html'), ['src/pages/guide.html']);
@@ -508,14 +509,23 @@ test('case 19: Windows line endings do not count as changed lines', async () => 
   assert.equal(lines.length, 1);
   assert.equal(lines[0].lines, 2);
   assert.equal(lines[0].files, 1);
+  // A page whose every line ending changed from LF to CRLF with that one word passed until the
+  // ninth round. Since the decision at review of 2026-10-09 the number of carriage returns
+  // stays as it is in a page, a catalogue and a stylesheet: the diff the size is counted from
+  // ignores them, so a changed line ending would ride along unseen. The change is refused,
+  // and the line endings still count as no changed line: 2 lines in the log.
+  fs.writeFileSync(path.join(root, 'src/pages/guide.html'), page(base).join('\r\n') + '\r\n');
+  fs.writeFileSync(path.join(root, 'src/pages/unix.html'), page(edited).join('\r\n') + '\r\n');
+  await refusedUntouched(root, ['src/pages/unix.html'], 'I do not recognise src/pages/unix.html as wording or a colour');
+  assert.equal(logLines(root)[1].lines, 2);
   // The same change to a Markdown file passed until the eighth round. Since the decision at
   // review of 2026-10-09 nothing but the words of a plain paragraph may change in a Markdown
   // file, and a changed line ending is no word: the functional plan's sentence, and still
   // only 2 changed lines counted.
-  fs.writeFileSync(path.join(root, 'src/pages/guide.html'), page(base).join('\n') + '\n');
+  fs.writeFileSync(path.join(root, 'src/pages/unix.html'), page(base).join('\n') + '\n');
   fs.writeFileSync(path.join(root, 'docs/guide.md'), edited.join('\r\n') + '\r\n');
   await refusedUntouched(root, ['docs/guide.md'], inexact('docs/guide.md'));
-  assert.equal(logLines(root)[1].lines, 2);
+  assert.equal(logLines(root)[2].lines, 2);
 });
 
 test('case 20: a path written with backslashes gives the same answers', async () => {
@@ -3110,6 +3120,111 @@ test('round 9: catalogue files — recognition, JSON by JSON.parse, strict YAML 
     assert.equal(base[p], undefined, `${p} is used once`);
     base[p] = b;
   }
+  const root = makeRepo(base);
+  const wrong = [];
+  for (const [item, p, b, n, expected] of shapes) {
+    assert.notEqual(b, n, `${p} holds a change`);
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    const want = expected === null ? STATUS_LINE : refusal(expected);
+    if (res.text !== want) wrong.push(`${item} ${p} ${JSON.stringify(b)}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
+    else if (expected === null) assertChecking(res, [p]);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+// The ninth round, stylesheets (decisions at review of 2026-10-09): a strict subset, held to
+// postcss by the differential test. A statement does not end at a `;` inside round or square
+// brackets; a statement that is neither a declaration, an at-rule nor a rule's head refuses
+// the file; a changed declaration that holds a backslash is refused; and a custom property
+// named for a colour qualifies only when everything else in the file that names it is a
+// `var()` in the value of a real colour property. Every row marked `red` answered otherwise
+// on `4212d9ff`. [item, path, base content, new content, the clause, or null for `checking`]
+test('round 9: stylesheets — brackets, statements outside the subset, escapes, and what reads a colour-named custom property', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
+  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
+  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  const colour = ['red', 'blue'];
+  let count = 0;
+  const row = (item, template, expected, pair = colour) => {
+    const p = `src/styles/r9/${String(item).replace(/[^a-z0-9]+/gi, '-')}-${++count}.css`;
+    return [item, p, template.replace('~', pair[0]), template.replace('~', pair[1]), typeof expected === 'function' ? expected(p) : expected];
+  };
+  const shapes = [
+    // 1. A `;` inside round or square brackets ends no statement (red: each read `color: red`
+    // as a declaration of its own and answered `checking`).
+    row('brackets', 'a { --shape: (a; color: ~; b) }\n', setting),
+    row('brackets', 'a { --shape: [a; color: ~; b] }\n', setting),
+    // In a plain property's value a colon outside round brackets is a missing semicolon, for
+    // postcss in square brackets too.
+    row('brackets', 'a { grid-area: [a; color: ~; b] }\n', lost),
+    row('brackets', 'a { grid-area: [a; b]; color: ~ }\n', null),
+    row('brackets', 'a { background: \\75 rl(a;color:~;b) }\n', un),
+    row('brackets', '@media (a; b) { a { color: ~ } }\n', null),
+    row('brackets', 'a { width: calc(1px + (2px * 3)); color: ~; }\n', null),
+    // A brace inside brackets, a closing bracket of another kind and a bracket never closed
+    // cannot be followed.
+    row('brackets', 'a { x: (b { c; } d); color: ~ }\n', lost),
+    row('brackets', 'a { x: (]; y: 0 } b { color: ~ }\n', lost),
+    row('brackets', 'a { x: 1) } b { color: ~ }\n', lost),
+    row('brackets', 'a { color: ~ } b { x: (1 }\n', lost),
+    row('brackets', 'a { color: @ }\n~import (x\n', open),
+    // 2. A statement that is neither blank, a declaration with a plain name, an at-rule nor
+    // a rule's head (red: each was passed over, and the colour elsewhere answered `checking`;
+    // postcss refuses each of these files).
+    row('statement', 'a { color: ~; foo }\n', lost),
+    row('statement', 'a { color: ~ } b\n', lost),
+    row('statement', 'a { margin: 0 color: blue; } c { color: ~ }\n', lost, ['red', 'green']),
+    row('statement', 'a { margin:: 0 } c { color: ~ }\n', lost),
+    row('statement', 'a { *zoom: 1 } c { color: ~ }\n', lost),
+    row('statement', 'margin: 0;\nc { color: ~ }\n', lost),
+    row('statement', '<!-- c { color: ~ } -->\n', lost),
+    row('statement', '@ { } c { color: ~ }\n', lost),
+    row('statement', 'a { "x"; color: ~ }\n', lost),
+    row('statement', 'a { color: ~; url(x) }\n', lost),
+    row('statement', 'a { color: ~ }\n"x"\n', lost),
+    // A character behind a backslash is no structure. An escaped brace, semicolon, quote or
+    // comment start cannot be followed, and neither can a backslash before a line break (red:
+    // each was read as the structure it escapes; four answered `checking`, `.a\{b` left a
+    // block open and the colour behind `\/*` stood in a comment).
+    row('escape', 'a\\{ color: ~ }\n', lost),
+    row('escape', 'a { b\\;c: d; color: ~ }\n', lost),
+    row('escape', 'a { color: ~ } b\\\n{ }\n', lost),
+    row('escape', '.c-\\[\\\'x\\\'\\] { color: ~ }\n', lost),
+    row('escape', '.a\\{b { color: ~ }\n', lost),
+    row('escape', '.a\\/* { color: ~ } */ b { margin: 0 }\n', lost),
+    // An escaped colon, slash or bracket in a selector, as a utility stylesheet writes them (guard).
+    row('escape', '.sm\\:w-1\\/2, .w-\\[calc\\(1px\\)\\] { color: ~ }\n', null),
+    // A comment is white space to the statements; a declaration right behind one is still a
+    // declaration, and a colour changed in it is not recognised, as before (guards).
+    row('comment', 'a {\n  /* brand */\n  color: ~;\n}\n', un),
+    row('comment', 'a { color /* c */ : ~ }\n', un),
+    row('comment', 'a { /* c */ }\n/* d */ @import "x";\nb { color: ~; /* e */ }\n/* f */\n', null),
+    // What a stylesheet may hold beside rules (guards).
+    row('statement', '@charset "utf-8";\n@import "x.css";\n@layer a, b;\n:root { --gap: 4px; }\n--top: 1;\n@media (min-width: 10px) {\n  a { @apply x; color: ~; ; }\n}\n', null),
+    row('statement', '{ color: ~ }\n', null),
+    row('statement', '.sm\\:flex, #fff, .red { COLOR : ~ !important }\n', null),
+    // 3. A string ends at a carriage return or a form feed too (red).
+    row('string', 'a { content: "x\r"; color: ~ }\n', lost),
+    row('string', 'a { content: "x\f"; color: ~ }\n', lost),
+    // 4. A custom property named for a colour: everything else in the file that names it is a
+    // `var()` in the value of a real colour property (red: each answered `checking`).
+    row('custom property', ':root { --brand-color: ~ }\na { animation-name: var(--brand-color) }\n', setting),
+    row('custom property', ':root { --brand-color: ~ }\n@container style(--brand-color: red) { a { margin: 0 } }\n', setting),
+    row('custom property', ':root { --brand-color: ~ }\n@property --brand-color { syntax: "<color>"; inherits: false; initial-value: red }\n', setting),
+    row('custom property', ':root { --brand-color: ~; --other: var(--brand-color) }\n', setting),
+    row('custom property', ':root { --brand-color: ~ }\na { width: calc(var( --brand-color ) * 2) }\n', setting),
+    row('custom property', ':root { --brand-color: ~ }\na { color: xvar(--brand-color) }\n', setting),
+    // Read by colour properties only, read by nothing, or only named alike (guards).
+    row('custom property', ':root { --brand-color: ~ }\na { color: var(--brand-color); border: 1px solid VAR( --brand-color , blue) }\n', null),
+    row('custom property', ':root { --brand-color: ~ }\na { background: linear-gradient(var(--brand-color), white) }\n', null),
+    row('custom property', ':root { --brand-color: ~ }\n.btn--brand-color { margin: 0 } a { width: var(--Brand-Color) }\n', null),
+    row('custom property', ':root { --brand-color: ~ } /* animation-name: var(--brand-color) */\n', null)
+  ];
+  const base = {};
+  for (const [, p, b] of shapes) base[p] = b;
   const root = makeRepo(base);
   const wrong = [];
   for (const [item, p, b, n, expected] of shapes) {
