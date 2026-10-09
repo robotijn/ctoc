@@ -4840,6 +4840,28 @@ Step 14, in this worktree with its own `node_modules`:
   93.84 | 99.38`; `hotfix-check.js | 100.00 | 98.75 | 99.05`; `[CTOC test-gate] coverage
   99.87% (threshold 99%), skipped 0, failed 0`; `[CTOC test-gate] PASS`; 212 seconds. No
   line of `hotfix-check.js` is left unrun.
+- `npm test` twice in a row on `1cc0639e`, the commit that holds this record (its code and
+  tests are `25d34fc1`'s); these lines were added after those runs, and `npx eslint .
+  --max-warnings 0`, `npx tsc --noEmit` and `npm audit` were clean on it too:
+  ```
+  ℹ tests 13255 | ℹ suites 2117 | ℹ pass 13255 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.87 | 93.82 | 99.38 |
+  ℹ hotfix-check.js | 100.00 | 98.75 | 99.05 |
+  [CTOC test-gate] coverage 99.87% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
+  ```
+  ℹ tests 13255 | ℹ suites 2117 | ℹ pass 13255 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.88 | 93.90 | 99.38 |
+  ℹ hotfix-check.js | 100.00 | 98.75 | 99.05 |
+  [CTOC test-gate] coverage 99.88% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
+  210 and 215 seconds. In them the differential's four sections took 7.7, 7.7, 2.8 and 3.4
+  seconds and 7.6, 7.8, 2.9 and 3.4 seconds, and every timing case measured between 1.9 and
+  5.3 times as long at four times the size (the bound is 8).
 
 ## Execution Plan (Steps 8-16)
 
