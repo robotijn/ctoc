@@ -738,7 +738,7 @@ instead of "tests failed" — still not a pass.
 - [x] Running a pass's `commit.add` and then its `commit.message` (with `<what changed>`
   filled in) from the project root, in a repository where another file holds a staged change,
   makes one commit that holds exactly the judged files; the other file stays staged.
-- [ ] Every refusal scenario of the functional plan that this slice covers (program logic,
+- [x] Every refusal scenario of the functional plan that this slice covers (program logic,
   setting, text inside code, price, sensitive area, more than 20 lines, new file, failing test,
   edited test, no test ran, unreadable change, unrecognised file) answers exactly the sentence
   with its clause; the failing-test clause reads
@@ -914,6 +914,42 @@ formats builds the wrong check.
     no documentation name is not recognised) and `docs/limit.md` with its clause for 21
     lines (it gets the sentence for a change the check cannot read exactly). Each is kept
     as a test.
+- *Parts of the specification that the ninth round's decisions at review supersede* (added
+  2026-10-10; the specification's text is left as approved here too):
+  - **"The rules and the order they run in"**, "The order is rule 1, 2, 7, 4, 5, 6, 3, then
+    8": the size rule runs once the kind of every file is known and before any reader reads
+    a file's content (Decision 175). **Rule 5** there: a path is asked as written and in two
+    folded forms, a run of capitals is split, and in a stylesheet's name only `tokens` keeps
+    its plural (Decisions 188 and 189). **Rule 6** there: a number of any kind, a bare host,
+    a scheme anywhere and a character nobody sees refuse too; a catalogue value is read as
+    written and as decoded (Decision 183).
+  - **"Rule 4", kind 1 (documentation)**: a colon, round brackets and list items of plain
+    prose may stand in a changed paragraph; a raw start tag anywhere refuses the file
+    (Decisions 176 to 178).
+  - **"Rule 4", kind 3 (message catalogue)**, whole: a catalogue is one only with a language
+    tag or a wording bundle's name, never under a dependency, build or settings name; each
+    format is read whole by one reader, JSON by `JSON.parse`; the placeholders keep their
+    order, not only their multiset (Decisions 179 to 183).
+  - **"Rule 4", kind 4 (colour)**: a stylesheet is read in a strict subset held to postcss,
+    and a colour-named custom property qualifies only when colour properties alone read it
+    (Decisions 185 and 186).
+  - **"The places that govern the work never qualify"**: `IRON_LOOP.md`, `SKILL.md`,
+    `MEMORY.md`, the folders `prompts` and `output-styles`, and every file a `CLAUDE.md` or
+    `AGENTS.md` of the last commit links to (Decision 187).
+  - **"The change that is judged (rule 1)"**, where it stages every judged file into the
+    temporary index: nothing is staged for a change that adds or deletes a path (Decision
+    191).
+  - **"Rule 8"**, "the affected-test selection is the file-name selection …": the whole
+    suite always runs (Decision 190); and where it describes the copy's removal: the copy's
+    folders are made writable first (Decision 192).
+  - **Decision 13, "No new dependency"**, again for tests only: `js-yaml`, `postcss` and
+    `postcss-value-parser` (Decisions 181 and 185).
+  - **The acceptance criteria**: the box "Every refusal scenario of the functional plan …"
+    is ticked again (Decision 175); the corpus box's counts are in Decision 199. **Step 8**
+    (TEST): case 10 gets the size clause for the functional plan's own numbers again, and
+    `docs/limit.md` its clause for 21 lines; case 19's page keeps its line endings on both
+    sides (Decision 184); the case on the file-name selection asserts that the whole suite
+    runs (Decision 190).
 
 1. **Rule order 1, 2, 7, 4, 5, 6, 3, 8.** The functional plan says the rules run in its listed
    order, but its own scenarios require an edited test to read "it changes a test" (rule 7)
@@ -2669,6 +2705,333 @@ formats builds the wrong check.
       not in this plan's file list; it needs a plan of its own.
     - *A stale comment outside this plan's files:* `src/lib/claim-fetcher.js` still calls
       Node.js 18 "the declared `engines` floor".
+175. **The size rule runs before any reader reads a file's content** (decision at review,
+    2026-10-09; source: the brief, part A; reason: the functional plan's scenario "More than
+    20 changed lines is refused" names the size clause, and since the eighth round a Markdown
+    change that gains or loses a line was answered first by the prose reader with "cannot
+    read exactly"). The order is now rule 1, 2, 7, the kind of each file (the first half of
+    rule 4: its name and its place), 3, the content of each file (the rest of rule 4), 5, 6,
+    then 8. A change over the limit that is program code or a setting is still named for
+    what it is, because the kind is decided first. Case 10 holds the functional plan's own
+    numbers ("it changes 25 lines in 2 files …"), and the acceptance box on the refusal
+    scenarios is ticked on it. It supersedes the order line of "The rules and the order
+    they run in".
+176. **A raw start tag anywhere refuses a Markdown file** (decision at review, 2026-10-09;
+    source: the brief, part A; reason: what follows such a start is raw text to some
+    renderer whatever seems to close it, above the changed paragraph or below it; the eighth
+    round's limit on Python-Markdown, Decision 174, is closed by it). The twelve starts, in
+    any letter case: `<script`, `<style`, `<pre`, `<textarea`, `<xmp`, `<plaintext`,
+    `<title`, `<noscript`, `<iframe`, `<!--`, `<![CDATA[` and `<?`. A comment alone on its
+    line, the one closed shape of Decision 152 besides a code span, is therefore gone: a
+    `<!--` anywhere refuses the file. Checked with Python-Markdown 3.9, micromark 4.0.2,
+    marked 4.3.0 and pandoc 3.11 on passed edits (the Execution Record); no further
+    disagreement came from raw HTML, so the brief's fall-back (refuse any raw tag anywhere)
+    was not needed. Cost on this repository's Markdown files: 65 of the 1,270 typo fixes
+    that passed.
+177. **Prose may hold a colon, parentheses and list items** (decision at review, 2026-10-09;
+    source: the brief, part A, steps (a) to (c), each kept only while the differential test
+    against markdown-it in four configurations stayed at zero disagreements in 1,000,000
+    cases). (a) A colon, where it follows a letter, a digit, a closing quotation mark or a
+    closing bracket and stands before a space or the end of the line, and never in the
+    file's first paragraph (a metadata reader takes `Key: value` lines there). (b) Round
+    brackets. (c) A list item of plain prose: 0 to 3 spaces, `-`, `*`, `+` or one to nine
+    digits with `.` or `)`, then 1 to 4 spaces, then plain prose; a changed line keeps its
+    marker, and in a paragraph that holds an item no line starts with a list word. *The
+    executor's choice in (c):* the paragraph is still the whole run of lines between two
+    empty lines, and every line of it must be plain prose or such an item. The brief's
+    reading, in which another item's line may bound the run, would pass 10,275 of the
+    226,738 typo fixes instead of 3,974; it was not built, because real renderers show a
+    code span that starts in a paragraph line and ends in a later item crossing the changed
+    line (Python-Markdown and pandoc read ``Para with `code``, `- changed words`, ``- more`
+    end`` as one paragraph with one code span), Python-Markdown reads `1)` lists as a
+    paragraph, and with its `sane_lists` a bullet under a numbered item is continuation
+    text. (d) Nothing was built for the brief's "propose only" step; the proposals are in
+    the Execution Record.
+178. **Only an empty line bounds a paragraph** (decision at review, 2026-10-09; found by
+    the executor with marked 4.3.0 in the sample of passed edits; reason: marked reads on
+    over a line of spaces to a `---` or `===` below it and makes a heading of the whole).
+    A line of spaces, or of other white space, is a line of its paragraph and no plain one.
+    No typo fix on this repository's files is lost by it.
+179. **Which file is a message catalogue** (decision at review, 2026-10-09; source: the
+    brief, part B; reason: `locales/package.json` and `i18n/tsconfig.json` passed as
+    catalogues). A dependency, build or settings name is decided first, in lower case, and is
+    never a catalogue wherever it lies (one function, `namedKind`, answers for the qualifying
+    kinds and for the table of clauses, so the two cannot disagree). A catalogue lies under a
+    catalogue folder (`locales`, `locale`, `i18n`, `lang`, `translations`, `messages`) AND
+    carries a language tag: its name without the extension, or a folder between the catalogue
+    folder and the file, is two or three letters with at most one more part (a region of two
+    letters or three digits, or a script of four letters), or its name is a wording bundle's
+    (`messages`, `strings`, `translations`, `labels`, `texts`), alone or with a tag behind
+    `_`. Everything else under a catalogue folder is a setting, as its extension says. The
+    same one function says what a language part is for a documentation text
+    (`README.pt-BR.txt`), which until now had a looser reading of its own. It supersedes
+    "Rule 4", kind 3, "with a folder named … in the path".
+180. **JSON is read by `JSON.parse`, and by nothing written by hand** (decision at review,
+    2026-10-09; source: the brief, part B). Each side must be exactly what `JSON.stringify`
+    writes of the parsed value with the file's own indentation, with or without one last
+    line break; the two sides then hold the same keys in the same order, the same types and
+    lists of the same length, and differ only in string values (a string in a list among
+    them: until this round only a `"key": "value"` line could change). So a comment, a
+    trailing comma, a byte-order mark, a number written another way, an escape nobody needs,
+    keys that JavaScript reorders and a file with no indentation (its one line would hold
+    every string, and a change to all of them would count as two changed lines) all refuse
+    the file. *A key that occurs twice needs no scan of its own:* `JSON.stringify` never
+    writes one object's key twice, so a file that is exactly what it writes holds none; the
+    parse keeps the last of two, the written form is then one entry shorter than the file,
+    and the comparison refuses (the coordinator asked for a separate scan; a second,
+    hand-written reading of JSON is what this decision removes, and the witness "no key
+    twice" shows the refusal). A key that holds `__proto__` refuses the file (the parse's
+    own reviver reports every key): a program that merges catalogues writes such a key onto
+    every object it has. *Cost:* a catalogue written by a tool that escapes every non-ASCII
+    letter (`"caf\u00e9"`, as Python's and PHP's writers do by default) or on one line does
+    not qualify.
+181. **YAML in a strict subset, held to js-yaml** (decision at review, 2026-10-09; source:
+    the brief, part B). The whole file is read on both sides: an optional `---` first line,
+    blank lines, comment lines, `key: value`, `key:` and `- value` lines (a list item's
+    value may change: the second place, with the JSON list, where this round lets something
+    through that was refused), plain keys, and plain or quoted values that end on their line.
+    Anything else refuses the file: a tag, an anchor, an alias, a flow collection, a block
+    scalar, a value over several lines, a document marker after the first line, a tab or
+    other control character, a quoted or complex key, a key twice in one mapping, an
+    indentation that is no mapping's or list's, a comment behind a value, a key that is one
+    of YAML's switches. `js-yaml` 4.3.2 is a test-only dependency at an exact version, and
+    the differential test requires that every edit the check passes loads on both sides to
+    the same shape with only string values changed. *What two readers of the older YAML
+    showed* (the coordinator's fifth point; PyYAML 6.0.3 and Ruby's Psych 3.1.0, run by the
+    executor on 120,000 passed edits): Psych reads only the first entry of a file that
+    starts with a byte-order mark, and PyYAML loads no file with a bare `=` or `<<` as a
+    value; both now refuse the file. A bare `y` or `n` is a switch to go-yaml 2 and is
+    refused as a changed value and as a key, with `true`, `false`, `yes`, `no`, `on`, `off`,
+    `null`, `~`, `.inf` and `.nan` in any letter case. A key that holds `__proto__` refuses
+    the file.
+182. **Properties files in a strict subset** (decision at review, 2026-10-09; source: the
+    brief, part B). Blank lines, comment lines and entries. A file with a line that ends in
+    a backslash (a continued line, or an escaped backslash another reader takes for one), a
+    carriage return on its own or a byte-order mark (Java reads it into the first key) is
+    refused. A line carries a value that may change only when its key holds no backslash and
+    `=` or `:` follows it, behind white space at most: where white space alone ends the key,
+    or the key holds an escaped separator, a reader that splits at the first `=` takes
+    another key than Java does. No loader of properties files is on the build machine (no
+    Java runtime), so this reader is held by witnesses only.
+183. **The wording rule, for every kind** (decision at review, 2026-10-09; source: the
+    brief, part B, and the coordinator's fourth point). Rule 6 refuses a number of any kind
+    (`\p{N}`: a circled or a Roman-numeral character too), a currency sign, `%`, `<`, `>`,
+    `{`, `}`, `$`, a backtick, `@`, `://`, `www.`, a bare host (a full stop between a letter
+    and two letters), a scheme anywhere (a colon between a letter or digit and anything but
+    a space) and a control or format character. A catalogue value also keeps its
+    placeholders in the same order (`{{name}}`, `%{name}`, `{name}`, `%1$s`, `%s`, `$name`,
+    `:name`), holds a letter outside them, starts like no path and is no switch. Each test
+    runs on the value as the program reads it AND as it is written in the file, and on both
+    as a browser reads an address; markup text is read as written and as its plain
+    character references spell it (`&shy;` is a hyphen nobody sees). *Cost:* a value with an
+    escape written in digits (`caf\u00e9` in a properties file, `"\x21"` in YAML) is refused;
+    three earlier rows that passed now assert that. *Known limit:* a Roman numeral written
+    in letters (`Chapter IV`) is a word.
+184. **Byte-order marks and line endings** (decision at review, 2026-10-09; source: the
+    brief, part D, and the coordinator's fourth point). In a page or a stylesheet a
+    byte-order mark stands on both sides or on neither; in a catalogue it refuses the file.
+    The two sides hold as many carriage returns, and, where no line comes or goes, the same
+    ending on every line: the diff the size is counted from ignores a carriage return at a
+    line's end, so one that moves from a line to another would change bytes nobody sees.
+    Case 19's passing example is a page with Windows line endings on both sides; a page
+    whose every line ending changes is refused.
+185. **Stylesheets in a strict subset, held to postcss** (decision at review, 2026-10-09;
+    source: the brief, part C). One function reads the whole file once. A semicolon ends no
+    statement inside round or square brackets (`--shape: (a; color: red; b)` is one
+    declaration); a brace inside brackets, a closing bracket that matches nothing and a
+    bracket left open cannot be followed; a statement is blank, an at-rule with a name, the
+    head of a rule, or a declaration with a plain property name, and outside every block
+    only a custom property is one; a plain property's value holds no colon outside round
+    brackets (a missing semicolon, for postcss in square brackets too); a string ends at a
+    carriage return and a form feed as at a line feed; an `@charset` rule names UTF-8.
+    `postcss` 8.5.29 and `postcss-value-parser` 4.2.0 are test-only dependencies at exact
+    versions, and the differential test requires that postcss reads every passed edit as a
+    change to exactly one declaration's value, one colour on both sides. *Escapes:* a
+    character behind a backslash is no structure, a changed declaration that holds a
+    backslash is not recognised, and a backslash before a brace, a semicolon, a quote, the
+    `/` of `/*`, a line break or the end of the file cannot be followed: those are what the
+    reader of the earlier rounds read as structure, so no file it refused passes now.
+    *Letters* are compared as a browser compares them, the ASCII letters without regard to
+    case and no other (`blac` with the Kelvin sign is no `black`). *Kept as it was:* a
+    declaration right behind a comment is a declaration, and a colour changed in it is not
+    recognised. *Cost:* a stylesheet with an old Internet Explorer filter
+    (`filter: progid:…`) or a star-property hack (`*zoom: 1`) is refused whole.
+186. **A custom property named for a colour is read by colour properties only** (decision
+    at review, 2026-10-09; source: the brief, part C; it narrows Decision 115). Besides its
+    own declaration, everything in the file that names the property, on either side, is a
+    `var()` in the value of a real colour property; an animation name, a width, another
+    custom property, a style query and an `@property` rule make the change a setting. *Known
+    limit:* only this file is read; a `var()` in another stylesheet, and a script, are not
+    seen.
+187. **More places govern the work** (decision at review, 2026-10-09; source: the brief,
+    part D). The names `IRON_LOOP.md`, `SKILL.md` and `MEMORY.md` in any letter case at any
+    depth; the folders `prompts` and `output-styles` anywhere in the path; and every file
+    that a relative Markdown link in a `CLAUDE.md` or an `AGENTS.md` of the LAST COMMIT
+    names, at any depth, read from its file's folder (a leading `/` from the repository's
+    top; with and without what stands behind `#` or `?`; `%20` as the character it spells).
+    The working folder's copies are never read, so a link removed there still counts. The
+    link reader takes more than a renderer follows (what stands behind `](` and behind
+    `[label]:`, a code span included): reading too much is the refusing side. An instruction
+    file that is a link stands for the file it points to. A committed instruction file whose
+    links cannot be listed (bytes that are no text, a link that leaves the repository or
+    leads to no regular file) refuses every change. *Known limits:* a link to a folder
+    governs no file in it; a path written without a link (in a code span, or behind `@` as
+    an import) is not read; git's listing of the last commit is read into 64 MiB at most,
+    and a repository whose listing is larger gets "the check stopped".
+188. **Sensitive words behind capitals, and one plural in a stylesheet's name** (decision
+    at review, 2026-10-09; source: the brief, part D; it changes Decisions 113 and 127). A
+    run of capitals ends where its last capital starts a word (`APIKey` holds `key`,
+    `SSOLogin` holds `login`; `APIKeyboard` holds none). In a stylesheet's own file name the
+    words count in the plural too, except `tokens` (`design-tokens.css` holds design tokens;
+    `payments.css` and `keys.css` name their area).
+189. **A path is asked as written and in every folded form** (decision at review,
+    2026-10-09; source: the coordinator's fourth point; it replaces the folding of Decision
+    127). Every rule about a path asks it as written, with compatibility letters taken for
+    plain ones (Unicode NFKC), and with marks and format characters dropped (NFKD, then
+    every mark and every zero-width or other format character removed). A rule that refuses
+    (a test, a governing name or folder, a linked file, a dependency, build or settings
+    name, a sensitive word, CTOC's secret-file guard) refuses when any form says so; a file
+    qualifies only when every form places it in the same kind. *The executor's mistake in
+    this round, found by the coordinator's review and repaired here:* commit `795325ab`
+    dropped marks and format characters before it looked for sensitive words, so `auth` and
+    `login` around a zero-width space became one word that is no sensitive word, and a page
+    under such a folder passed, which 4212d9ff refused. Letter case is no form: names are
+    compared without regard to it, as the eighth round's decision words it for
+    documentation names.
+190. **The whole suite runs in the copy** (decision at review, 2026-10-09; source: the
+    brief, part E; it supersedes "Rule 8", "the affected-test selection is the file-name
+    selection …"). A test file named after every judged file made the check run that
+    selection alone, and a failing test under another name never ran. The check now calls
+    the quality agent's `runFullTests` and nothing else, under the same time limit (300
+    seconds). The quality agent keeps `runSpecificTests` for its own affected-tests path;
+    the hotfix check no longer calls it.
+191. **Nothing is staged for a change that adds or deletes a path** (decision at review,
+    2026-10-09; source: the brief, part E). Rule 2 refuses such a change whatever it holds,
+    and `add --all` into the temporary index wrote every staged file into the repository's
+    object store; a call that names no file wrote every untracked file there. The change is
+    now returned to the rules unstaged, and rule 2 gives the clause. Its changed lines are
+    still counted for the log: git's own count for tracked paths, and the lines of an
+    untracked file as they stand in the working folder, read in pieces. *A different
+    refusal, never a pass:* a change that holds an added path beside a file that is no text
+    is now answered by rule 2, where it read "is not text".
+192. **The copy is removed whatever the tests left in it** (decision at review, 2026-10-09;
+    source: the brief, part E). Before the copy's worktree is removed, every real folder
+    under the check's temporary folder is given back to its owner to read, write and enter
+    (a link is never followed or changed). A removal that still fails keeps the first and
+    the last 80 characters of its reason in `detail`, so what failed and where both stay.
+193. **`npm audit fix`, without force** (decision at review, 2026-10-09; source: the brief,
+    part E; it closes the "Not done" item of the seventh and eighth rounds).
+    `brace-expansion` moved from 1.1.15 to 1.1.21 and the linter's `js-yaml` from 4.2.0 to
+    4.3.2; `npm audit` reports no finding. *A fact outside this plan's files:*
+    `src/lib/circuit-breaker.js` requires `js-yaml` at run time while `package.json` names
+    none for the product (it arrives with the linter); the test-only `js-yaml` is pinned to
+    4.3.2, the line the product already loads, because 5.4.3 broke the type check there.
+194. **Every guard fails closed** (decision at review, 2026-10-09; source: the coordinator's
+    first point). A failure, an exception, an unknown construct or a missing file ends in a
+    refusal, never in a pass and never in an older or looser way of reading. Each format has
+    one reader, and the hand-written line readers of the catalogues are deleted, not kept
+    beside the new ones. The JSON reader catches only a syntax error of the parse; every
+    other fault stops the check. A change that carries no count of its changed lines, or
+    that was read from a repository and carries no list of linked files, is a fault. A
+    reader that does not know a file's kind throws. *Found by reading for this point:* a
+    documentation file with no changed word passed as a change of nothing (reachable only
+    by hand, since git lists no such file); it is refused now.
+195. **One function for each thing that is decided** (decision at review, 2026-10-09;
+    source: the coordinator's third point). The first call and the test call run the same
+    `judge`, `readChange` and `ruleRefusal`; the menu route is the only caller of the rules
+    besides the tests. Shared now where two places decided the same thing: the named kinds
+    (the qualifying kinds and the table of clauses); the wording patterns (rule 4's readers
+    and rule 6); the forms of a path (rules 4, 5 and 7, the linked files and CTOC's
+    secret-file guard); what a declaration is in a stylesheet (the colour tokens, the custom
+    properties and what reads them); what one colour is (a colour property's token and a
+    custom property's value); what a language part is (a catalogue and a documentation
+    text); where a tag may start in Markdown; how carriage returns are taken off (the
+    "texts differ" rule and the readers).
+196. **A transform only adds reasons to refuse** (decision at review, 2026-10-09; source:
+    the coordinator's fourth point). The program that later reads a file sees its raw
+    bytes. The module's header lists every place where the check folds, strips, decodes or
+    skips before it decides, each with what keeps it on the refusing side: the bytes read
+    as UTF-8; a byte-order mark skipped; `\r\n` read as `\n`; names compared without letter
+    case; a path folded; a link target percent-decoded; a catalogue value decoded; a value
+    read as an address; placeholders taken out before rule 6; a character reference
+    decoded; a stylesheet's comments, strings, `url(…)` and escapes blanked and its values
+    trimmed; its keywords in ASCII lower case; JSON written back. *Left as it was, for the
+    owner to change if he wants:* the tables that let a file qualify are compared without
+    regard to letter case (`README.MD`, `Locales/EN/common.JSON`), as the eighth round
+    decided for documentation names and as the file systems of macOS and Windows compare; a
+    comparison in the exact letters would refuse those.
+197. **The check reads what the consumer reads** (decision at review, 2026-10-09; source:
+    the coordinator's fifth point). The consumer of each format, what holds the check to it,
+    and the one place that nothing holds:
+    - *HTML:* a browser. parse5 in the gated differential test; Chromium 156's own parser on
+      120,000 passed edits (the Execution Record). Not held: a character set the server
+      names in a header, and what a script does with a text it reads.
+    - *Stylesheets:* a browser. postcss in the gated test; Chromium 156's own CSS parser on
+      120,000 passed edits. Not held: a `var()` or a script outside the file, and the
+      server's header.
+    - *JSON:* a JSON loader. The reader is `JSON.parse` itself. Not held: a loader that
+      reads a number past double precision, or a lone surrogate, otherwise than JavaScript,
+      in a part of the file that does not change.
+    - *YAML:* a YAML loader. js-yaml in the gated test; PyYAML and Psych on 120,000 passed
+      edits. Not held: loaders that were not run (go-yaml, SnakeYAML).
+    - *Properties:* Java's loader. Not held at all by a real loader (none on the machine);
+      witnesses only.
+    - *Markdown:* a renderer. markdown-it in four configurations in the gated test;
+      Python-Markdown, micromark, marked and pandoc on passed edits. Not held: renderers that
+      were not run (kramdown, goldmark, an MDX compiler); the list of characters a plain
+      line may hold is what stands against them.
+    - *Paths:* git, and the file system under it. The listings are git's own, with `-z` and
+      literal path arguments; a named file whose spelling differs from git's is "no change
+      that git would commit". Not held: a file system that compares names its own way; the
+      forms of Decision 189 are the answer to it.
+198. **A page or a stylesheet names no character set but UTF-8** (decision at review,
+    2026-10-09; the executor, under the coordinator's fifth point). The check reads bytes
+    as UTF-8; under Shift_JIS or GBK a browser reads a letter or a brace after a non-ASCII
+    character as the second half of that character. A page that holds the word `charset`
+    not followed by `=` and `utf-8` is refused (also where the word stands in its text: the
+    refusing side), and a stylesheet whose `@charset` names anything else.
+199. **The tests of the ninth round, and the counts** (the executor; it replaces the counts
+    of Decision 173). **The corpus** holds 42 shapes that qualify and 301 traps (44 of them
+    the kept cases of removed formats), plus the mode change, the two property cases and
+    the linear-time case: 347 tests. Three traps qualify now, each by one of this round's
+    widenings: `docs/brackets.md` (round brackets), `CHANGELOG.txt` and `docs/under-list.md`
+    (list items). Six shapes that qualify are new: `docs/colon-later.md`, `docs/steps.md`,
+    `locales/de/common.json`, `i18n/messages_fr.properties`, `config/locales/de.yml` and
+    `src/styles/brand.css`. `docs/lint.md` is a trap (a raw start tag). The catalogue
+    fixtures moved under a language folder. **The main test file** has 120 tests as the
+    runner counts them (93 at the top level); ten of the 93 are this round's. **The differential test** has 8
+    tests: the HTML, Markdown, YAML and CSS runs (110,000, 22,000, 60,000 and 30,000 cases
+    by default), the 74 witnesses of the HTML reader, the 180 witnesses of this round's 148
+    refusal rules, the documents written by hand, and the route sample.
+200. **Known limits, recorded and not closed** (the executor, 2026-10-10; the first three
+    are the brief's own sentences).
+    - *git commands in the copy reach the real repository.* A test that runs `git stash`,
+      `git branch` or `git config` in the copy acts on the repository the copy is a worktree
+      of.
+    - *A file edited between the pass and the commit* is caught only by the second piece's
+      gate, which compares the committed bytes with the judged ones; the fast path must not
+      be offered before that gate exists.
+    - *Hidden text, and text read by its id* (Decision 174) stand.
+    - *A Roman numeral written in letters* is a word to rule 6.
+    - *A `var()` in another stylesheet, or a script,* that reads a colour-named custom
+      property is not seen (Decision 186).
+    - *A character set named in a server's header* is not seen (Decision 198).
+    - *A paragraph between `:::` lines* is put into a `div` by pandoc's `commonmark_x`
+      reader (Decision 174); one edit of 24,000 in this round's sample.
+    - *The rule that a file's kind is the same in every form of its path* has no witness
+      from a real name: the extension of a qualifying name is plain letters, so no name was
+      found that is one kind as written and another when folded. It is tested by injecting
+      another extension for one form.
+    - *A YAML or properties loader that was not run* may read a passed file otherwise
+      (Decision 197).
+    - *This repository's own continuous integration* still installs nothing before it runs
+      the tests (Decision 174), so the differential test cannot load there; now it needs
+      `js-yaml`, `postcss` and `postcss-value-parser` too.
+201. **Facts of the build machine that the tests now allow for** (the executor,
+    2026-10-09). The system's git moved from 2.50.1 to 2.54.0, which starts
+    `git maintenance run --auto --detach` after a commit; that detached process wrote into a
+    fixture repository while a test removed it. Every git call of the three test files
+    carries `maintenance.auto=false` and `gc.auto=0`. The check itself commits nothing.
 
 ## Execution Record
 
@@ -4198,6 +4561,285 @@ Step 14, in this worktree with its own `node_modules`:
   29 seconds, no test failing in any. In them the main test file's five timing cases
   measured 3.1 to 4.2 times as long at four times the size, and the corpus's case printed
   no input above 5 times (it prints those).
+
+### Fix round 9 — catalogues, stylesheets, paths, the test run, and a measured widening of the prose rule (2026-10-09 and 2026-10-10)
+
+A ninth round, in this worktree from `4212d9ff`, on the session's brief for "the second fix
+round on a built plan" (parts A to F: Markdown, catalogue files, stylesheets, paths and
+names, the test run and housekeeping, evidence) and on two additions the coordinator sent
+while it ran, after automated security reviews of this round's own commits (five points:
+every guard fails closed; no control regression; two validators must not disagree; a
+transform only adds reasons to refuse; the check reads what the consumer reads). Decisions
+175 to 201. The specification hash was checked before the first plan edit and after every
+plan edit: `8092f09db82bf8ac0a95ac2a1a9d04bde47c6fecde79229ae1b5ae0aa7ebd1dd`, equal to the
+approval record's `content_sha256`. The plan's file list did not change. The work began on
+2026-10-09 and ended after midnight; "decision at review, 2026-10-09" is the brief's own
+label for every change of the round.
+
+**Mistakes of the executor in this round, each found and repaired inside it.**
+- *A control regression* (commit `795325ab`, repaired by `611dbd7f`): marks and format
+  characters were dropped from a path before the sensitive words were looked for, so `auth`
+  and `login` around a zero-width space became one word, and a page under such a folder
+  passed that `4212d9ff` refused. The coordinator's review named a "normalization
+  differential"; the test of the fourth point reproduces it, and a path is now asked as
+  written too (Decision 189).
+- *The whole suite was red for six commits* (`795325ab` to `afb3d7a6`, repaired by
+  `2ce215bd`): two empty `catch` blocks of this round failed the project's own false-green
+  fence, and the executor had run only the hotfix test files and a few others since. The
+  hotfix check itself showed it, on its first run against this repository's own suite (the
+  real run below). Every later number in this record that names `npm test` is from a whole
+  run.
+- *A lint error was committed* (`24754cec`, an unneeded escape in a test's template;
+  repaired by the next commit, `63287539`): the commit command did not stop on the linter's
+  exit code.
+
+**Commits, test first.** `67f501df` and `fa4b6bf7` the three test-only parsers and `npm
+audit fix`. Markdown: `3ecf2e80` tests, `463f1354` code; `943b72d3` test, `27b493d2` code
+(the line of spaces). Catalogues: `6cd1a077` tests, `600d7337` code. Stylesheets: `24754cec`
+and `63287539` tests, `4af50156` code. Paths, the test run and housekeeping: `641ba331`
+tests, `795325ab` code. The coordinator's points: `2ed2ee54` tests, `611dbd7f` code;
+`6ff6cdb1` the witnesses; `d04c5b89` tests, `741a52b5` code (what PyYAML and Psych showed);
+`afb3d7a6` the module's header and the differential's default size; `2ce215bd` the two
+empty `catch` blocks; `4dfa9593` and `25d34fc1` tests only. `25d34fc1` is the last commit
+that changes code or tests; this record follows it.
+
+**Red on `4212d9ff`, green after, part by part.** Each test file of a part was copied into
+an export of `4212d9ff` and run there before the code was written.
+- *A, Markdown:* the rows for a colon, round brackets and list items were refused; the rows
+  with a raw start tag below the paragraph passed; the size scenario read "cannot read
+  exactly"; the Markdown differential passed 4.4% with ingredients missing. Green:
+  `463f1354`.
+- *B, catalogues:* the new YAML differential passed 6,350 edits, 2,006 of them read
+  otherwise by js-yaml (a block scalar, a flow collection, a tag, a second document); 29
+  corpus tests and all five selected tests of the main file failed (`locales/package.json`
+  and `i18n/tsconfig.json` answered `checking`). Green: `600d7337`.
+- *C, stylesheets:* the new CSS differential passed 4,042 of 18,165 edits, 567 of them read
+  otherwise by postcss (105 a missing semicolon, 99 a double colon, 92 a value that is not
+  one colour, 85 and more an unknown word, 49 an unclosed bracket, 8 an at-rule without a
+  name); 33 rows of the main file's table and five corpus traps were wrong. Green:
+  `4af50156`; then 0 disagreements in 3 x 1,000,000 cases.
+- *D and E, paths, the test run, housekeeping:* 34 rows of the paths table answered
+  `checking`; the file-name selection ran one test file; an unnamed first call wrote two
+  objects into the object store, the 40 MiB untracked file among them; a test that left a
+  read-only folder kept the copy alive, and a long reason was cut after 200 characters.
+  Green: `795325ab`.
+- *The coordinator's points:* 12 changes with an unparsable piece on both sides answered
+  `checking` on `4212d9ff`; a documentation file with no changed word passed; 21 rows where
+  a raw and a transformed form differ passed, two of them only on this round's own
+  `795325ab` (the regression above). Green: `611dbd7f`, `741a52b5`.
+
+**The widening of the prose rule, measured.** On the 1,627 Markdown files tracked at
+`4212d9ff` (463,219 lines), one one-letter typo per line of visible prose: 226,738 edits
+(134,063 in a list or a quote, 58,045 in a paragraph at the top level, 34,630 in a
+heading; the eighth round counted 226,111 on a slightly earlier plan file). Judged under a
+neutral path:
+
+| reader | edits that pass | share |
+|---|---|---|
+| `4212d9ff` | 1,270 | 0.56% |
+| the raw start rule, no widening | 1,205 | 0.53% |
+| (a) the colon | 2,326 | 1.03% |
+| (b) round brackets | 3,035 | 1.34% |
+| (c) list items, as built (the final reader) | 3,974 | 1.75% |
+| (c) as the brief words it, not built | 10,275 | 4.53% |
+
+The first condition, in a fixed order, that the rule before the widening does not hold,
+as a share of the 226,738: a backtick 21.25% (48,189); the line stands below another raw
+tag 17.91% (40,612); a heading line right above or below, with no empty line between
+14.48% (32,824); a code fence that renderers read differently 11.27% (25,547); a raw start
+tag somewhere in the file 8.76% (19,869); the line is a heading 8.36% (18,955); inside
+front matter or a metadata block 6.26% (14,199); an asterisk or an underscore 3.25%
+(7,362); the paragraph touches a fence or a metadata block 1.59% (3,599); a line indented
+four spaces or by a tab 1.52% (3,436); a table line 1.35% (3,070); a block quote 1.05%
+(2,379); nothing, the rule holds 0.54% (1,218); only what the widening is about 1.29%
+(2,934: a colon 1,168, a colon and a bracket 550, a list item and a bracket 418, a bracket
+242, a list item 198, a list item and a colon 188, all three 170); a square bracket 0.45%
+(1,009); another character 502; punctuation or a hyphen 419; a slash 418; a line that
+starts with a digit or a mark 128; an angle bracket 55; a first line that is indented 14;
+13 that the list does not explain (a tag in a code span the reader takes for unsure).
+Refused by the final reader for ONE condition only, which is what one more step could
+unlock at most: the line is a heading 9,457 (4.17%); an asterisk or an underscore 2,231
+(0.98%); below another raw tag 1,457 (0.64%); a backtick 1,143 (0.50%); a heading right
+above or below 717 (0.32%); an ambiguous fence 438; punctuation or a hyphen 412; another
+character 326; a slash 190; a raw start tag 103; a square bracket 72.
+
+Each step was kept only while the Markdown differential (four configurations of
+markdown-it) stayed at zero in 1,000,000 cases, seed 20261009, 948,102 edits: the raw start
+rule alone 39,097 passed (4.1%), (a) 49,882 (5.3%), (b) 71,303 (7.5%), (c) 97,195 (10.3%);
+0 disagreements each.
+
+*Proposals for the brief's step (d), none built:* a list whose items bound the paragraph
+(10,275 against 3,974; the renderers' disagreement in Decision 177 stands against it); a
+heading line as a paragraph's bound, and the words of a heading itself (9,457 edits are
+refused only for being a heading; a heading changes its anchor, Decision 142); emphasis
+marks around unchanged words (2,231); a code span on the changed line (1,143); a hyphen
+with a space on both sides (part of the 412). Outside Markdown: a path behind `@` in an
+instruction file as a link (an import); a link to a folder as governing every file in it; a
+colour right behind a comment in a stylesheet; the quality agent running one test command
+once where two detected languages share it (below).
+
+**The differential test.** Four sections, each a seeded stream of documents and edits
+against a real parser. By default 110,000 HTML, 22,000 Markdown, 60,000 YAML and 30,000 CSS
+cases: 104,044 edits with 6,126 passed (5.9%), 20,871 with 2,154 (10.3%), 57,033 with
+11,266 (19.8%) and 27,083 with 3,327 (12.3%); 0 disagreements. Inside the gated run on
+`25d34fc1`, beside the rest of the suite: 7.8 s, 8.1 s, 2.6 s and 3.3 s, 21.8 seconds
+together, and 3.1 s for the 16 edits through the real menu route (alone and without
+coverage the four take 4.4 seconds). The soak, on `afb3d7a6` (the two later code changes
+touch only the link reader's percent bytes and the copy's removal, neither on the path
+this test runs), edits and passed edits, 0 disagreements in every cell:
+
+| seed | HTML, 6,000,000 cases | Markdown, 1,000,000 | YAML, 1,000,000 | CSS, 1,000,000 |
+|---|---|---|---|---|
+| 20261009 | 5,673,054 / 332,459 | 948,102 / 97,195 | 951,397 / 186,440 | 902,588 / 109,139 |
+| 7 | 5,673,361 / 332,079 | 947,651 / 97,885 | 950,636 / 185,429 | 902,502 / 108,604 |
+| 99 | 5,673,349 / 332,625 | 948,506 / 97,702 | 950,906 / 184,620 | 902,703 / 108,573 |
+
+**The consumers themselves, on edits the check passed** (scratch runs on the build
+machine; none is in the gated suite).
+- *Markdown:* 144,000 passed edits during the round (seeds 31, 32, 33) and 24,000 on the
+  final reader (seed 71) through Python-Markdown 3.9 (plain; with `extra`, `meta`,
+  `sane_lists`, `smarty`, `toc`, `admonition`, `nl2br`; with `meta`), micromark 4.0.2
+  (plain; raw HTML let through; GitHub's extensions) and marked 4.3.0 (plain; no GitHub
+  extensions; pedantic): one class, in marked, during the round (a line of spaces above an
+  underline, Decision 178), none after. pandoc 3.11 (`markdown`, `gfm`, `commonmark_x`) on
+  the two samples of 24,000: about 23,900 pairs compared each (pandoc refuses the rest:
+  front matter that is no YAML); one edit inside the `div` of a `:::` block and two inside
+  a definition's body (`dd`), each a change of words only (Decision 200).
+- *YAML:* 120,000 passed edits (seeds 41, 42, 43) loaded with PyYAML 6.0.3 and Ruby's
+  Psych 3.1.0. Before `741a52b5`: Psych read the same value before and after in 441, 439
+  and 483 of each 40,000 (a byte-order mark: it reads the first entry only) and loaded
+  neither side of 46, 57 and 39 more; PyYAML loaded neither side of 592, 628 and 628 (a
+  bare `=`). After: 0 disagreements in both.
+- *Stylesheets:* 120,000 passed edits (seeds 51, 52, 53) read by Chromium 156.0.8078.4's
+  own CSS parser (a headless build already on the machine, its network pointed at a dead
+  local proxy): in 108,618 colour values of one rule changed and nothing else; in 11,382
+  the browser read the same stylesheet before and after (the change stands in a rule it
+  drops); none where a rule or a declaration came or went or another value changed.
+- *HTML:* 120,000 passed edits (seeds 61, 62, 63) parsed by the same Chromium: in every
+  one, exactly one plain visible text node changed.
+
+**Witnesses.** `tests/hotfix-check-differential.test.js` holds 180 witnesses for the 148
+refusal rules this round added (besides the 74 witnesses of the HTML reader's 59 rules):
+the smallest change that one rule, and no other, refuses. In scratch copies of the module
+each rule was weakened in turn: 132 weakenings, each made exactly its own witnesses pass
+the check and fail the test (none survived, none failed a witness of another rule, and no
+witness rule was left without a weakening that bites it). 14 more weakenings of what only
+a real repository shows each failed their test of the main file: the link reader's run
+time, the links of the last commit, an unreadable instruction file, percent bytes, staging
+an added path, the copy's removal (three), the size rule's place, the three guards of the
+first point, a JSON fault that is no syntax error, and the selection of tests. Not shown
+by a witness: the rule that a file's kind is the same in every form of its path
+(Decision 200), and one comparison in the JSON reader that the form of the file and the
+count of lines already imply (that no key comes).
+
+**The coordinator's first point: every guard fails closed.** Read: the JSON, YAML and
+properties readers, the stylesheet's statement splitter, the order of recognition, the
+link lookup, the widened prose reader and the size rule. Each ends in a refusal on a
+failure, an exception, an unknown construct or a missing file; the one path that did not
+was a documentation file with no changed word (Decision 194). One reader per format: the
+hand-written line readers of the catalogues are deleted (the linter refuses an unused
+function, and none is left). Tests: 28 changes, in six formats, with a piece the reader
+cannot parse on the old side, the new side or both, each through both calls; a fault
+injected into each of the eight rule steps by hand, each leaving the rules as a fault; and
+seven faults injected through the menu (the copy of the index, the judged file's name, the
+JSON reader writing back, a fault of `JSON.parse` that is no syntax error, the folding of
+the path, the risk pattern, the test run), each answered with "the check stopped", the
+fault's message in `detail` and a log line of the cause `unreadable`.
+
+**The coordinator's second point: no control regression.** The three test files exactly as
+at `4212d9ff`, run from a scratch folder against the final module: 27 of 423 tests fail (9
+of 102 in the main file, 16 of 316 in the corpus, 2 of 5 in the differential test), each
+by a decision of this round: case 10 and `trap: docs/limit.md` (the size rule first, 175);
+case 19 (line endings, 184); `qualifies: docs/lint.md`, round 4, round 7 and round 8's
+tables, the Markdown run and the documents written by hand (a raw start tag anywhere, a
+line of spaces, and the widening, 176 to 178); `trap: CHANGELOG.txt`, `docs/brackets.md`,
+`docs/under-list.md` (they qualify now, 177); the edge shapes, round 3, finding 2b, the
+property case, the linear-time case and nine catalogue traps (`locales/keys.json` and its
+like: no language tag, so a setting, 179; the JSON reader, 180; escapes written in digits,
+183); the selection case (190). Because a table stops at its first wrong row, the same
+files were run once more with both modules asked on every call (the old module's answer
+returned to the test, so every row is reached): 1,251 distinct answers differ. *From a
+refusal to a pass:* 568 calls of the rules, all Markdown or documentation text, each
+passed first by the reader with one widening switched on (round brackets 448, list items
+109, the colon 11), and 7 calls through the menu (list items 5, round brackets 2). Five
+more through the menu (four to a pass, one to another refusal) are no change: the old test
+replaces the quality agent of the old module's own copy, which the final module does not
+load, and the unchanged test passes against the final module. *From a pass to
+a refusal, or to another refusal:* Markdown 164 to "cannot read exactly" (176, 178) and
+69 to the size clause (175); HTML 51 to the risk-marker clause (a colon inside a word: a
+scheme anywhere, 183), 2 for line endings (184), 1 for a broken `charset` (198);
+stylesheets 266 to "cannot follow" (185); catalogues 118 (recognition 179, the whole-file
+readers 180 to 182, the wording rule 183). On generated edits, 200,000 cases of each kind
+judged by both modules (seed 20261009): HTML 189,090 edits, no answer changed between a
+pass and a refusal; stylesheets 180,506 edits, none from a refusal to a pass, 9,530 from a
+pass to a refusal; YAML 190,330 edits, 13,135 from a refusal to a pass, every one the
+value of a list item (the brief's part B, Decision 181), 41,344 from a pass to a refusal;
+Markdown 189,703 edits, 11,718 from a refusal to a pass (round brackets 4,286, list items
+5,243, the colon 2,189), 449 from a pass to a refusal. No guard had to be restored besides
+the one of Decision 189.
+
+**The third, fourth and fifth points** are Decisions 195, 196 and 197. The fourth has a
+case per transform in the main file's test "a transform only adds reasons to refuse": 41
+rows, each a file whose raw and transformed forms differ and of which only one would
+pass; all refuse (or pass, where the row is the guard beside one). The fifth found the two
+YAML differences above and the Kelvin sign in a colour's name, which the postcss oracle
+shared with the reader and no generated case held.
+
+**Six real runs** through `node src/commands/start.js hotfix check …` on `2ce215bd`, in a
+repository of their own with a two-test suite, both calls and the commit:
+- a wording change in `locales/en/common.json`, in `locales/en/app.yml` (a list item's
+  value), a colour on a real colour property and a colour in `--brand-color` (read by
+  `background` and `border-color` only) in `src/styles/site.css`, and a typo inside a list
+  item of `docs/guide.md`: each first call answered `checking`, "Checking the hotfix
+  against the existing tests.", with `next: hotfix check --run-tests '<file>'`; each test
+  call answered `hotfix`, "2 tests passed."; each commit command committed one file, one
+  line in and one out;
+- a wording change in `locales/package.json`: both calls answered "I did not treat this as
+  a hotfix because it changes the dependencies in locales/package.json; it goes through a
+  normal plan, and your edits stay in place, not committed."
+- The log held five lines `hotfix`, 1 file, 2 lines, and two `refused`, `dependencies`.
+
+**The check on this repository's own suite** (a scratch clone with its packages; a wording
+change in a list item of `docs/CODE_OF_CONDUCT.md`). On `afb3d7a6`: refused after 235
+seconds, "the existing tests fail (tests/false-green-fence.test.js: NO NEW FALSE-GREEN
+SITE: every finding is already baselined or whitelisted)", which was true (the second
+mistake above). On `25d34fc1`: `hotfix`, "26510 tests passed.", after 428 seconds, no copy
+left behind. The count is twice the suite's 13,255: the quality agent runs the test
+command of every detected language, and this repository has two with the same `npm test`.
+One run takes 208 to 215 seconds here, inside the 300-second limit, which stays as it was;
+on a slower or busier machine the run is stopped at the limit and the answer is "no test
+ran", a refusal.
+
+**The acceptance boxes.** Ticked in this round: "Every refusal scenario of the functional
+plan …" (the size scenario answers its own clause again: case 10 and Decision 175; its
+other scenarios rest on cases this round did not change in what they assert). Every other
+ticked box was run again in the gated runs below; the corpus box's counts are those of
+Decision 199.
+
+**Not done, said plainly.**
+- The brief's step (d) and the other proposals above: proposed only.
+- A separate scan for a key that occurs twice in JSON (Decision 180 gives the reason).
+- A comparison of names in their exact letters (Decision 196): left for the owner.
+- No loader of properties files was run (none on the machine), and no YAML loader besides
+  js-yaml, PyYAML and Psych.
+- The quality agent runs this repository's suite twice; not changed.
+- The soak ran on `afb3d7a6`, not on the last commit (see above).
+- Continuous integration still cannot load the differential test; the undeclared `js-yaml`
+  of `src/lib/circuit-breaker.js` and the stale comment in `src/lib/claim-fetcher.js` lie
+  outside this plan's files.
+- The two `pandoc` processes of the eighth round's record are still running at full load;
+  this round did not start them and left them alone. The processes this round started (a
+  pandoc server, a headless Chromium) were stopped.
+- Steps 11, 13 and 16 stay with the session's reviewers; their boxes are not ticked.
+
+Step 14, in this worktree with its own `node_modules`:
+- `npx eslint . --max-warnings 0`: no finding. `npx tsc --noEmit`: exit 0. `npm audit`:
+  "found 0 vulnerabilities".
+- `npm test` on `25d34fc1`, before this record was written: `ℹ tests 13255 | ℹ suites 2117 |
+  ℹ pass 13255 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0`; `all files | 99.87 |
+  93.84 | 99.38`; `hotfix-check.js | 100.00 | 98.75 | 99.05`; `[CTOC test-gate] coverage
+  99.87% (threshold 99%), skipped 0, failed 0`; `[CTOC test-gate] PASS`; 212 seconds. No
+  line of `hotfix-check.js` is left unrun.
 
 ## Execution Plan (Steps 8-16)
 
