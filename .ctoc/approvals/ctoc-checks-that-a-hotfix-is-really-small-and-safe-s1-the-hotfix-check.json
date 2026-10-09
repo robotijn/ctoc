@@ -1,9 +1,11 @@
 {
-  "content_sha256": "4aaf099b44f61ce1721e1bd2309bc781e49f2b8a2896c60aff3ecb22e80f8003",
+  "content_sha256": "8092f09db82bf8ac0a95ac2a1a9d04bde47c6fecde79229ae1b5ae0aa7ebd1dd",
   "hash_scope": "specification",
   "stage_from": "implementation",
   "stage_to": "todo",
-  "approved_at": "2026-10-08T20:12:34.617Z",
+  "approved_at": "2026-10-09T11:22:56.337Z",
   "approved_by": "human",
+  "backfilled": true,
+  "backfill_reason": "The file list is widened by three test-only files (tests/hotfix-check-differential.test.js, package.json, package-lock.json): a seeded differential test holds the hotfix check's reader to real parsers (parse5, markdown-it) as devDependencies. Session decision of 2026-10-09 under the owner's instruction of that day to decide such matters without asking; the owner approved this plan on 2026-10-08 and chose on 2026-10-09 that the check keeps only what it can read exactly.",
   "plan_basename": "ctoc-checks-that-a-hotfix-is-really-small-and-safe-s1-the-hotfix-check"
 }

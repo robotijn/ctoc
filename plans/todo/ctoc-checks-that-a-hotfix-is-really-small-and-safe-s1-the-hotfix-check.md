@@ -47,6 +47,12 @@ files:
   # README.md (tests/readme-numbers.test.js holds README's copy to the files on disk).
   - "CLAUDE.md"
   - README.md
+  # Session decision 2026-10-09, under the owner's instruction to decide: the reader is held to
+  # real parsers by a seeded differential test. parse5 and markdown-it are test-only
+  # dependencies (devDependencies, exact versions); nothing is added at runtime.
+  - tests/hotfix-check-differential.test.js
+  - package.json
+  - package-lock.json
 approved_by: human
 approved_at: 2026-10-08T20:12:34.566Z
 gate_crossed: implementation → todo
