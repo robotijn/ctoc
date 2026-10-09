@@ -3528,9 +3528,11 @@ test('round 9: the copy is removed whatever the tests leave in it, and a removal
     }
     git(root, ['worktree', 'prune']);
     assert.equal(res.verdict, 'hotfix', JSON.stringify(res));
-    // Where a folder's mode is not what lets its owner remove from it, the copy goes all the same.
-    if (left.length > 0) assert.match(res.detail, /^the temporary copy at .+ could not be removed: /);
-    else assert.equal(res.detail, undefined);
+    // The failure that is named is the folder's own, not a later one of the removal. (Where a
+    // folder's mode is not what keeps its owner from removing in it, no mode is changed and the
+    // copy goes all the same.)
+    if (process.platform === 'win32' && left.length === 0) assert.equal(res.detail, undefined);
+    else assert.equal(res.detail, `the temporary copy at ${path.join(PRIVATE_TMP, left[0])} could not be removed: EPERM: operation not permitted`);
   });
   await t.test('a removal that still fails names the start and the end of its reason', async () => {
     const root = testedProject();
