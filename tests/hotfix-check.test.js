@@ -2041,7 +2041,11 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
     ['src/pages/cdata.html', '<svg><![CDATA[ a > <b>Save</b> ]]></svg>\n', '<svg><![CDATA[ a > <b>Store</b> ]]></svg>\n', inexact('src/pages/cdata.html')],
     // Catalogue escapes: YAML's \x and \u, a properties file's \u; an unknown or short
     // escape is not wording.
-    ['i18n/esc.yaml', 'title: "Save"\n', 'title: "Sto\\x72e"\n', null],
+    // Since the coordinator's point at review of 2026-10-09 a value is read as written too, and
+    // an escape written with digits holds digits (until then this row passed: the decoded
+    // value is `Store`). A value with an escape that holds none still passes.
+    ['i18n/esc.yaml', 'title: "Save"\n', 'title: "Sto\\x72e"\n', risk('i18n/esc.yaml')],
+    ['i18n/en/esc-quote.yaml', 'title: "Save"\n', 'title: "Say \\"store\\" now"\n', null],
     ['i18n/at.yaml', 'title: "Save"\n', 'title: "Mail \\u0040x"\n', risk('i18n/at.yaml')],
     // Since the ninth round a YAML or JSON file outside the strict subset "holds something I
     // cannot follow" (an escape YAML does not know, a second `: ` in a plain value, a comment
@@ -2050,7 +2054,10 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
     ['i18n/en/short.yaml', 'title: "Save"\n', 'title: "Sto\\x7"\n', lost('i18n/en/short.yaml')],
     ['i18n/en/plain.yaml', 'title: Save\n', 'title: Store: now\n', lost('i18n/en/plain.yaml')],
     ['i18n/en/hashstart.yaml', 'title: Save\n', 'title: #Store\n', lost('i18n/en/hashstart.yaml')],
-    ['lang/uni.properties', 'title=Save\n', 'title=Sto\\u0072e\n', null],
+    // As `i18n/esc.yaml` above: the escape is written with digits (until the coordinator's
+    // point at review of 2026-10-09 this row passed).
+    ['lang/uni.properties', 'title=Save\n', 'title=Sto\\u0072e\n', risk('lang/uni.properties')],
+    ['lang/en/colon.properties', 'title=Save\n', 'title=Save\\: all\n', null],
     ['lang/en/badu.properties', 'title=Save\n', 'title=Sto\\u00zz\n', un('lang/en/badu.properties')],
     ['locales/ctl.json', '{\n  "title": "Save"\n}\n', '{\n  "title": "Sto\tre"\n}\n', lost('locales/ctl.json')],
     // Stylesheets: a colour function in its space form, a string, a colour beside a `url(…)`.
@@ -3045,7 +3052,10 @@ test('round 9: catalogue files — recognition, JSON by JSON.parse, strict YAML 
     // each line was read alone, so what stood on other lines was never seen).
     row('yaml', 'yml', '---\n# The catalogue\nmenu:\n  save: @\n  days:\n    - Monday\n  list:\n  - "one"\n  - \'two\'\n\nnext: Hi\n', ['Save', 'Store'], null),
     row('yaml', 'yml', 'days:\n  - @\n  - Tuesday\n', ['Monday', 'Mondays'], null),
-    row('yaml', 'yml', 'save: "@ it\\x21"\n', ['Save', 'Store'], null),
+    // An escape written with digits holds digits as it is written (the coordinator's point
+    // at review of 2026-10-09; until then this row passed), one without them passes.
+    row('yaml', 'yml', 'save: "@ it\\x21"\n', ['Save', 'Store'], risk),
+    row('yaml', 'yml', 'save: "@ \\"it\\" now"\n', ['Save', 'Store'], null),
     row('yaml, a tag', 'yml', 'desc: !!str |\n  save: @\n', ['Save', 'Store'], lost),
     row('yaml, an anchor', 'yml', 'desc: &a |\n  save: @\n', ['Save', 'Store'], lost),
     row('yaml, a tab', 'yml', 'desc:\t|\n  save: @\n', ['Save', 'Store'], lost),
@@ -3279,6 +3289,11 @@ test('round 9: paths and names — governing names and folders, what the instruc
     ['governing name', 'docs/memory-notes.md', PROSE, null],
     ['governing name', 'docs/skills-we-need.md', PROSE, null],
     ['governing folder', 'docs/prompting/tone.md', PROSE, null],
+    // One reader says what a language part is, for a catalogue and for a documentation text
+    // (red: `readme.zh-hans-cn.txt` passed under a looser reading of its own).
+    ['language part', 'docs/readme.zh-Hans-CN.txt', PROSE, un],
+    ['language part', 'docs/readme.de-formal.txt', PROSE, un],
+    ['language part', 'docs/readme.zh-Hans.txt', PROSE, null],
     // 2. A file an instruction file of the last commit links to governs the work (red: `checking`).
     ['linked', 'docs/linked.md', PROSE, un],
     ['linked', 'docs/rules.md', PROSE, un],
@@ -3502,4 +3517,246 @@ test('round 9: the copy is removed whatever the tests leave in it, and a removal
     assert.equal(res.detail, `the temporary copy at ${parent} could not be removed: ${reason.slice(0, 80)} … ${reason.slice(-80)}`);
     fs.rmSync(parent, { recursive: true, force: true });
   });
+});
+
+test('round 9: every guard fails closed — a file its reader cannot parse is refused, a fault in any rule stops the check, and nothing falls back to a looser reading', async (t) => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
+  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
+
+  await t.test('per format: something the reader cannot parse, on the old side, the new side or both, never passes', async () => {
+    // [format, path, before, after, clause]. Where both sides hold the same unparsable piece and
+    // one string differs beside it, a reader that fell back to reading lines would pass.
+    const rows = [
+      ['JSON', 'locales/en/both.json', '{\n  "save": "Save",\n}\n', '{\n  "save": "Store",\n}\n', lost],
+      ['JSON', 'locales/en/new.json', '{\n  "save": "Save",\n  "open": "Open"\n}\n', '{\n  "save": "Store",\n  "open": "Open",\n}\n', lost],
+      ['JSON', 'locales/en/old.json', '{\n  "save": "Save",\n  "open": "Open",\n}\n', '{\n  "save": "Store",\n  "open": "Open"\n}\n', lost],
+      ['JSON', 'locales/en/cut.json', '{\n  "save": "Save"\n', '{\n  "save": "Store"\n', lost],
+      ['JSON', 'locales/en/comment.json', '{\n  // a note\n  "save": "Save"\n}\n', '{\n  // a note\n  "save": "Store"\n}\n', lost],
+      ['JSON', 'locales/en/twice.json', '{\n  "save": "Save",\n  "save": "Keep"\n}\n', '{\n  "save": "Store",\n  "save": "Keep"\n}\n', lost],
+      ['JSON', 'locales/en/empty.json', '{\n  "save": "Save"\n}\n', '\n', un],
+      ['YAML', 'locales/en/both.yml', 'save: Save\nmenu: [a, b]\n', 'save: Store\nmenu: [a, b]\n', lost],
+      ['YAML', 'locales/en/new.yml', 'save: Save\nopen: Open\n', 'save: Store\nopen: &a Open\n', lost],
+      ['YAML', 'locales/en/old.yml', 'save: Save\nopen: !!str Open\n', 'save: Store\nopen: Open\n', lost],
+      ['YAML', 'locales/en/block.yml', 'save: Save\ntext: |\n  save: Save\n', 'save: Store\ntext: |\n  save: Save\n', lost],
+      ['YAML', 'locales/en/tab.yml', 'save: Save\nopen:\tOpen\n', 'save: Store\nopen:\tOpen\n', lost],
+      ['YAML', 'locales/en/cut.yml', 'save: "Save"\nopen: Open\n', 'save: "Store\nopen: Open\n', lost],
+      ['properties', 'lang/en/both.properties', 'save=Save\nlong=a \\\n  b\n', 'save=Store\nlong=a \\\n  b\n', lost],
+      ['properties', 'lang/en/new.properties', 'save=Save\nopen=Open\n', 'save=Store\nopen=Open\\\n', lost],
+      ['properties', 'lang/en/old.properties', 'save=Save\nopen=Open\\\n', 'save=Store\nopen=Open\n', lost],
+      ['properties', 'lang/en/escape.properties', 'save=Save\n', 'save=Sto\\u00zzre\n', un],
+      ['CSS', 'src/styles/both.css', 'a { color: red; oops }\n', 'a { color: blue; oops }\n', lost],
+      ['CSS', 'src/styles/new.css', 'a { color: red; }\nb { margin: 0; }\n', 'a { color: blue; }\nb { margin: 0; \n', open],
+      ['CSS', 'src/styles/old.css', 'a { color: red; }\nb { margin: 0; \n', 'a { color: blue; }\nb { margin: 0; }\n', open],
+      ['CSS', 'src/styles/comment.css', 'a { color: red; }\n/* open\n', 'a { color: blue; }\n/* open\n', open],
+      ['CSS', 'src/styles/string.css', 'a { color: red; }\nb { content: "x\n; }\n', 'a { color: blue; }\nb { content: "x\n; }\n', lost],
+      ['HTML', 'src/pages/both.html', '<p>Save</p>\n<div class="x\n', '<p>Store</p>\n<div class="x\n', inexact],
+      ['HTML', 'src/pages/new.html', '<p>Save</p>\n<p>More</p>\n', '<p>Store</p>\n<p>More</p\n', inexact],
+      ['HTML', 'src/pages/comment.html', '<p>Save</p>\n<!-- open\n', '<p>Store</p>\n<!-- open\n', inexact],
+      ['Markdown', 'docs/both.md', 'Some words here.\n\n``` js extra\ncode\n```\n', 'Some other words here.\n\n``` js extra\ncode\n```\n', inexact],
+      ['Markdown', 'docs/new.md', 'Some words here.\n\nMore words.\n', 'Some other words here.\n\n<div>More words.\n', inexact],
+      ['Markdown', 'docs/return.md', 'Some words here.\rMore.\n', 'Some other words here.\rMore.\n', inexact]
+    ];
+    const base = {};
+    for (const [, p, before] of rows) base[p] = before;
+    const root = makeRepo(base);
+    const wrong = [];
+    for (const [format, p, before, after, clause] of rows) {
+      fs.writeFileSync(path.join(root, ...p.split('/')), after);
+      const first = await check(root, p);
+      const second = await check(root, '--run-tests', p);
+      fs.writeFileSync(path.join(root, ...p.split('/')), before);
+      for (const res of [first, second]) {
+        if (res.text !== refusal(clause(p))) wrong.push(`${format} ${p}: ${res.verdict === 'refused' ? res.text : res.verdict}`);
+      }
+    }
+    assert.deepEqual(wrong, []);
+  });
+
+  /** A change that passes every rule, built by hand: one wording change in a page. */
+  const passing = (rel = 'site/page.html') => ({
+    files: [{ display: rel, topRel: rel, status: 'M', oldMode: '100644', newMode: '100644', oldSha: null, oldText: HOME, newText: HOME_STORE,
+      hunks: [{ oldStart: 4, newStart: 4, removed: ['<button>Save</button>'], added: ['<button>Store</button>'] }] }],
+    lineCount: 2
+  });
+  const boom = () => { throw new Error('injected fault'); };
+
+  await t.test('a fault inside any rule function leaves the rules as a fault, never as a pass', () => {
+    assert.equal(ruleRefusal(passing()), null, 'the change passes when nothing is injected');
+    // Each rule reads one thing no rule before it reads; a getter that throws there is a fault inside that rule.
+    const inject = {
+      'rule 2, the same files': (c) => Object.defineProperty(c.files[0], 'status', { get: boom }),
+      'rule 7, no test edited': (c) => Object.defineProperty(c.files[0], 'display', { get: boom }),
+      'rule 4, texts that differ without a changed line': (c) => Object.defineProperty(c.files[0], 'hunks', { get: boom }),
+      'rule 4, the kind': (c) => Object.defineProperty(c.files[0], 'oldText', { get: boom }),
+      'rule 3, the size': (c) => Object.defineProperty(c, 'lineCount', { get: boom }),
+      'rule 4, the content': (c) => Object.defineProperty(c.files[0], 'kind', { get: boom, set() {} }),
+      'rule 6, risk markers': (c) => Object.defineProperty(c.files[0], 'runs', { get: boom, set() {} })
+    };
+    for (const [rule, poison] of Object.entries(inject)) {
+      const change = passing();
+      poison(change);
+      assert.throws(() => ruleRefusal(change), /injected fault/, rule);
+    }
+    // Rule 5 reads the path, as every rule before it does; its own step is the folding of the letters.
+    const normalize = String.prototype.normalize;
+    t.mock.method(String.prototype, 'normalize', function fold(form) {
+      if (form === 'NFKD') boom();
+      return normalize.call(this, form);
+    });
+    try {
+      assert.throws(() => ruleRefusal(passing()), /injected fault/, 'rule 5, the sensitive area');
+    } finally {
+      t.mock.restoreAll();
+    }
+    // What the rules need and a caller left out is a fault too, never a default.
+    for (const lineCount of [undefined, null, NaN, -1, 1.5, '2']) {
+      assert.throws(() => ruleRefusal({ ...passing(), lineCount }), /no count of its changed lines/, `a line count of ${String(lineCount)}`);
+    }
+    assert.throws(() => ruleRefusal({ ...passing(), top: os.tmpdir() }), /no list of the files the instruction files link to/);
+    assert.throws(() => ruleRefusal({ ...passing(), top: os.tmpdir(), governed: ['site/page.html'] }), /no list of the files the instruction files link to/);
+    assert.equal(ruleRefusal({ ...passing(), top: os.tmpdir(), governed: new Set(['site/page.html']) }).cause, 'unrecognised');
+    // A file with nothing changed in it is no pass of nothing, in any format.
+    for (const rel of ['docs/page.md', 'site/page.html', 'locales/en/page.json', 'locales/en/page.yml', 'lang/en/page.properties', 'site/page.css']) {
+      const same = { display: rel, topRel: rel, status: 'M', oldMode: '100644', newMode: '100644', oldSha: null, oldText: 'Some words here.\n',
+        newText: 'Some words here.\n', hunks: [] };
+      assert.notEqual(ruleRefusal({ files: [same], lineCount: 0 }), null, rel);
+    }
+  });
+
+  await t.test('through the menu: a fault in the reading, in a rule or in the test run is "the check stopped"', async () => {
+    const root = makeRepo({ 'src/pages/home.html': HOME, 'locales/en/common.json': '{\n  "save": "Save"\n}\n', 'tests/home.test.js': PASSING_TEST },
+      { testScript: SCRIPT });
+    const page = ['src/pages/home.html', HOME_STORE];
+    const catalogue = ['locales/en/common.json', '{\n  "save": "Store"\n}\n'];
+    const real = { extname: path.posix.extname, stringify: JSON.stringify, parse: JSON.parse, normalize: String.prototype.normalize,
+      test: RegExp.prototype.test };
+    // [where the fault is injected, the judged file, the arguments before it, how to inject]
+    const faults = [
+      ['rule 1, the copy of the index', page, [], () => t.mock.method(safeFs, 'cpSync', boom)],
+      ['rule 7, the name of the judged file', page, [], () => t.mock.method(path.posix, 'extname', (p) => (p === 'home.html' ? boom() : real.extname(p)))],
+      ['rule 4, the JSON reader writing the file back', catalogue, [],
+        () => t.mock.method(JSON, 'stringify', (...args) => (args.length === 3 && args[0] && args[0].save ? boom() : real.stringify(...args)))],
+      ['rule 4, the JSON reader, a fault that is no syntax error', catalogue, [],
+        () => t.mock.method(JSON, 'parse', (text, ...rest) => {
+          if (String(text).includes('"save"')) throw new TypeError('injected fault');
+          return real.parse(text, ...rest);
+        })],
+      ['rule 5, the folding of the path', page, [], () => t.mock.method(String.prototype, 'normalize', function fold(form) {
+        if (form === 'NFKD') boom();
+        return real.normalize.call(this, form);
+      })],
+      ['rule 6, the risk pattern', page, [], () => t.mock.method(RegExp.prototype, 'test', function probe(text) {
+        if (this.source.includes('www')) boom();
+        return real.test.call(this, text);
+      })],
+      ['rule 8, the test run', page, ['--run-tests'], () => t.mock.method(qualityAgent, 'runFullTests', async () => boom())]
+    ];
+    for (const [where, [p, after], args, injectFault] of faults) {
+      const before = fs.readFileSync(path.join(root, ...p.split('/')), 'utf8');
+      fs.writeFileSync(path.join(root, ...p.split('/')), after);
+      injectFault();
+      let res;
+      try {
+        res = await check(root, ...args, p);
+      } finally {
+        t.mock.restoreAll();
+      }
+      fs.writeFileSync(path.join(root, ...p.split('/')), before);
+      assert.equal(res.text, unreadable('the check stopped'), where);
+      assert.equal(res.detail, 'injected fault', where);
+      assert.deepEqual(withoutTime(logLines(root)).pop(), { verdict: 'refused', cause: 'unreadable', urgent: false, files: 0, lines: 0 }, where);
+    }
+  });
+});
+
+// The coordinator's fourth and fifth points at review, 2026-10-09. The program that later
+// reads a file sees its raw bytes, so wherever the check folds, strips, decodes or skips
+// before it decides, that may only add reasons to refuse: a rule that refuses asks the text
+// as written AND every folded form and refuses when one of them says so; a rule that lets a
+// file through must hold for all of them. Each row is a file whose raw and transformed forms
+// differ, and of which only one would pass.
+test('round 9: a transform only adds reasons to refuse, and the check reads what the consumer reads', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
+  const area = (word) => (f) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
+  const marker = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
+  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  const testEdited = (f) => `it changes a test (${f})`;
+  const deps = (f) => `it changes the dependencies in ${f}`;
+  const PAGE = [HOME, HOME_STORE];
+  const PROSE = ['Some words here.\n', 'Some other words here.\n'];
+  const yaml = (a, b) => [`save: ${a}\nopen: Open\n`, `save: ${b}\nopen: Open\n`];
+  const page = (a, b) => [HOME.replace('Save', a), HOME.replace('Save', b)];
+  // [the transform, path, [before, after], the clause, or null for the first call's `checking`]
+  const rows = [
+    // Marks and unseen characters are dropped from a path: two words then read as one, so the
+    // path is asked as written too (red on the round's own commit 795325ab: `checking`).
+    ['path: marks and format characters dropped', 'src/authZWSPlogin/page.html', PAGE, area('auth')],
+    ['path: marks and format characters dropped', 'src/authACUTElogin/page.html', PAGE, area('auth')],
+    ['path: compatibility letters', 'src/authKGSIGN/page.html', PAGE, area('auth')],
+    ['path: compatibility letters', 'src/FWAUTH/page.html', PAGE, area('auth')],
+    // A governing name, a test folder and a dependency name behind a character nobody sees.
+    ['path: a governing name folded', 'docs/CLAUDEZWNJ.md', PROSE, un],
+    ['path: a governing name folded', 'docs/FWAGENTS.md', PROSE, un],
+    ['path: a governing folder folded', 'promptsZWSP/intro.md', PROSE, un],
+    ['path: a test folder folded', 'teZWSPsts/page.html', PAGE, testEdited],
+    ['path: a dependency name folded', 'locales/en/pacZWSPkage.json', ['{\n  "save": "Save"\n}\n', '{\n  "save": "Store"\n}\n'], deps],
+    // A name that qualifies only once folded does not qualify: the raw name must qualify too.
+    ['path: a qualifying name must qualify as written', 'docs/page.mZWSPd', PROSE, un],
+    ['path: a qualifying name must qualify as written', 'locaZWSPles/en/common.json', ['{\n  "save": "Save"\n}\n', '{\n  "save": "Store"\n}\n'], setting],
+    // An accent in a name changes nothing (guards).
+    ['path: an accent', 'docs/cafEACUTE/page.md', PROSE, null],
+    ['path: an accent', 'locales/pt_BR/cafEACUTE.json', ['{\n  "save": "Save"\n}\n', '{\n  "save": "Store"\n}\n'], null],
+    // A catalogue value is read as written and as its format decodes it.
+    ['catalogue: an escape decoded', 'locales/en/escape.yml', yaml('"Save"', '"StoBSLASHu0072e"'), marker],
+    ['catalogue: an escape decoded', 'locales/en/hex.yml', yaml('"Save"', '"StoBSLASHx72e"'), marker],
+    ['catalogue: an escape decoded', 'lang/en/escape.properties', ['save=Save\n', 'save=CafBSLASHu00e9\n'], marker],
+    ['catalogue: an escape decoded', 'locales/en/at.yml', yaml('"Save"', '"Save aBSLASHx40b"'), marker],
+    ['catalogue: an escape decoded', 'locales/en/quotes.yml', yaml("'Save'", "'It''s saved'"), null],
+    ['catalogue: an escape decoded', 'locales/en/escaped-quote.yml', yaml('"Save"', '"Say BSLASH"saveBSLASH" now"'), null],
+    ['catalogue: an escape decoded', 'lang/en/plain.properties', ['save=Save\n', 'save=Store it\n'], null],
+    // What a YAML reader of the older kind reads as a switch, and a key that names an object's own machinery.
+    ['catalogue: a switch for an older YAML reader', 'locales/en/switch.yml', yaml('y', 'n'), un],
+    ['catalogue: a switch for an older YAML reader', 'locales/en/switch-name.yml', ['save: Save\ny: Yes please\n', 'save: Store\ny: Yes please\n'], lost],
+    ['catalogue: a key no catalogue holds', 'locales/en/proto.json', ['{\n  "__proto__": {\n    "save": "Save"\n  }\n}\n', '{\n  "__proto__": {\n    "save": "Store"\n  }\n}\n'], lost],
+    ['catalogue: a key no catalogue holds', 'locales/en/proto.yml', ['__proto__:\n  save: Save\n', '__proto__:\n  save: Store\n'], lost],
+    ['catalogue: a key no catalogue holds', 'lang/en/proto.properties', ['a.__proto__.save=Save\n', 'a.__proto__.save=Store\n'], lost],
+    // A character reference is read as written and as the character it spells.
+    ['markup: a reference decoded', 'src/pages/shy.html', page('Save', 'Sto&shy;re'), marker],
+    ['markup: a reference decoded', 'src/pages/amp.html', page('Save', 'Save &amp; close'), null],
+    // A colour's name in the letters a browser compares: the Kelvin sign is no `k`.
+    ['stylesheet: letter case', 'src/styles/kelvin.css', [':root { --brand-color: red }\n', ':root { --brand-color: blacKELVIN }\n'],
+      (f) => inexact(f)],
+    ['stylesheet: letter case', 'src/styles/upper.css', [':root { --brand-color: red }\n', ':root { --brand-color: BLACK }\n'], null],
+    // Line endings: the same on every line, not only as many.
+    ['line endings moved', 'src/styles/moved.css', ['a { color: red; }\r\nb { margin: 0; }\n', 'a { color: blue; }\nb { margin: 0; }\r\n'], un],
+    ['line endings moved', 'locales/en/moved.yml', ['save: Save\r\nopen: Open\n', 'save: Store\nopen: Open\r\n'], un],
+    ['line endings moved', 'src/pages/moved.html', ['<p>Save</p>\r\n<p>More</p>\n', '<p>Store</p>\n<p>More</p>\r\n'], un],
+    ['line endings moved', 'src/styles/kept.css', ['a { color: red; }\r\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n'], null],
+    // A character set other than UTF-8, which is how the check read the bytes.
+    ['character set', 'src/pages/sjis.html', page('<meta charset="shift_jis">Save', '<meta charset="shift_jis">Store'), (f) => inexact(f)],
+    ['character set', 'src/pages/equiv.html', page('<meta http-equiv="Content-Type" content="text/html; charset=iso-2022-jp">Save',
+      '<meta http-equiv="Content-Type" content="text/html; charset=iso-2022-jp">Store'), (f) => inexact(f)],
+    ['character set', 'src/styles/sjis.css', ['@charset "shift_jis";\na { color: red; }\n', '@charset "shift_jis";\na { color: blue; }\n'], lost],
+    ['character set', 'src/styles/utf.css', ['@charset "UTF-8";\na { color: red; }\n', '@charset "UTF-8";\na { color: blue; }\n'], null]
+  ];
+  const spelt = (text) => text.replaceAll('ZWSP', '\u200b').replaceAll('ZWNJ', '\u200c').replaceAll('EACUTE', '\u00e9').replaceAll('ACUTE', '\u0301')
+    .replaceAll('KGSIGN', '\u338f').replaceAll('KELVIN', '\u212a').replaceAll('FWAUTH', '\uff21\uff35\uff34\uff28').replaceAll('FWAGENTS', '\uff21\uff27\uff25\uff2e\uff34\uff33').replaceAll('BSLASH', '\\');
+  const base = {};
+  for (const row of rows) {
+    row[1] = spelt(row[1]);
+    row[2] = row[2].map(spelt);
+    base[row[1]] = row[2][0];
+  }
+  const root = makeRepo(base);
+  const wrong = [];
+  for (const [what, p, [before, after], expected] of rows) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), after);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), before);
+    const want = expected === null ? STATUS_LINE : refusal(expected(p));
+    if (res.text !== want) wrong.push(`${what}: ${JSON.stringify(p)} ${JSON.stringify(after).slice(0, 60)}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
+  }
+  assert.deepEqual(wrong, []);
 });
