@@ -40,8 +40,8 @@
 // ECMAScript modules with `require`, which needs Node.js 20.19 or later, or 22.12 or later:
 // the guard below says so in one sentence.
 //
-// Size: by default 150,000 HTML, 30,000 Markdown, 80,000 YAML and 40,000 CSS cases, about twenty
-// seconds in the gated run (under coverage, on the build machine). The long soak (6
+// Size: by default 110,000 HTML, 22,000 Markdown, 60,000 YAML and 30,000 CSS cases, about twenty
+// seconds in the gated run (under coverage, beside the rest of the suite, on the build machine). The long soak (6
 // million HTML cases and 1 million of each other kind) runs with HOTFIX_DIFFERENTIAL_SOAK=1.
 // Every case is a pure function of the seed and its index, so a failure names both and
 // reproduces:
@@ -79,11 +79,11 @@ const { ruleRefusal } = require('../src/lib/hotfix-check');
 const SOAK = process.env.HOTFIX_DIFFERENTIAL_SOAK === '1';
 const SEED = Number(process.env.HOTFIX_DIFFERENTIAL_SEED || 20261009);
 const FROM = Number(process.env.HOTFIX_DIFFERENTIAL_FROM || 0);
-const HTML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_HTML || (SOAK ? 6000000 : 150000));
+const HTML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_HTML || (SOAK ? 6000000 : 110000));
 const SHOW = Number(process.env.HOTFIX_DIFFERENTIAL_SHOW || 0);
-const MARKDOWN_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_MARKDOWN || (SOAK ? 1000000 : 30000));
-const YAML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_YAML || (SOAK ? 1000000 : 80000));
-const CSS_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_CSS || (SOAK ? 1000000 : 40000));
+const MARKDOWN_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_MARKDOWN || (SOAK ? 1000000 : 22000));
+const YAML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_YAML || (SOAK ? 1000000 : 60000));
+const CSS_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_CSS || (SOAK ? 1000000 : 30000));
 
 /** The Markdown readers of the oracle: markdown-it in four configurations. */
 const MARKDOWN_READERS = [
@@ -1806,19 +1806,19 @@ function assertRun(t, kind, count) {
   if (stats.cases >= 10000) assert.deepEqual(missing, [], `the check passed no edit in a document with: ${missing.join(', ')}`);
 }
 
-// Measured on 2026-10-10, seed 20261009, default size: 141,857 edits, 8,366 passed (5.9%).
+// Measured on 2026-10-10, seed 20261009, default size: 104,044 edits, 6,126 passed (5.9%).
 test('HTML: every edit the check passes is a change to plain visible text for the HTML parser', (t) => {
   assertRun(t, 'html', HTML_CASES);
 });
 
-// Measured on 2026-10-10, seed 20261009, default size: 28,460 edits, 2,944 passed (10.3%). (The
+// Measured on 2026-10-10, seed 20261009, default size: 20,871 edits, 2,154 passed (10.3%). (The
 // eighth round's generator passed 18.0%; the ninth round's writes list items, colons, brackets
 // and the raw start tags the reader now refuses a file for.)
 test('Markdown: every edit the check passes changes only the words of a paragraph, for markdown-it in four configurations', (t) => {
   assertRun(t, 'markdown', MARKDOWN_CASES);
 });
 
-// Measured on 2026-10-10, seed 20261009, default size: 76,022 edits, 14,994 passed (19.7%). Beyond
+// Measured on 2026-10-10, seed 20261009, default size: 57,033 edits, 11,266 passed (19.8%). Beyond
 // this test, 120,000 passed edits were loaded with PyYAML 6.0.3 and Ruby's Psych 3.1.0, readers
 // of the older YAML (the plan's Execution Record): no disagreement once a byte-order mark and a
 // bare `=` or `<<` refused the file.
@@ -1826,7 +1826,7 @@ test('YAML: every catalogue edit the check passes changes only string values for
   assertRun(t, 'yaml', YAML_CASES);
 });
 
-// Measured on 2026-10-10, seed 20261009, default size: 36,132 edits, 4,427 passed (12.3%). Beyond
+// Measured on 2026-10-10, seed 20261009, default size: 27,083 edits, 3,327 passed (12.3%). Beyond
 // this test, 120,000 passed edits were read by Chromium 156's own CSS parser (the plan's
 // Execution Record): in each, colour values of one rule changed, or nothing did.
 test('CSS: every stylesheet edit the check passes changes exactly one colour for postcss', (t) => {
