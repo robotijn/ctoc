@@ -20,6 +20,7 @@ const crypto = require('crypto');
 const { spawnSync } = require('child_process');
 
 const { route } = require('../src/lib/menu-screens');
+const { ruleRefusal } = require('../src/lib/hotfix-check');
 const qualityAgent = require('../src/lib/quality-agent');
 const safeFs = require('../src/lib/safe-fs');
 
@@ -386,10 +387,17 @@ test('case 9: a sensitive area is refused even for wording', async () => {
 test('case 10: more than 20 changed lines is refused with the counts', async () => {
   const lines = (word, n) => Array.from({ length: n }, (_, i) => `${word} line ${String.fromCharCode(97 + i)}`).join('\n') + '\n';
   const root = testedProject({ 'docs/one.md': lines('Old', 7), 'docs/two.md': lines('Old', 6) });
-  fs.writeFileSync(path.join(root, 'docs/one.md'), lines('New', 6));
+  // 13 lines reworded line for line in two files: 26 changed lines.
+  fs.writeFileSync(path.join(root, 'docs/one.md'), lines('New', 7));
   fs.writeFileSync(path.join(root, 'docs/two.md'), lines('New', 6));
   await refusedUntouched(root, ['docs/one.md', 'docs/two.md'],
-    'it changes 25 lines in 2 files and a hotfix is at most 20 lines in at most 3 files');
+    'it changes 26 lines in 2 files and a hotfix is at most 20 lines in at most 3 files');
+  // The functional plan's own numbers, 13 lines removed and 12 added (25 lines in 2 files). Since
+  // the eighth round (the decision at review of 2026-10-09) a Markdown file may gain or lose no
+  // line, and no other kind ever could, so rule 4 refuses this change before rule 3 counts it:
+  // the refusal stays, with the sentence for a change the check cannot read exactly.
+  fs.writeFileSync(path.join(root, 'docs/one.md'), lines('New', 6));
+  await refusedUntouched(root, ['docs/one.md', 'docs/two.md'], inexact('docs/one.md'));
 });
 
 test('case 11: a new file is refused', async () => {
@@ -481,16 +489,26 @@ test('case 18: the same change checked twice gives the same answers (core.autocr
 
 test('case 19: Windows line endings do not count as changed lines', async () => {
   const base = Array.from({ length: 30 }, (_, i) => `Line ${String.fromCharCode(97 + (i % 26))} of the guide.`);
-  const root = makeRepo({ 'docs/guide.md': base.join('\n') + '\n' });
   const edited = base.slice();
   edited[3] = 'Line d of the handbook.';
-  fs.writeFileSync(path.join(root, 'docs/guide.md'), edited.join('\r\n') + '\r\n');
-  assertChecking(await check(root, 'docs/guide.md'), ['docs/guide.md']);
-  assertPass(await check(root, '--run-tests', 'docs/guide.md'), ['docs/guide.md']);
+  // A page whose every line ending changed from LF to CRLF, and one word: 2 changed lines.
+  const page = (rows) => rows.map((l) => `<p>${l}</p>`);
+  const root = testedProject({ 'src/pages/guide.html': page(base).join('\n') + '\n', 'docs/guide.md': base.join('\n') + '\n' });
+  fs.writeFileSync(path.join(root, 'src/pages/guide.html'), page(edited).join('\r\n') + '\r\n');
+  assertChecking(await check(root, 'src/pages/guide.html'), ['src/pages/guide.html']);
+  assertPass(await check(root, '--run-tests', 'src/pages/guide.html'), ['src/pages/guide.html']);
   const lines = logLines(root);
   assert.equal(lines.length, 1);
   assert.equal(lines[0].lines, 2);
   assert.equal(lines[0].files, 1);
+  // The same change to a Markdown file passed until the eighth round. Since the decision at
+  // review of 2026-10-09 nothing but the words of a plain paragraph may change in a Markdown
+  // file, and a changed line ending is no word: the functional plan's sentence, and still
+  // only 2 changed lines counted.
+  fs.writeFileSync(path.join(root, 'src/pages/guide.html'), page(base).join('\n') + '\n');
+  fs.writeFileSync(path.join(root, 'docs/guide.md'), edited.join('\r\n') + '\r\n');
+  await refusedUntouched(root, ['docs/guide.md'], inexact('docs/guide.md'));
+  assert.equal(logLines(root)[1].lines, 2);
 });
 
 test('case 20: a path written with backslashes gives the same answers', async () => {
@@ -725,7 +743,9 @@ test('case 34: a fault inside the check is "the check stopped", its message in d
 });
 
 test('case 35: git settings in the repository change no answer', async (t) => {
-  const guide = ['# Guide', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', ''].join('\n');
+  // A plain paragraph of eight lines (until the eighth round its first line was a heading, which
+  // a paragraph of pure prose cannot hold).
+  const guide = ['Guide', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', ''].join('\n');
   const edit = (root) => fs.writeFileSync(path.join(root, 'docs/guide.md'),
     guide.replace('one', 'uno').replace('four', 'cuatro'));
   const both = async (root, args) => ({
@@ -1291,7 +1311,11 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['tools/webpack.config.js', 'module.exports = {};\n', 'module.exports = { a: 1 };\n', 'it changes how the project is built or shipped in tools/webpack.config.js'],
     ['docs/CLAUDE.md', 'Old rule.\n', 'New rule.\n', un('docs/CLAUDE.md')],
     ['skills/x/helper.js', 'f(1);\n', 'f(2);\n', 'it changes program logic in skills/x/helper.js, and only wording and colours qualify'],
-    ['docs/endings.md', 'One.\nTwo.\n', 'One.\r\nTwo.\r\n', null],
+    // Since the eighth round (the decision at review of 2026-10-09) nothing but the words of a
+    // plain paragraph may change in a Markdown file: a change of line endings alone, which
+    // passed, gets the functional plan's sentence (its log line still counts no changed line,
+    // asserted below), and so do the two front-matter rows further down.
+    ['docs/endings.md', 'One.\nTwo.\n', 'One.\r\nTwo.\r\n', inexact('docs/endings.md')],
     // The security check's second round: front matter after a byte-order mark is still
     // settings, an escaped scheme is still an address, and a `value` inside another
     // attribute's value is no `value` attribute. A stray `}` in a tag was harmless; since the
@@ -1300,8 +1324,8 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['src/pages/stray.html', '<p data-x=}>Save</p>\n', '<p data-x=}>Store</p>\n', inexact('src/pages/stray.html')],
     // An unclosed first-line `---` was no front matter; since every scanner fails closed
     // (2026-10-09) it is a front matter left open, and the change is unreadable.
-    ['docs/rule.md', '---\nOld text.\n', '---\nNew text.\n', 'I could not read the change (docs/rule.md leaves a tag, quote, comment, block, fence or span open)'],
-    ['docs/bom.md', '\uFEFF---\ntitle: a\n---\nBody.\n', '\uFEFF---\ntitle: b\n---\nBody.\n', 'it changes a setting in docs/bom.md, and settings changes are a common cause of outages'],
+    ['docs/rule.md', '---\nOld text.\n', '---\nNew text.\n', inexact('docs/rule.md')],
+    ['docs/bom.md', '\uFEFF---\ntitle: a\n---\nBody.\n', '\uFEFF---\ntitle: b\n---\nBody.\n', inexact('docs/bom.md')],
     ['locales/esc.json', '{\n  "help": "Help"\n}\n', '{\n  "help": "\\u006aavascript:alert()"\n}\n', un('locales/esc.json')],
     ['src/pages/opt.html', '<option title="no value here">Red</option>\n', '<option title="no value here">Blue</option>\n', un('src/pages/opt.html')],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
@@ -1344,7 +1368,8 @@ test('edge shapes of every kind give the exact verdict', async () => {
   assert.equal((await check(root, 'src/pages/nonl.html')).text, refusal('it adds, removes or renames src/pages/nonl.html'));
   const lines = logLines(root);
   assert.equal(lines[lines.length - 1].lines, 1, 'a new file without a final newline counts its one line');
-  assert.equal(lines.find((l) => l.verdict === 'hotfix').lines, 0, 'line endings alone are no changed line');
+  const endings = shapes.findIndex((x) => x[0] === 'docs/endings.md');
+  assert.deepEqual([lines[endings].verdict, lines[endings].lines], ['refused', 0], 'line endings alone are no changed line');
   assert.equal(lines.filter((l) => l.verdict === 'hotfix').length, shapes.filter((x) => x[3] === null).length + 1,
     'one line per pass: each passing shape, and the two-file pass');
   // git lists changed files before new ones; the check still judges in path order.
@@ -1394,20 +1419,59 @@ test('a log folder that cannot be written changes no answer', async () => {
 // The code review's and the security check's findings of 2026-10-08 (Steps 11 and 13),
 // each case written and seen failing before its fix.
 
-/** The CPU time this process spends in `fn`, in milliseconds; child processes are not counted. */
-async function cpuMs(fn) {
-  const start = process.cpuUsage();
-  const result = await fn();
-  const used = process.cpuUsage(start);
-  return { ms: (used.user + used.system) / 1000, result };
+/**
+ * A timing case in ratio form (the decision at review of 2026-10-09: a bound in milliseconds
+ * passed or failed with the machine's load, where a ratio does not). `at(n)` gives the call to
+ * time on an input of size `n`, built before it is timed; `cost(call)` runs it and answers
+ * what it cost in milliseconds. The call is warmed once; `n` grows until one call costs at
+ * least 20 ms or `4n` would pass `limit` (inputs of many megabytes measure the engine's
+ * memory, not the reader); an input that cannot grow that far is run several times in a row,
+ * so that what is timed still costs about 20 ms. Then the minimum of five runs at `n` and of
+ * five runs at `4n` is taken. Work that is linear in the input gives a ratio near 4,
+ * quadratic work one near 16, and the bound is 8. The one absolute bound is seconds wide and
+ * stops a runaway reader early.
+ * @param {(n: number) => (() => unknown)} at @param {number} n the first size tried @param {number} limit the largest `4n`
+ * @param {(call: () => unknown) => (number|Promise<number>)} [cost] by default the time the call takes
+ * @returns {Promise<{n: number, small: number, big: number, ratio: number}>}
+ */
+async function growth(at, n, limit, cost = wallMs) {
+  let call = at(n);
+  await cost(call); // warm once
+  let once = await cost(call);
+  while (once < 20 && n * 8 <= limit) {
+    n *= once < 5 && n * 16 <= limit ? 4 : 2;
+    call = at(n);
+    once = await cost(call);
+  }
+  assert.ok(once < 5000, `one call at size ${n} took ${once.toFixed(0)} ms`);
+  const times = once < 20 ? Math.min(Math.ceil(20 / Math.max(once, 0.02)), 1000) : 1;
+  const run = async (fn) => {
+    let sum = 0;
+    for (let k = 0; k < times; k++) sum += await cost(fn);
+    return sum;
+  };
+  const least = async (fn) => Math.min(await run(fn), await run(fn), await run(fn), await run(fn), await run(fn));
+  const small = await least(call);
+  const big = await least(at(4 * n));
+  return { n, small, big, ratio: big / Math.max(small, 20) };
 }
-
-/** The extra CPU time `big` costs over the cheaper of two `small` runs of the same check. */
-async function extraCpuMs(small, big) {
-  const a = await cpuMs(small);
-  const b = await cpuMs(big);
-  const c = await cpuMs(small);
-  return { extra: b.ms - Math.min(a.ms, c.ms), small: a.result, big: b.result };
+/** @param {() => unknown} call @returns {number} the time one call takes, in milliseconds */
+function wallMs(call) {
+  const start = process.hrtime.bigint();
+  call();
+  return Number(process.hrtime.bigint() - start) / 1e6;
+}
+/** The change the rules read, built by hand: one file whose lines changed in place. */
+function changeOf(rel, oldText, newText) {
+  const o = oldText.split('\n');
+  const n = newText.split('\n');
+  assert.equal(o.length, n.length, 'the edit adds no line');
+  const hunks = [];
+  for (let i = 0; i < o.length; i++) if (o[i] !== n[i]) hunks.push({ oldStart: i + 1, newStart: i + 1, removed: [o[i]], added: [n[i]] });
+  return {
+    files: [{ display: rel, topRel: rel, status: 'M', oldMode: '100644', newMode: '100644', oldSha: null, oldText, newText, hunks }],
+    lineCount: hunks.length * 2
+  };
 }
 
 test('finding 1: no repository hook and no file-system monitor runs during either call', async () => {
@@ -1438,72 +1502,92 @@ test('finding 1: no repository hook and no file-system monitor runs during eithe
   assert.equal(fs.existsSync(monitorMarker), false, 'no file-system monitor ran during the check');
 });
 
-test('finding 2a: the first failing test is read from 195 KB of blank lines in linear time', async (t) => {
+test('finding 2a: the first failing test is read from blank lines in linear time', async (t) => {
   const root = testedProject();
   fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+  // The reader of a failing run's output is reached through the test call only, so the call
+  // is made in this process with the quality agent answering a failing run, and what is
+  // counted is the processor time this process spends from the moment the run's output is
+  // handed over (the copy is made before that; git runs in other processes).
+  let handedOver = process.cpuUsage();
   const failingWith = (output) => async () => {
-    t.mock.method(qualityAgent, 'runFullTests', async () => ({ passed: false, passCount: 0, failed: 1, skipped: 0, flaky: 0, output }));
+    t.mock.method(qualityAgent, 'runFullTests', async () => {
+      handedOver = process.cpuUsage();
+      return { passed: false, passCount: 0, failed: 1, skipped: 0, flaky: 0, output };
+    });
     try {
       return await check(root, '--run-tests', 'src/pages/home.html');
     } finally {
       t.mock.restoreAll();
     }
   };
-  const { extra, big } = await extraCpuMs(failingWith('boom\n'), failingWith(`${'\n'.repeat(195 * 1024)}boom\n`));
+  const readerMs = async (call) => {
+    await call();
+    const used = process.cpuUsage(handedOver);
+    return (used.user + used.system) / 1000;
+  };
+  // What the rest of the call costs after the hand-over, with nothing to read: taken off.
+  const idle = Math.min(await readerMs(failingWith('boom\n')), await readerMs(failingWith('boom\n')), await readerMs(failingWith('boom\n')));
+  const big = await failingWith(`${'\n'.repeat(1024)}boom\n`)();
   assert.equal(big.text, refusal('the existing tests fail (the test command reported a failure)'));
-  t.diagnostic(`195 KB of blank lines: ${extra.toFixed(1)} ms more processor time`);
-  assert.ok(extra < 100, `195 KB of blank lines cost ${extra.toFixed(1)} ms more`);
+  const { n, small, big: four, ratio } = await growth((kb) => failingWith(`${'\n'.repeat(kb * 1024)}boom\n`), 16, 4096,
+    async (call) => Math.max(await readerMs(call) - idle, 0));
+  t.diagnostic(`${n} KB of blank lines: ${small.toFixed(1)} ms, ${4 * n} KB: ${four.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
+  assert.ok(ratio < 8, `${n} KB of blank lines took ${small.toFixed(1)} ms and ${4 * n} KB took ${four.toFixed(1)} ms`);
 });
 
-test('finding 2b: a catalogue line with 100,000 trailing spaces is read in linear time', async (t) => {
+test('finding 2b: a catalogue line with trailing spaces is read in linear time', async (t) => {
   const base = '{\n  "save": "Save"\n}\n';
   const root = makeRepo({ 'locales/en.json': base });
-  const judgeLine = (line) => async () => {
-    fs.writeFileSync(path.join(root, 'locales', 'en.json'), `{\n${line}\n}\n`);
-    return check(root, 'locales/en.json');
+  fs.writeFileSync(path.join(root, 'locales', 'en.json'), `{\n  "save": "Store"${' '.repeat(1000)}x\n}\n`);
+  assert.equal((await check(root, 'locales/en.json')).text, refusal('I do not recognise locales/en.json as wording or a colour'));
+  const at = (n) => {
+    const change = changeOf('locales/en.json', base, `{\n  "save": "Store"${' '.repeat(1000 * n)}x\n}\n`);
+    return () => assert.equal(ruleRefusal(change).cause, 'unrecognised');
   };
-  const { extra, big } = await extraCpuMs(judgeLine('  "save": "Store" x'), judgeLine(`  "save": "Store"${' '.repeat(100000)}x`));
-  assert.equal(big.text, refusal('I do not recognise locales/en.json as wording or a colour'));
-  t.diagnostic(`100,000 trailing spaces: ${extra.toFixed(1)} ms more processor time`);
-  assert.ok(extra < 100, `100,000 trailing spaces cost ${extra.toFixed(1)} ms more`);
+  const { n, small, big, ratio } = await growth(at, 16, 1600);
+  t.diagnostic(`${n} thousand trailing spaces: ${small.toFixed(1)} ms, ${4 * n} thousand: ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
+  assert.ok(ratio < 8, `${n} thousand trailing spaces took ${small.toFixed(1)} ms and ${4 * n} thousand took ${big.toFixed(1)} ms`);
 });
 
-test('finding 2c: a colour change in a 300 KB one-line stylesheet is judged in linear time', async (t) => {
-  const many = '.a { color: red; } '.repeat(Math.ceil(300 * 1024 / 19));
-  const long = `.a { box-shadow:${' red'.repeat(75 * 1024)}; }`;
+test('finding 2c: a colour change in a one-line stylesheet is judged in linear time', async (t) => {
+  const many = (n) => '.a { color: red; } '.repeat(100 * n);
+  const long = (n) => `.a { box-shadow:${' red'.repeat(400 * n)}; }`;
   const shapes = [
-    ['short declarations, the last colour changed', many, `${many.slice(0, many.lastIndexOf('red'))}blue; } `],
-    ['one long declaration, every colour changed', long, long.replace(/red/g, 'tan')]
-  ];
-  for (const [label, base, changed] of shapes) {
-    const root = makeRepo({ 'src/styles/site.css': `${base}\n`, 'src/styles/small.css': '.a { color: red; }\n' });
-    const judgeFile = (file, content) => async () => {
-      fs.writeFileSync(path.join(root, 'src', 'styles', file), content);
-      return check(root, `src/styles/${file}`);
-    };
-    const { extra, big } = await extraCpuMs(judgeFile('small.css', '.a { color: blue; }\n'), judgeFile('site.css', `${changed}\n`));
+    ['short declarations, the last colour changed', many, (base) => `${base.slice(0, base.lastIndexOf('red'))}blue; } `, null],
     // Since the sixth round a colour passes only as the whole value of its property (the
     // functional plan, amended 2026-10-09), so the long `box-shadow` list is refused; the
     // time it takes to say so is what this case measures.
-    if (label.startsWith('one long')) assert.equal(big.text, refusal(inexact('src/styles/site.css')));
-    else assertChecking(big, ['src/styles/site.css']);
-    t.diagnostic(`${label}: ${extra.toFixed(1)} ms more processor time`);
-    assert.ok(extra < 100, `${label}: 300 KB cost ${extra.toFixed(1)} ms more`);
+    ['one long declaration, every colour changed', long, (base) => base.replace(/red/g, 'tan'), inexact('src/styles/site.css')]
+  ];
+  for (const [label, build, edit, clause] of shapes) {
+    const root = makeRepo({ 'src/styles/site.css': `${build(4)}\n` });
+    fs.writeFileSync(path.join(root, 'src', 'styles', 'site.css'), `${edit(build(4))}\n`);
+    const res = await check(root, 'src/styles/site.css');
+    if (clause === null) assertChecking(res, ['src/styles/site.css']);
+    else assert.equal(res.text, refusal(clause));
+    const at = (n) => {
+      const change = changeOf('src/styles/site.css', `${build(n)}\n`, `${edit(build(n))}\n`);
+      return () => assert.equal((ruleRefusal(change) || { clause: null }).clause, clause);
+    };
+    const { n, small, big, ratio } = await growth(at, 16, 800);
+    t.diagnostic(`${label}: size ${n} ${small.toFixed(1)} ms, size ${4 * n} ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
+    assert.ok(ratio < 8, `${label}: size ${n} took ${small.toFixed(1)} ms and size ${4 * n} took ${big.toFixed(1)} ms`);
   }
 });
 
-test('finding 2, same class: a page with 20,000 script blocks is judged in linear time', async (t) => {
-  const blocks = `${'<script>x</script>\n'.repeat(20000)}<p>Save</p>\n`;
-  const root = makeRepo({ 'src/pages/big.html': blocks, 'src/pages/small.html': '<script>x</script>\n<p>Save</p>\n' });
-  const judgeFile = (file, content) => async () => {
-    fs.writeFileSync(path.join(root, 'src', 'pages', file), content);
-    return check(root, `src/pages/${file}`);
+test('finding 2, same class: a page with many script blocks is judged in linear time', async (t) => {
+  const page = (n) => `${'<script>x</script>\n'.repeat(100 * n)}<p>Save</p>\n`;
+  const root = makeRepo({ 'src/pages/big.html': page(2) });
+  fs.writeFileSync(path.join(root, 'src', 'pages', 'big.html'), page(2).replace('<p>Save</p>', '<p>Store</p>'));
+  assertChecking(await check(root, 'src/pages/big.html'), ['src/pages/big.html']);
+  const at = (n) => {
+    const change = changeOf('src/pages/big.html', page(n), page(n).replace('<p>Save</p>', '<p>Store</p>'));
+    return () => assert.equal(ruleRefusal(change), null);
   };
-  const { extra, big } = await extraCpuMs(judgeFile('small.html', '<script>x</script>\n<p>Store</p>\n'),
-    judgeFile('big.html', blocks.replace('<p>Save</p>', '<p>Store</p>')));
-  assertChecking(big, ['src/pages/big.html']);
-  t.diagnostic(`20,000 script blocks: ${extra.toFixed(1)} ms more processor time`);
-  assert.ok(extra < 100, `20,000 script blocks cost ${extra.toFixed(1)} ms more`);
+  const { n, small, big, ratio } = await growth(at, 16, 800);
+  t.diagnostic(`${100 * n} script blocks: ${small.toFixed(1)} ms, ${400 * n}: ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
+  assert.ok(ratio < 8, `${100 * n} script blocks took ${small.toFixed(1)} ms and ${400 * n} took ${big.toFixed(1)} ms`);
 });
 
 test('finding 6: a tracked test command with shell structure runs no test and says so', async () => {
@@ -1724,7 +1808,6 @@ test('round 2, finding 9: a pass names each judged file with its staged id, whic
 test('round 4: components and code elements in HTML, Markdown lists and definitions, catalogue values, custom properties; Vue, JSX, Sass, Less and reStructuredText files are not recognised', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
-  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
   const shapes = [
     // Only HTML host elements carry wording, and nothing anywhere inside a component.
     // The fifth round (2026-10-09): element names are matched in any letter case, as HTML reads
@@ -1746,20 +1829,25 @@ test('round 4: components and code elements in HTML, Markdown lists and definiti
     ['src/styles/design-tokens.css', '.a { border-color: red; }\n', '.a { border-color: blue; }\n', null],
     // Markdown lists: a fence inside an item whose content starts at column 4, a thematic
     // break that is no list item, and code after a list that has ended.
-    ['docs/list-fence.md', '1.  Step:\n\n    ```\n    pip install requests\n    ```\n', '1.  Step:\n\n    ```\n    pip install reqests\n    ```\n', un('docs/list-fence.md')],
-    ['docs/break.md', '* * *\n\n    pip install requests\n', '* * *\n\n    pip install reqests\n', un('docs/break.md')],
-    ['docs/ended.md', '- Item.\n\nText.\n\n    pip install requests\n', '- Item.\n\nText.\n\n    pip install reqests\n', un('docs/ended.md')],
-    ['docs/wide.md', '-     pip install requests\n', '-     pip install reqests\n', un('docs/wide.md')],
-    ['docs/fence-out.md', '- a\n  ```\n  x\n- b\n```\npip install requests\n```\n', '- a\n  ```\n  x\n- b\n```\npip install reqests\n```\n', open('docs/fence-out.md')],
-    ['docs/ordered.md', '1. Step one.\n\n   Old words.\n', '1. Step one.\n\n   New words.\n', null],
-    ['docs/ordered-two.md', 'Text.\n2. foo\n\n      pip install requests\n', 'Text.\n2. foo\n\n      pip install reqests\n', un('docs/ordered-two.md')],
-    ['docs/item-fence.md', '- ```\n  pip install requests\n  ```\n', '- ```\n  pip install reqests\n  ```\n', un('docs/item-fence.md')],
-    ['docs/item-doctest.md', '- >>> print("old")\n  old\n', '- >>> print("old")\n  new\n', un('docs/item-doctest.md')],
+    // Since the eighth round (the decision at review of 2026-10-09: a Markdown edit qualifies only
+    // as a wording change in pure prose, because no reader agrees with every renderer on
+    // structure) each Markdown row of this table, which relied on a list, indented code, a
+    // fence or a definition, asserts the functional plan's sentence; `docs/ordered.md` (a
+    // paragraph inside a list item) and `docs/after-def.md` (a line under a definition) passed.
+    ['docs/list-fence.md', '1.  Step:\n\n    ```\n    pip install requests\n    ```\n', '1.  Step:\n\n    ```\n    pip install reqests\n    ```\n', inexact('docs/list-fence.md')],
+    ['docs/break.md', '* * *\n\n    pip install requests\n', '* * *\n\n    pip install reqests\n', inexact('docs/break.md')],
+    ['docs/ended.md', '- Item.\n\nText.\n\n    pip install requests\n', '- Item.\n\nText.\n\n    pip install reqests\n', inexact('docs/ended.md')],
+    ['docs/wide.md', '-     pip install requests\n', '-     pip install reqests\n', inexact('docs/wide.md')],
+    ['docs/fence-out.md', '- a\n  ```\n  x\n- b\n```\npip install requests\n```\n', '- a\n  ```\n  x\n- b\n```\npip install reqests\n```\n', inexact('docs/fence-out.md')],
+    ['docs/ordered.md', '1. Step one.\n\n   Old words.\n', '1. Step one.\n\n   New words.\n', inexact('docs/ordered.md')],
+    ['docs/ordered-two.md', 'Text.\n2. foo\n\n      pip install requests\n', 'Text.\n2. foo\n\n      pip install reqests\n', inexact('docs/ordered-two.md')],
+    ['docs/item-fence.md', '- ```\n  pip install requests\n  ```\n', '- ```\n  pip install reqests\n  ```\n', inexact('docs/item-fence.md')],
+    ['docs/item-doctest.md', '- >>> print("old")\n  old\n', '- >>> print("old")\n  new\n', inexact('docs/item-doctest.md')],
     // Since the review of 2026-10-09 a definition in any but its plain one-line form cannot be read exactly.
     ['docs/two-defs.md', 'See [it][b].\n\n[a]:\n[b]: /one\n', 'See [it][b].\n\n[a]:\n[b]: /two\n', inexact('docs/two-defs.md')],
     // A reference definition with an inline title.
     ['docs/inline-title.md', 'See [it][a].\n\n[a]: /u\n"Old title"\n', 'See [it][a].\n\n[a]: /u\n"New title"\n', inexact('docs/inline-title.md')],
-    ['docs/after-def.md', 'See [it][a].\n\n[a]: /u\nOld words.\n', 'See [it][a].\n\n[a]: /u\nNew words.\n', null],
+    ['docs/after-def.md', 'See [it][a].\n\n[a]: /u\nOld words.\n', 'See [it][a].\n\n[a]: /u\nNew words.\n', inexact('docs/after-def.md')],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
     // stay, and each now asserts the "not recognised" refusal.
@@ -1824,16 +1912,21 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
     ['src/styles/extra.css', 'a { color: red; }\n}\n', 'a { color: blue; }\n}\n', lost('src/styles/extra.css')],
     // Markdown: a change above an unclosed fence, under one (a guard), an unclosed front
     // matter, a brace beside the change and an unclosed HTML comment in the prose.
-    ['docs/fence-below.md', 'Old words.\n\n```\ncode\n', 'New words.\n\n```\ncode\n', open('docs/fence-below.md')],
-    ['docs/fence-above.md', '```\ncode\nOld words.\n', '```\ncode\nNew words.\n', open('docs/fence-above.md')],
-    ['docs/front-open.md', '---\nOld text.\n', '---\nNew text.\n', open('docs/front-open.md')],
+    // Since the eighth round (the decision at review of 2026-10-09) Markdown is read as pure
+    // prose. A plain paragraph ABOVE a fence or a comment that is never closed is prose for
+    // every renderer, so `docs/fence-below.md` and `docs/comment-open.md` now qualify; a change
+    // under an open fence, inside front matter, beside a brace, or to the fence itself gets the
+    // functional plan's sentence.
+    ['docs/fence-below.md', 'Old words.\n\n```\ncode\n', 'New words.\n\n```\ncode\n', null],
+    ['docs/fence-above.md', '```\ncode\nOld words.\n', '```\ncode\nNew words.\n', inexact('docs/fence-above.md')],
+    ['docs/front-open.md', '---\nOld text.\n', '---\nNew text.\n', inexact('docs/front-open.md')],
     // Since the sixth round a brace is a plain character to the HTML reader; in Markdown it
     // reaches its own paragraph, so this change beside one is "not recognised", no longer "open".
-    ['docs/brace-open.md', 'Old words {{ x\n', 'New words {{ x\n', un('docs/brace-open.md')],
-    ['docs/comment-open.md', 'Old words.\n\n<!-- note\n', 'New words.\n\n<!-- note\n', inexact('docs/comment-open.md')],
+    ['docs/brace-open.md', 'Old words {{ x\n', 'New words {{ x\n', inexact('docs/brace-open.md')],
+    ['docs/comment-open.md', 'Old words.\n\n<!-- note\n', 'New words.\n\n<!-- note\n', null],
     // One side well-formed and the other not.
     ['src/pages/one-side.html', '<p>Save</p>\n<!-- c -->\n', '<p>Store</p>\n<!-- c --\n', inexact('src/pages/one-side.html')],
-    ['docs/one-side.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n``\n', open('docs/one-side.md')],
+    ['docs/one-side.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n``\n', inexact('docs/one-side.md')],
     // Well-formed files still qualify.
     ['src/pages/closed.html', '<p>Save</p>\n<!-- note -->\n<script>run();</script>\n', '<p>Store</p>\n<!-- note -->\n<script>run();</script>\n', null],
     ['docs/closed.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n```\n', null],
@@ -1897,9 +1990,6 @@ test('round 4: CTOC\'s enforcement list applies only in CTOC\'s own repository',
 test('round 3: the whole-file scanners read script escape states, titles, comments, stylesheet strings and Markdown code spans; JSX, Vue, Sass and reStructuredText files are not recognised', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
-  // Every scanner fails closed (2026-10-09): a file that ends inside an unclosed string,
-  // template literal, regular expression, script, front matter or fence is unreadable.
-  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
   const shapes = [
     // A script block's escape states: `</script>` inside `<!--<script>` does not end it.
     ['src/pages/escaped.html', '<script><!--<script></script><b>Save</b></script>\n<p>Hi</p>\n', '<script><!--<script></script><b>Store</b></script>\n<p>Hi</p>\n', un('src/pages/escaped.html')],
@@ -1929,16 +2019,21 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
     ['src/styles/quoted.css', 'a { background: url("one.png") red; }\n', 'a { background: url("one.png") blue; }\n', inexact('src/styles/quoted.css')],
     // Markdown: code spans, unmatched backticks, a JSON front matter never closed, a link
     // target in angle brackets, a full reference, a heading after an indented block.
-    ['docs/span.md', 'Run `pip install requests` first.\n', 'Run `pip install reqests` first.\n', un('docs/span.md')],
-    ['docs/beside.md', 'Run `npm test` first, ``x`` and ` alone.\n', 'Run `npm test` now, ``x`` and ` alone.\n', null],
-    ['docs/open-json.md', '{\n  "title": "Old"\n\nBody old.\n', '{\n  "title": "Old"\n\nBody new.\n', open('docs/open-json.md')],
+    // Since the eighth round (the decision at review of 2026-10-09) each of these rows, which
+    // relied on a code span, a link or a fence, asserts the functional plan's sentence
+    // (`docs/beside.md` and `docs/escaped.md` passed). `docs/open-json.md` now qualifies: its
+    // changed paragraph is plain prose bounded by an empty line, and no reader of the rule
+    // takes a `{` line above it for front matter. `docs/after-code.md` still qualifies.
+    ['docs/span.md', 'Run `pip install requests` first.\n', 'Run `pip install reqests` first.\n', inexact('docs/span.md')],
+    ['docs/beside.md', 'Run `npm test` first, ``x`` and ` alone.\n', 'Run `npm test` now, ``x`` and ` alone.\n', inexact('docs/beside.md')],
+    ['docs/open-json.md', '{\n  "title": "Old"\n\nBody old.\n', '{\n  "title": "Old"\n\nBody new.\n', null],
     // Since the review of 2026-10-09 a destination in angle brackets cannot be read exactly
     // (without its link text it would be a tag).
     ['docs/angle.md', 'See [the guide](<a b.md>) now.\n', 'See [the guide](<a c.md>) now.\n', inexact('docs/angle.md')],
-    ['docs/full.md', 'See [the guide][a] now.\n\n[a]: /a\n[b]: /b\n', 'See [the guide][b] now.\n\n[a]: /a\n[b]: /b\n', un('docs/full.md')],
-    ['docs/escaped.md', 'See [x](a\\)b) old.\n', 'See [x](a\\)b) new.\n', null],
+    ['docs/full.md', 'See [the guide][a] now.\n\n[a]: /a\n[b]: /b\n', 'See [the guide][b] now.\n\n[a]: /a\n[b]: /b\n', inexact('docs/full.md')],
+    ['docs/escaped.md', 'See [x](a\\)b) old.\n', 'See [x](a\\)b) new.\n', inexact('docs/escaped.md')],
     ['docs/after-code.md', 'Text.\n\n    code here\n\nOld words.\n', 'Text.\n\n    code here\n\nNew words.\n', null],
-    ['docs/unfence.md', '```\ncode\n```\nOld words.\n', '```\ncode\n\nOld words.\n', open('docs/unfence.md')],
+    ['docs/unfence.md', '```\ncode\n```\nOld words.\n', '```\ncode\n\nOld words.\n', inexact('docs/unfence.md')],
     // Instruction files by class, and documentation in any other dot-folder.
     ['docs/GEMINI.local.md', 'Old rule.\n', 'New rule.\n', un('docs/GEMINI.local.md')],
     ['src/copilot-instructions.md', 'Old rule.\n', 'New rule.\n', un('src/copilot-instructions.md')],
@@ -2031,65 +2126,72 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(2, 'src/pages/after-held.html', '<my-card><p>one</p></my-card>\n<p>@</p>\n', ['Save', 'Store'], null),
     // 3. Markdown that may be built as MDX: a brace in the changed prose and an `import` or
     // `export` block are code.
-    row(3, 'docs/mdx-brace.md', 'Hello {eval(@)} there.\n', ['name', 'code'], un('docs/mdx-brace.md')),
-    row(3, 'docs/mdx-open.md', 'Hello {\n  eval(@)\n} there.\n', ['name', 'code'], un('docs/mdx-open.md')),
-    row(3, 'docs/mdx-beside.md', 'Hello {name}. @ words.\n', ['Old', 'New'], un('docs/mdx-beside.md')),
-    row(3, 'docs/mdx-import.md', "import Chart from './@'\n\nWords.\n", ['chart', 'other'], un('docs/mdx-import.md')),
-    row(3, 'docs/mdx-wrap.md', "import Chart\n  from './@'\n\nWords.\n", ['chart', 'other'], un('docs/mdx-wrap.md')),
-    row(3, 'docs/mdx-export.md', "export const meta = '@'\n\nWords.\n", ['old', 'new'], un('docs/mdx-export.md')),
-    row(3, 'docs/mdx-far.md', '<p>Hello {name}</p>\n\n@ words.\n', ['Old', 'New'], null),
+    // Since the eighth round (the decision at review of 2026-10-09: Markdown qualifies only as a
+    // wording change in pure prose) every Markdown row of items 3 to 6 that relied on a brace,
+    // an `import` line, a code span, a list, a quote, a table or a link label asserts the
+    // functional plan's sentence. Of the rows that passed, `docs/mdx-far.md` (a paragraph below
+    // a `<p>` tag), `docs/tick-cell.md`, `docs/tick-third.md`, `docs/tick-alone.md`,
+    // `docs/tick-items.md` and `docs/quote-prose.md` refuse now; `docs/important.md` and
+    // `docs/quote-after.md` are plain paragraphs and still qualify.
+    row(3, 'docs/mdx-brace.md', 'Hello {eval(@)} there.\n', ['name', 'code'], inexact('docs/mdx-brace.md')),
+    row(3, 'docs/mdx-open.md', 'Hello {\n  eval(@)\n} there.\n', ['name', 'code'], inexact('docs/mdx-open.md')),
+    row(3, 'docs/mdx-beside.md', 'Hello {name}. @ words.\n', ['Old', 'New'], inexact('docs/mdx-beside.md')),
+    row(3, 'docs/mdx-import.md', "import Chart from './@'\n\nWords.\n", ['chart', 'other'], inexact('docs/mdx-import.md')),
+    row(3, 'docs/mdx-wrap.md', "import Chart\n  from './@'\n\nWords.\n", ['chart', 'other'], inexact('docs/mdx-wrap.md')),
+    row(3, 'docs/mdx-export.md', "export const meta = '@'\n\nWords.\n", ['old', 'new'], inexact('docs/mdx-export.md')),
+    row(3, 'docs/mdx-far.md', '<p>Hello {name}</p>\n\n@ words.\n', ['Old', 'New'], inexact('docs/mdx-far.md')),
     row(3, 'docs/important.md', 'important @ words.\n', ['old', 'new'], null),
     // 4. Backticks pair inside one paragraph or heading, never across a blank line or the
     // start of a block; where a table cell, an escape or a tag makes the pairing uncertain,
     // everything from the first to the last backtick is compared exactly.
-    row(4, 'docs/tick-para.md', 'A lone ` here.\n\nRun `@` now.\n', rm, un('docs/tick-para.md')),
-    row(4, 'docs/tick-heading.md', '# A lone ` here\nRun `@` now.\n', rm, un('docs/tick-heading.md')),
-    row(4, 'docs/tick-list.md', '- a lone ` here\n- run `@` now\n', rm, un('docs/tick-list.md')),
-    row(4, 'docs/tick-setext.md', 'A lone ` here\n===\nRun `@` now.\n', rm, un('docs/tick-setext.md')),
-    row(4, 'docs/tick-break.md', 'A lone ` here\n* * *\nRun `@` now.\n', rm, un('docs/tick-break.md')),
-    row(4, 'docs/tick-quote.md', 'A lone ` here\n> Run `@` now.\n', rm, un('docs/tick-quote.md')),
+    row(4, 'docs/tick-para.md', 'A lone ` here.\n\nRun `@` now.\n', rm, inexact('docs/tick-para.md')),
+    row(4, 'docs/tick-heading.md', '# A lone ` here\nRun `@` now.\n', rm, inexact('docs/tick-heading.md')),
+    row(4, 'docs/tick-list.md', '- a lone ` here\n- run `@` now\n', rm, inexact('docs/tick-list.md')),
+    row(4, 'docs/tick-setext.md', 'A lone ` here\n===\nRun `@` now.\n', rm, inexact('docs/tick-setext.md')),
+    row(4, 'docs/tick-break.md', 'A lone ` here\n* * *\nRun `@` now.\n', rm, inexact('docs/tick-break.md')),
+    row(4, 'docs/tick-quote.md', 'A lone ` here\n> Run `@` now.\n', rm, inexact('docs/tick-quote.md')),
     // Refused until the review of 2026-10-09 because a table cell might end at the `|`. The
     // line is no table row (no delimiter row follows), and markdown-it reads the first two
     // backticks as the span and the changed words as plain text, as the check now does.
-    row(4, 'docs/tick-cell.md', '| ` | `@` |\n', rm, null),
-    row(4, 'docs/tick-row.md', '| a | b |\n| - | - |\n| ` | `@` |\n', rm, un('docs/tick-row.md')),
-    row(4, 'docs/tick-escape.md', 'A \\` then `@` now.\n', rm, un('docs/tick-escape.md')),
+    row(4, 'docs/tick-cell.md', '| ` | `@` |\n', rm, inexact('docs/tick-cell.md')),
+    row(4, 'docs/tick-row.md', '| a | b |\n| - | - |\n| ` | `@` |\n', rm, inexact('docs/tick-row.md')),
+    row(4, 'docs/tick-escape.md', 'A \\` then `@` now.\n', rm, inexact('docs/tick-escape.md')),
     // Since the review of 2026-10-09 the tag is read first, as a Markdown reader does, and the
     // changed words stand in a code span: code, no longer "cannot read exactly".
-    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, un('docs/tick-tag.md')),
-    row(4, 'docs/tick-lazy.md', '> a `@\nc` d\n', ['b', 'x'], un('docs/tick-lazy.md')),
+    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, inexact('docs/tick-tag.md')),
+    row(4, 'docs/tick-lazy.md', '> a `@\nc` d\n', ['b', 'x'], inexact('docs/tick-lazy.md')),
     // An ordered item not numbered 1 after a bullet item starts no item: the span runs on.
     // After another ordered item it does, and each item's lone backtick pairs with nothing.
     // Since the review of 2026-10-09: readers disagree whether `2.` right under a bullet item
     // starts a list or runs the paragraph on, so the file cannot be read exactly.
     row(4, 'docs/tick-second.md', '- a `@\n2. b` c\n', ['b', 'x'], inexact('docs/tick-second.md')),
-    row(4, 'docs/tick-third.md', '2. a `@\n3. b` c\n', ['b', 'x'], null),
-    row(4, 'docs/tick-wrapped.md', 'Run `rm -rf\n@` now.\n', ['build', 'dist'], un('docs/tick-wrapped.md')),
-    row(4, 'docs/tick-indent.md', '> a `@\n    c` d\n', ['b', 'x'], un('docs/tick-indent.md')),
-    row(4, 'docs/tick-lazy-rule.md', '- a `@\nb\n===\ny` z\n', ['x', 'w'], un('docs/tick-lazy-rule.md')),
-    row(4, 'docs/tick-item-rule.md', '> a\n- b `\n  ===\n  run `@` now\n', rm, un('docs/tick-item-rule.md')),
-    row(4, 'docs/tick-import.md', 'a `@\nimport `c` d\n', ['b', 'x'], un('docs/tick-import.md')),
-    row(4, 'docs/tick-after-fence.md', '```\ncode\n```\n    @\n', pip, un('docs/tick-after-fence.md')),
-    row(4, 'docs/tick-after-heading.md', '# Title\n    @\n', pip, un('docs/tick-after-heading.md')),
-    row(4, 'docs/tick-after-quote.md', '>     code\n    @\n', pip, un('docs/tick-after-quote.md')),
-    row(4, 'docs/tick-alone.md', 'Run `npm test` first.\n\n@ words with ` alone.\n', ['Old', 'New'], null),
-    row(4, 'docs/tick-items.md', '- run `npm test`\n- @ words\n- then `npm start`\n', ['old', 'new'], null),
+    row(4, 'docs/tick-third.md', '2. a `@\n3. b` c\n', ['b', 'x'], inexact('docs/tick-third.md')),
+    row(4, 'docs/tick-wrapped.md', 'Run `rm -rf\n@` now.\n', ['build', 'dist'], inexact('docs/tick-wrapped.md')),
+    row(4, 'docs/tick-indent.md', '> a `@\n    c` d\n', ['b', 'x'], inexact('docs/tick-indent.md')),
+    row(4, 'docs/tick-lazy-rule.md', '- a `@\nb\n===\ny` z\n', ['x', 'w'], inexact('docs/tick-lazy-rule.md')),
+    row(4, 'docs/tick-item-rule.md', '> a\n- b `\n  ===\n  run `@` now\n', rm, inexact('docs/tick-item-rule.md')),
+    row(4, 'docs/tick-import.md', 'a `@\nimport `c` d\n', ['b', 'x'], inexact('docs/tick-import.md')),
+    row(4, 'docs/tick-after-fence.md', '```\ncode\n```\n    @\n', pip, inexact('docs/tick-after-fence.md')),
+    row(4, 'docs/tick-after-heading.md', '# Title\n    @\n', pip, inexact('docs/tick-after-heading.md')),
+    row(4, 'docs/tick-after-quote.md', '>     code\n    @\n', pip, inexact('docs/tick-after-quote.md')),
+    row(4, 'docs/tick-alone.md', 'Run `npm test` first.\n\n@ words with ` alone.\n', ['Old', 'New'], inexact('docs/tick-alone.md')),
+    row(4, 'docs/tick-items.md', '- run `npm test`\n- @ words\n- then `npm start`\n', ['old', 'new'], inexact('docs/tick-items.md')),
     // 5. Block quotes are read like the document they quote.
-    row(5, 'docs/quote-code.md', '> Install:\n>\n>     @\n', pip, un('docs/quote-code.md')),
-    row(5, 'docs/quote-fence.md', '> ~~~\n> @\n> ~~~\n', pip, un('docs/quote-fence.md')),
-    row(5, 'docs/quote-doctest.md', '> >>> print("old")\n> @\n', ['old', 'new'], un('docs/quote-doctest.md')),
-    row(5, 'docs/quote-list.md', '> - Install:\n>\n>       @\n', pip, un('docs/quote-list.md')),
-    row(5, 'docs/quote-nested.md', '> > Install:\n> >\n> >     @\n', pip, un('docs/quote-nested.md')),
-    row(5, 'docs/item-quote.md', '- >     @\n', pip, un('docs/item-quote.md')),
-    row(5, 'docs/quote-tab.md', '>\t@\n', pip, un('docs/quote-tab.md')),
-    row(5, 'docs/quote-deep.md', `${'> '.repeat(40)}@ words.\n`, ['Old', 'New'], un('docs/quote-deep.md')),
-    row(5, 'docs/quote-def.md', 'See [@] now.\n\n> [other]: /u/delete\n', ['guide', 'other'], un('docs/quote-def.md')),
-    row(5, 'docs/item-def.md', 'See [@] now.\n\n- [other]: /u/delete\n', ['guide', 'other'], un('docs/item-def.md')),
-    row(5, 'docs/markers.md', `${'- '.repeat(20)}@ words.\n`, ['Old', 'New'], un('docs/markers.md')),
-    row(5, 'docs/quote-prose.md', '> @ words.\n>\n> More words.\n\nAfter.\n', ['Old', 'New'], null),
+    row(5, 'docs/quote-code.md', '> Install:\n>\n>     @\n', pip, inexact('docs/quote-code.md')),
+    row(5, 'docs/quote-fence.md', '> ~~~\n> @\n> ~~~\n', pip, inexact('docs/quote-fence.md')),
+    row(5, 'docs/quote-doctest.md', '> >>> print("old")\n> @\n', ['old', 'new'], inexact('docs/quote-doctest.md')),
+    row(5, 'docs/quote-list.md', '> - Install:\n>\n>       @\n', pip, inexact('docs/quote-list.md')),
+    row(5, 'docs/quote-nested.md', '> > Install:\n> >\n> >     @\n', pip, inexact('docs/quote-nested.md')),
+    row(5, 'docs/item-quote.md', '- >     @\n', pip, inexact('docs/item-quote.md')),
+    row(5, 'docs/quote-tab.md', '>\t@\n', pip, inexact('docs/quote-tab.md')),
+    row(5, 'docs/quote-deep.md', `${'> '.repeat(40)}@ words.\n`, ['Old', 'New'], inexact('docs/quote-deep.md')),
+    row(5, 'docs/quote-def.md', 'See [@] now.\n\n> [other]: /u/delete\n', ['guide', 'other'], inexact('docs/quote-def.md')),
+    row(5, 'docs/item-def.md', 'See [@] now.\n\n- [other]: /u/delete\n', ['guide', 'other'], inexact('docs/item-def.md')),
+    row(5, 'docs/markers.md', `${'- '.repeat(20)}@ words.\n`, ['Old', 'New'], inexact('docs/markers.md')),
+    row(5, 'docs/quote-prose.md', '> @ words.\n>\n> More words.\n\nAfter.\n', ['Old', 'New'], inexact('docs/quote-prose.md')),
     row(5, 'docs/quote-after.md', '> ~~~\n> code\n> ~~~\n\n@ words.\n', ['Old', 'New'], null),
     // 6. Link labels fold case as CommonMark does.
-    ['6', 'docs/fold.md', 'See [guide] now.\n\n[SS]: /u/delete\n', 'See [ẞ] now.\n\n[SS]: /u/delete\n', un('docs/fold.md')],
+    ['6', 'docs/fold.md', 'See [guide] now.\n\n[SS]: /u/delete\n', 'See [\u1e9e] now.\n\n[SS]: /u/delete\n', inexact('docs/fold.md')],
     // 7. `listing` and `tt` are code elements.
     row(7, 'src/pages/listing.html', '<listing>@</listing>\n', pip, un('src/pages/listing.html')),
     row(7, 'src/pages/tt.html', '<p>Run <tt>@</tt></p>\n', pip, un('src/pages/tt.html')),
@@ -2205,25 +2307,37 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
     row(4, 'src/pages/implied-list.html', '<ul><li>One<li>@</ul>\n', save, null),
     row(4, 'src/pages/card.html', '<my-card>@</my-card>\n', save, exact('src/pages/card.html')),
     // 5. A changed line that starts `import ` or `export ` is code wherever it stands.
-    row(5, 'docs/import-heading.md', "# Title\nimport Chart from './@'\n", ['chart', 'other'], un('docs/import-heading.md')),
-    row(5, 'docs/import-wrapped.md', "# Title\nimport Chart\n  from './@'\n", ['chart', 'other'], un('docs/import-wrapped.md')),
-    row(5, 'docs/import-fence.md', "```\ncode\n```\nexport const meta = '@'\n", ['old', 'new'], un('docs/import-fence.md')),
-    row(5, 'docs/import-mid.md', 'We\nimport @ goods.\n', ['old', 'new'], un('docs/import-mid.md')),
-    row(5, 'docs/important-heading.md', '# Title\nimportant @ words.\n', ['old', 'new'], null),
+    // Since the eighth round (the decision at review of 2026-10-09: Markdown qualifies only as a
+    // wording change in pure prose) the Markdown rows of items 5 to 8 that relied on a heading,
+    // an autolink, a placeholder or a brace assert the functional plan's sentence; a paragraph
+    // below any raw `<` no longer qualifies (`docs/autolink.md`, `docs/placeholder.md` and the
+    // like passed), and neither does a heading whatever its anchor. The session's decision
+    // also removed the guards for Markdown built as MDX. Kept, by the executor, is the one
+    // that costs a line: a paragraph that starts with `import ` or `export ` (rows 5), because
+    // `import Chart from "chart"` is a plain prose line by the rule. `docs/import-mid.md` (the
+    // word inside a paragraph) now qualifies, and so do `docs/brace-open.md` and
+    // `docs/brace-string.md`: a plain paragraph between the braces of an MDX expression that
+    // runs over empty lines is prose to every Markdown renderer. That is a known limit of the
+    // decision for projects that build `.md` files as MDX.
+    row(5, 'docs/import-heading.md', "# Title\nimport Chart from './@'\n", ['chart', 'other'], exact('docs/import-heading.md')),
+    row(5, 'docs/import-wrapped.md', "# Title\nimport Chart\n  from './@'\n", ['chart', 'other'], exact('docs/import-wrapped.md')),
+    row(5, 'docs/import-fence.md', "```\ncode\n```\nexport const meta = '@'\n", ['old', 'new'], exact('docs/import-fence.md')),
+    row(5, 'docs/import-mid.md', 'We\nimport @ goods.\n', ['old', 'new'], null),
+    row(5, 'docs/important-heading.md', '# Title\nimportant @ words.\n', ['old', 'new'], exact('docs/important-heading.md')),
     // 6. An autolink is one opaque piece. A placeholder such as `<file>` inside a paragraph
     // holds the rest of its own paragraph only; one that starts a line holds the rest of the file.
-    row(6, 'docs/autolink.md', 'See <https://example.org/guide> first.\n\n@ words.\n', words, null),
-    row(6, 'docs/autolink-same.md', 'See <http://example.org/guide> and the @ words.\n', ['old', 'new'], null),
-    [6, 'docs/autolink-mail.md', 'Write to <mailto:team@example.org> or <team@example.org>.\n\nOld words.\n', 'Write to <mailto:team@example.org> or <team@example.org>.\n\nNew words.\n', null],
-    row(6, 'docs/autolink-own.md', 'See <https://example.org/@> first.\n', ['guide', 'other'], un('docs/autolink-own.md')),
+    row(6, 'docs/autolink.md', 'See <https://example.org/guide> first.\n\n@ words.\n', words, exact('docs/autolink.md')),
+    row(6, 'docs/autolink-same.md', 'See <http://example.org/guide> and the @ words.\n', ['old', 'new'], exact('docs/autolink-same.md')),
+    [6, 'docs/autolink-mail.md', 'Write to <mailto:team@example.org> or <team@example.org>.\n\nOld words.\n', 'Write to <mailto:team@example.org> or <team@example.org>.\n\nNew words.\n', exact('docs/autolink-mail.md')],
+    row(6, 'docs/autolink-own.md', 'See <https://example.org/@> first.\n', ['guide', 'other'], exact('docs/autolink-own.md')),
     // No autolink (a space inside), and no tag a Markdown reader passes on: read as a
     // placeholder, which its paragraph's end closes.
     // A pass until the review of 2026-10-09: what is neither an autolink nor a tag for a
     // Markdown reader is outside the strict subset.
     row(6, 'docs/autolink-space.md', 'See <https://example.org/a b> first.\n\n@ words.\n', words, exact('docs/autolink-space.md')),
     row(6, 'docs/autolink-space-same.md', 'See <https://example.org/a b> @.\n', ['first', 'now'], exact('docs/autolink-space-same.md')),
-    row(6, 'docs/placeholder.md', 'Edit <file> and <your-name> then save.\n\n@ words.\n', words, null),
-    row(6, 'docs/placeholder-closed.md', 'Edit <file>x</file> and <name> then save.\n\n@ words.\n', words, null),
+    row(6, 'docs/placeholder.md', 'Edit <file> and <your-name> then save.\n\n@ words.\n', words, exact('docs/placeholder.md')),
+    row(6, 'docs/placeholder-closed.md', 'Edit <file>x</file> and <name> then save.\n\n@ words.\n', words, exact('docs/placeholder-closed.md')),
     row(6, 'docs/placeholder-same.md', 'Edit <file> then @.\n', ['save', 'store'], exact('docs/placeholder-same.md')),
     row(6, 'docs/placeholder-block.md', '<file>\n\n@ words.\n', words, exact('docs/placeholder-block.md')),
     row(6, 'docs/placeholder-item.md', '- <file>\n\n@ words.\n', words, exact('docs/placeholder-item.md')),
@@ -2234,7 +2348,7 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
     // Refused until the review of 2026-10-09. The fence ends the paragraph, the paragraph's end
     // closes the placeholder as a browser does, and markdown-it and parse5 read the changed
     // words as plain text of a paragraph of their own, as the check now does.
-    row(6, 'docs/placeholder-code-line.md', 'Use <runsql> here\n```\ncode\n```\n@ words.\n', words, null),
+    row(6, 'docs/placeholder-code-line.md', 'Use <runsql> here\n```\ncode\n```\n@ words.\n', words, exact('docs/placeholder-code-line.md')),
     // 7. A changed heading qualifies only when its generated anchor stays the same.
     row(7, 'docs/heading.md', '# @\n\nWords.\n', ['Install', 'Setup'], exact('docs/heading.md')),
     row(7, 'docs/heading-typo.md', '## Getting @\n\nWords.\n', ['started', 'going'], exact('docs/heading-typo.md')),
@@ -2242,17 +2356,17 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
     row(7, 'docs/heading-quote.md', '> # @\n\nWords.\n', ['Install', 'Upgrade'], exact('docs/heading-quote.md')),
     row(7, 'docs/heading-item.md', '- ## @\n\nWords.\n', ['Install', 'Upgrade'], exact('docs/heading-item.md')),
     row(7, 'docs/heading-reference.md', '# The @\n\nWords.\n', ['copy', '&copy;'], exact('docs/heading-reference.md')),
-    row(7, 'docs/heading-caps.md', '# @\n\nWords.\n', ['instal the App', 'Instal the app'], null),
-    row(7, 'docs/heading-setext-caps.md', '@\n---\n\nWords.\n', ['instal the App', 'Instal the app'], null),
-    row(7, 'docs/heading-marks.md', '# Install@\n\nWords.\n', ['.', '!'], null),
+    row(7, 'docs/heading-caps.md', '# @\n\nWords.\n', ['instal the App', 'Instal the app'], exact('docs/heading-caps.md')),
+    row(7, 'docs/heading-setext-caps.md', '@\n---\n\nWords.\n', ['instal the App', 'Instal the app'], exact('docs/heading-setext-caps.md')),
+    row(7, 'docs/heading-marks.md', '# Install@\n\nWords.\n', ['.', '!'], exact('docs/heading-marks.md')),
     row(7, 'docs/heading-below.md', '# Install\n\n@ words.\n', words, null),
     // 8. A brace reaches its own paragraph, and an expression left open reaches what follows it.
     row(8, 'docs/brace-far.md', 'Hello {name} there.\n\n@ words.\n', words, null),
     row(8, 'docs/brace-before.md', '@ words.\n\nHello {name} there.\n', words, null),
-    row(8, 'docs/brace-same.md', 'Hello {name}. @ words.\n', words, un('docs/brace-same.md')),
-    row(8, 'docs/brace-same-wrapped.md', 'Hello {name}.\n@ words.\n', words, un('docs/brace-same-wrapped.md')),
-    row(8, 'docs/brace-open.md', '{/*\n\n@ words.\n\n*/}\n', words, un('docs/brace-open.md')),
-    row(8, 'docs/brace-string.md', 'Hello {"}" +\n\n@\n\n} there.\n', ['run', 'drop'], un('docs/brace-string.md')),
+    row(8, 'docs/brace-same.md', 'Hello {name}. @ words.\n', words, exact('docs/brace-same.md')),
+    row(8, 'docs/brace-same-wrapped.md', 'Hello {name}.\n@ words.\n', words, exact('docs/brace-same-wrapped.md')),
+    row(8, 'docs/brace-open.md', '{/*\n\n@ words.\n\n*/}\n', words, null),
+    row(8, 'docs/brace-string.md', 'Hello {"}" +\n\n@\n\n} there.\n', ['run', 'drop'], null),
     row(8, 'docs/brace-liquid.md', '{% if a %}\n\n{{ name }}\n\n@ words.\n', words, null),
     // 9 and 10. The path is folded (Unicode NFKC, lower case) and split at every character
     // that is no letter; camel-case sub-words count as words too.
@@ -2367,45 +2481,50 @@ test('round 7: names, frames, options, noscript, end tags, text over lines and b
     row(6, 'src/pages/emptied.html', '<table>@<tr><td>a</td></tr></table>\n', ['x', ' '], un('src/pages/emptied.html')),
     // 7. Markdown, script text: an `export` line is a paragraph for a Markdown reader, and the
     // `<script>` under it starts an HTML block that a blank line does not end (red).
-    row(7, 'docs/export-script.md', 'export const x = y\n<script>\n\n@\n</script>\n', ['alpha', 'zulu'], un('docs/export-script.md')),
-    row(7, 'docs/doctest-script.md', '>>> x\n<script>\n\n@\n</script>\n', ['alpha', 'zulu'], un('docs/doctest-script.md')),
+    // Since the eighth round (the decision at review of 2026-10-09: Markdown qualifies only as a
+    // wording change in pure prose) every Markdown row of items 7 to 12 asserts the functional
+    // plan's sentence. The rows that passed (`docs/lazy-quote.md`, `docs/lazy-item.md`,
+    // `docs/lazy-none.md`, `docs/lazy-indented.md`, `docs/image-beside.md`, `docs/details.md`,
+    // `docs/table.md`) relied on a lazy line, inline HTML, an element left open or a table.
+    row(7, 'docs/export-script.md', 'export const x = y\n<script>\n\n@\n</script>\n', ['alpha', 'zulu'], exact('docs/export-script.md')),
+    row(7, 'docs/doctest-script.md', '>>> x\n<script>\n\n@\n</script>\n', ['alpha', 'zulu'], exact('docs/doctest-script.md')),
     // An HTML block is raw: a fence or a code span inside it is no code, and its tags count (red).
     row(7, 'docs/block-fence.md', '<div>\n```\n<code>\n```\n</div>\n\n@ words.\n', words, exact('docs/block-fence.md')),
     row(7, 'docs/block-span.md', '<div>\n`<code>`\n</div>\n\n@ words.\n', words, exact('docs/block-span.md')),
     row(7, 'docs/block-autolink.md', '<div>\n<https://example.org/x>\n</div>\n\n@ words.\n', words, exact('docs/block-autolink.md')),
     // 8. A definition or a label over several lines (red).
     row(8, 'docs/def-lines.md', '[\nguide]: /@\n\nWords.\n', ['one', 'two'], exact('docs/def-lines.md')),
-    row(8, 'docs/label-lines.md', 'See [@\nguide] now.\n\n[the guide]: /u\n', ['the', 'a'], un('docs/label-lines.md')),
-    row(8, 'docs/label-target.md', 'See [the guide](/@) now.\n\n[the guide]: /u\n', ['one', 'two'], un('docs/label-target.md')),
+    row(8, 'docs/label-lines.md', 'See [@\nguide] now.\n\n[the guide]: /u\n', ['the', 'a'], exact('docs/label-lines.md')),
+    row(8, 'docs/label-target.md', 'See [the guide](/@) now.\n\n[the guide]: /u\n', ['one', 'two'], exact('docs/label-target.md')),
     // 9. A tag split across block quote lines: the markers are no part of it (red).
-    row(9, 'docs/quote-tag.md', '> <a\n> href="/@">link</a>\n', ['one', 'two'], un('docs/quote-tag.md')),
+    row(9, 'docs/quote-tag.md', '> <a\n> href="/@">link</a>\n', ['one', 'two'], exact('docs/quote-tag.md')),
     // 10. Continuation and code: a quoted line under a lazy line continues the paragraph and
     // may underline it into a heading (red); an indented line under a definition, a finished
     // HTML block or a table is code (red); a lazy line is prose.
     row(10, 'docs/lazy-underline.md', '> @\nmore\n> ---\n', ['Install', 'Upgrade'], exact('docs/lazy-underline.md')),
-    row(10, 'docs/def-code.md', '[guide]: /u\n    @\n', pip, un('docs/def-code.md')),
-    row(10, 'docs/comment-code.md', '<!-- note -->\n    @\n', pip, un('docs/comment-code.md')),
-    row(10, 'docs/table-code.md', '| a | b |\n| - | - |\n| c | d |\n    @\n', pip, un('docs/table-code.md')),
-    row(10, 'docs/lazy-quote.md', '> A quote that\nruns @ lazily.\n\nAfter.\n', ['on', 'along'], null),
-    row(10, 'docs/lazy-item.md', '- an item that\nruns @ lazily\n- the next item\n', ['on', 'along'], null),
-    row(10, 'docs/lazy-none.md', '> ```\n> code\n> ```\n@ words.\n', words, null),
+    row(10, 'docs/def-code.md', '[guide]: /u\n    @\n', pip, exact('docs/def-code.md')),
+    row(10, 'docs/comment-code.md', '<!-- note -->\n    @\n', pip, exact('docs/comment-code.md')),
+    row(10, 'docs/table-code.md', '| a | b |\n| - | - |\n| c | d |\n    @\n', pip, exact('docs/table-code.md')),
+    row(10, 'docs/lazy-quote.md', '> A quote that\nruns @ lazily.\n\nAfter.\n', ['on', 'along'], exact('docs/lazy-quote.md')),
+    row(10, 'docs/lazy-item.md', '- an item that\nruns @ lazily\n- the next item\n', ['on', 'along'], exact('docs/lazy-item.md')),
+    row(10, 'docs/lazy-none.md', '> ```\n> code\n> ```\n@ words.\n', words, exact('docs/lazy-none.md')),
     // Under a quote inside a quote, a line four columns in that would start a block:
     // markdown-it ends both quotes and reads it as code, CommonMark's text makes it a lazy line (red).
     row(10, 'docs/lazy-nested.md', '> > Quote\n    <div>@</div>\n', save, exact('docs/lazy-nested.md')),
-    row(10, 'docs/lazy-indented.md', '> Quote\n    <b>@</b> lazily\n', save, null),
+    row(10, 'docs/lazy-indented.md', '> Quote\n    <b>@</b> lazily\n', save, exact('docs/lazy-indented.md')),
     // 11. What a Markdown reader does not pass on as a tag is none: an end tag behind a
     // backslash leaves the code element open (red); an image's text is an attribute (red).
-    row(11, 'docs/escaped-end.md', 'Run <code>x\\</code> and @ it.</code>\n', ['save', 'store'], un('docs/escaped-end.md')),
-    row(11, 'docs/image-text.md', '![The @ logo](/logo.png)\n', ['old', 'new'], un('docs/image-text.md')),
-    row(11, 'docs/image-beside.md', '![The logo](/logo.png) <br> The @ words.\n', ['old', 'new'], null),
+    row(11, 'docs/escaped-end.md', 'Run <code>x\\</code> and @ it.</code>\n', ['save', 'store'], exact('docs/escaped-end.md')),
+    row(11, 'docs/image-text.md', '![The @ logo](/logo.png)\n', ['old', 'new'], exact('docs/image-text.md')),
+    row(11, 'docs/image-beside.md', '![The logo](/logo.png) <br> The @ words.\n', ['old', 'new'], exact('docs/image-beside.md')),
     // 12. The tags a Markdown reader makes count: an end tag inside a paragraph closes nothing
     // outside it (red); a list item's paragraph may or may not get a `<p>`, so a placeholder
     // left open in it cannot be read exactly.
     row(12, 'docs/end-in-paragraph.md', '<x-box>\n\nText </x-box> and @ words.\n', ['old', 'new'], exact('docs/end-in-paragraph.md')),
     row(12, 'docs/item-placeholder.md', '- Use <file> here\n  <div>@</div>\n', words, exact('docs/item-placeholder.md')),
-    row(12, 'docs/details.md', '<details>\n<summary>More</summary>\n\nThe @ words.\n\n</details>\n', ['old', 'new'], null),
-    row(12, 'docs/table.md', '| Name | Use |\n| --- | --- |\n| Save | @ your work |\n', ['Keep', 'Store'], null),
-    row(12, 'docs/table-extra.md', '| Name |\n| --- |\n| Save | @ |\n', ['dropped', 'gone'], un('docs/table-extra.md'))
+    row(12, 'docs/details.md', '<details>\n<summary>More</summary>\n\nThe @ words.\n\n</details>\n', ['old', 'new'], exact('docs/details.md')),
+    row(12, 'docs/table.md', '| Name | Use |\n| --- | --- |\n| Save | @ your work |\n', ['Keep', 'Store'], exact('docs/table.md')),
+    row(12, 'docs/table-extra.md', '| Name |\n| --- |\n| Save | @ |\n', ['dropped', 'gone'], exact('docs/table-extra.md'))
   ];
   const base = {};
   for (const [, p, b] of shapes) base[p] = b;
@@ -2420,4 +2539,212 @@ test('round 7: names, frames, options, noscript, end tags, text over lines and b
     else if (expected === null) assertChecking(res, [p]);
   }
   assert.deepEqual(wrong, []);
+});
+
+// The eighth round (2026-10-09, the decision at review, under the owner's decision that the
+// check keeps only what it can read exactly): Markdown is not one language, and no reader
+// agrees with every renderer on structure, so a `.md` or `.txt` edit qualifies only as a
+// wording change in pure prose. These rows pin the rule item by item; the corpus holds the
+// findings of the security run. Every row marked `c2c` answered otherwise on `c2c9f86d`.
+// [item, path, base content, new content, the clause, or null for `checking`]
+test('round 8: Markdown and plain text qualify only as a wording change in pure prose', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
+  const area = (f, word) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
+  const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
+  const words = ['old', 'new'];
+  let count = 0;
+  /** One row from a template holding `@`, replaced by the old and the new text; the file is named after the item. */
+  const row = (item, template, [o, n], expected, ext = 'md', name = null) => {
+    const p = name || `docs/r8/${String(item).replace(/[^a-z0-9]+/gi, '-')}-${++count}.${ext}`;
+    return [item, p, template.replace('@', o), template.replace('@', n), expected === true ? exact(p) : expected];
+  };
+  const shapes = [
+    // 1. A plain prose line: letters, combining marks, digits, spaces and plain punctuation.
+    row('plain', 'Wait, then go; is it "done"? Yes! It\'s the well-known @ way.\n', words, null),
+    row('plain', '\u201cQuoted\u201d words \u2014 and so on\u2026 \u2018yes\u2019 \u2013 the @ way\n', words, null),
+    row('plain', '"@" words here.\n', ['Old', 'New'], null),
+    row('plain', '\u2018@\u2019 words here.\n', ['Old', 'New'], null),
+    row('plain', 'Chapter 12 has the @ words.\n', words, null),
+    row('plain', 'Cafe\u0301 and na\u00efve @ words, \u041f\u0440\u0438\u0432\u0435\u0442 \u4e16\u754c.\n', words, null),
+    row('plain', 'The @ words run on\n   in a second line\n  and a third.\n', words, null),
+    row('plain', 'One.\n\nThe @ words.\n\nThree.\n', words, null),
+    // Not plain: white space other than a space, punctuation that is not prose, a character
+    // of the control or format categories; and the limits on the punctuation that is prose.
+    ...['a\tb', 'a\u00a0b', 'a.b', 'a,b', 'a;b', 'what?!', 'a -b', 'a- b', 'a--b', 'pre-2', 'a: b', '(a)', 'a/b', 'a_b', '*a*', '#a', '`a`',
+      'a\\b', '~a', 'a@b', 'a&b', 'a=b', 'a+b', 'a%', '$a', '{a}', '[a]', 'a|b', 'a^b', 'a<b', 'a>b', 'a\u200bb', 'a\u202eb', 'a\u00adb',
+      'a\u2028b', 'a\u0007b', '\u00aba\u00bb', 'a\u2019b.c']
+      .map((bad) => row('not plain', `Some ${bad} and the @ words.\n`, words, true)),
+    row('not plain', '12 @ words.\n', words, true),
+    row('not plain', '- the @ words\n', words, true),
+    row('not plain', '\u2026the @ words\n', words, true),
+    row('not plain', '    the @ words\n', words, true),
+    // The first line of a changed paragraph is not indented (found by the differential test:
+    // a list item above may hold such a paragraph).
+    row('indented', ' The @ words.\n', words, true),
+    row('indented', '- Step one.\n\n   The @ words.\n', words, true),
+    // The leading and the trailing spaces of a changed line stay as they are.
+    ['spaces', 'docs/r8/lead.md', 'The words.\n  More old words.\n', 'The words.\n More new words.\n', exact('docs/r8/lead.md')],
+    ['spaces', 'docs/r8/trail.md', 'The old words.\nMore.\n', 'The new words. \nMore.\n', exact('docs/r8/trail.md')],
+    ['spaces', 'docs/r8/trail-kept.md', 'The old words.  \nMore.\n', 'The new words.  \nMore.\n', null],
+    // 2. The paragraph: every line of it is plain, and an empty line or the file's start or end
+    // bounds it; a line of spaces counts as empty, a line of other white space does not.
+    row('paragraph', '# Title\nThe @ words.\n', words, true),
+    row('paragraph', 'The @ words.\n- an item\n', words, true),
+    row('paragraph', 'The @ words.\nSee [a link](/x).\n', words, true),
+    row('paragraph', 'Text.\n   \nThe @ words.\n', words, null),
+    row('paragraph', 'Text.\n\t\nThe @ words.\n', words, true),
+    row('paragraph', '# Title\n\nThe @ words.\n\n- an item\n', words, null),
+    // 3. Position: front matter or a metadata block, from a line of three or more `-`, or `+++`,
+    // directly followed by a non-blank line, to its closing line; with none, the rest of the file.
+    row('front matter', '---\ntitle: x\n\nThe @ words inside\n\n---\n\nAfter.\n', words, true),
+    row('front matter', '---\ntitle: x\n\nInside\n\n---\n\nThe @ words after.\n', words, null),
+    row('front matter', '---\ntitle: x\n...\n\nThe @ words after.\n', words, null),
+    row('front matter', '---\ntitle: x\n\nThe @ words, never closed.\n', words, true),
+    row('front matter', '-----\ntitle: x\n\nThe @ words inside\n\n---\n', words, true),
+    row('front matter', '+++\ntitle = "x"\n---\n\nThe @ words inside\n\n+++\n', words, true),
+    row('front matter', '---\n\nThe @ words under a rule.\n', words, null),
+    row('front matter', 'Text.\n\n---\nkey: x\n\nThe @ words inside\n\n---\n', words, true),
+    row('front matter', '```\n---\ntitle: x\n```\n\nThe @ words.\n', words, null),
+    // Position: a code fence. Three or more backticks or tildes at the start of a line open
+    // one; a line of as many of the same, followed only by spaces, closes it; an unclosed one
+    // makes the rest of the file code.
+    row('fence', '```\n\nThe @ words inside\n\n```\n', words, true),
+    row('fence', '~~~sh\n\nThe @ words inside\n\n~~~\n', words, true),
+    row('fence', '```\ncode\n```\n\nThe @ words after.\n', words, null),
+    row('fence', '```\ncode\n```   \n\nThe @ words after.\n', words, null),
+    row('fence', '```\ncode\n\nThe @ words, never closed.\n', words, true),
+    row('fence', '````\n```\n````\n\nThe @ words after.\n', words, null),
+    row('fence', '```\n~~~\n```\n\nThe @ words after.\n', words, null),
+    row('fence', '```\ncode\n``` x\n```\n\nThe @ words after.\n', words, null),
+    row('fence', '```\ncode\n``` x\n\nThe @ words inside.\n\n```\n', words, true),
+    row('fence', 'The @ words before.\n\n```\ncode\n', words, null),
+    // A fence-like line that readers read differently refuses the whole file: other white
+    // space beside it, indentation (four spaces by the decision; one to three because a list
+    // item above may hold the fence and end early, found by the differential test), a
+    // backtick or a second word after it, a closing fence longer than the opening one, and a
+    // fence right under the start of a definition.
+    row('fence, ambiguous', 'The @ words.\n\n```\t\ncode\n```\n', words, true),
+    row('fence, ambiguous', 'The @ words.\n\n    ```\n    code\n    ```\n', words, true),
+    row('fence, ambiguous', 'The @ words.\n\n ```\ncode\n ```\n', words, true),
+    row('fence, ambiguous', 'The @ words.\n\n``` a`b\ncode\n```\n', words, true),
+    row('fence, ambiguous', 'The @ words.\n\n```js title\ncode\n```\n', words, true),
+    row('fence, ambiguous', 'The @ words.\n\n```\ncode\n````\n', words, true),
+    row('fence, ambiguous', 'The @ words.\n\n[ref]:\n```\ncode\n```\n', words, true),
+    row('fence, ambiguous', 'The @ words.\n\n---\ntitle: x\n```\n---\n', words, true),
+    // Position: a raw `<` above. The decision names twelve raw starts and their closers; the
+    // differential test showed that a closer can be escaped by the Markdown around it and that
+    // any element left open holds the paragraph, so every `<` before a letter, `!`, `?` or
+    // `/` above the paragraph refuses it, also inside front matter.
+    row('raw', '<br>\n\nThe @ words.\n', words, true),
+    row('raw', 'A <b\n\nThe @ words.\n', words, true),
+    row('raw', '</div>\n\nThe @ words.\n', words, true),
+    row('raw', '<!x>\n\nThe @ words.\n', words, true),
+    row('raw', '<?php\n\nThe @ words.\n', words, true),
+    row('raw', '<script>\n</script>\n\nThe @ words.\n', words, true),
+    row('raw', '<!-- a\n-->\n\nThe @ words.\n', words, true),
+    row('raw', '---\ntitle: <b>\n---\n\nThe @ words.\n', words, true),
+    row('raw', 'A < b and <3\n\nThe @ words.\n', words, null),
+    row('raw', 'The @ words.\n\n<div>\n', words, null),
+    // Three shapes are read as closed by every renderer: a comment alone on its line, a tag
+    // inside a code span on one line, a tag inside a code fence (but one of the twelve raw starts).
+    row('raw, closed', '<!-- a note -->   \n<!---->\n\nThe @ words.\n', words, null),
+    row('raw, closed', ' <!-- a note -->\n\nThe @ words.\n', words, true),
+    row('raw, closed', '<!-- a -- b -->\n\nThe @ words.\n', words, true),
+    row('raw, closed', '<!-- a --> x\n\nThe @ words.\n', words, true),
+    row('raw, closed', '<!--->\n\nThe @ words.\n', words, true),
+    row('raw, closed', '<!-- a <b> -->\n\nThe @ words.\n', words, true),
+    row('raw, closed', 'Use `<a>` and ``<b> ` <c>`` now.\n\nThe @ words.\n', words, null),
+    row('raw, closed', 'Use `<a>` <b> now.\n\nThe @ words.\n', words, true),
+    row('raw, closed', 'Use \\`<a>` now.\n\nThe @ words.\n', words, true),
+    row('raw, closed', 'Use \\<a> now.\n\nThe @ words.\n', words, true),
+    row('raw, closed', 'Use `<a>\n` now.\n\nThe @ words.\n', words, true),
+    row('raw, closed', 'A ` alone.\nUse `<a>` now.\n\nThe @ words.\n', words, true),
+    row('raw, closed', 'Use `x | <a>` now.\n\nThe @ words.\n', words, true),
+    row('raw, closed', '```\n<div> <b>\n```\n\nThe @ words.\n', words, null),
+    row('raw, closed', '```\n<!-- a -->\n```\n\nThe @ words.\n', words, true),
+    row('raw, closed', '```\n<?php\n```\n\nThe @ words.\n', words, true),
+    row('raw, closed', '```\n<TextArea>\n```\n\nThe @ words.\n', words, true),
+    // A first word that pandoc reads as a list marker; a first word that MDX reads as code.
+    row('first word', 'i. The @ words.\n', words, true),
+    row('first word', 'IV. The @ words.\n', words, true),
+    row('first word', 'Yes. The @ words.\n', words, null),
+    row('first word', 'import Chart from "@"\n', ['chart', 'other'], true),
+    row('first word', 'export default @\n', ['Layout', 'Other'], true),
+    row('first word', 'important @ words.\n', words, null),
+    // 4. Changed words: rule 6 as before, and no word of 7 to 40 hexadecimal digits.
+    row('changed words', 'The @ passed.\n', ['decade', 'facade'], null),
+    row('changed words', 'The wall was @ again.\n', ['effaced', 'defaced'], risk('docs/r8/changed-words-1.md'), 'md', 'docs/r8/changed-words-1.md'),
+    row('changed words', 'The wall was well-@, again.\n', ['effaced', 'DEFACED'], risk('docs/r8/changed-words-2.md'), 'md', 'docs/r8/changed-words-2.md'),
+    row('changed words', `The word @ is long.\n`, ['a'.repeat(40), 'b'.repeat(40)], risk('docs/r8/changed-words-3.md'), 'md', 'docs/r8/changed-words-3.md'),
+    row('changed words', `The word @ is longer.\n`, ['a'.repeat(41), 'b'.repeat(41)], null),
+    row('changed words', 'Wait @ days.\n', ['30', '60'], risk('docs/r8/changed-words-4.md'), 'md', 'docs/r8/changed-words-4.md'),
+    // 5. Nothing else in the file may change: no line comes or goes, no line ending and no
+    // byte-order mark changes, no carriage return stands on its own.
+    ['nothing else', 'docs/r8/two.md', 'The old words.\n\n# Title\n\nMore old words.\n', 'The new words.\n\n# Title\n\nMore new words.\n', null],
+    ['nothing else', 'docs/r8/two-bad.md', 'The old words.\n\n# Old title\n', 'The new words.\n\n# New title\n', exact('docs/r8/two-bad.md')],
+    ['nothing else', 'docs/r8/swapped.md', 'One line here.\nTwo lines here.\n', 'Two lines here.\nOne line here.\n', null],
+    ['nothing else', 'docs/r8/added.md', 'The old words.\n', 'The new words.\n\n', exact('docs/r8/added.md')],
+    ['nothing else', 'docs/r8/removed.md', 'The old words.\nMore.\n', 'The new words. More.\n', exact('docs/r8/removed.md')],
+    ['nothing else', 'docs/r8/no-newline.md', 'The old words.\n', 'The new words.', exact('docs/r8/no-newline.md')],
+    ['nothing else', 'docs/r8/crlf.md', 'The old words.\r\nMore.\r\n', 'The new words.\r\nMore.\r\n', null],
+    ['nothing else', 'docs/r8/crlf-one.md', 'The old words.\r\nMore.\r\n', 'The new words.\nMore.\r\n', exact('docs/r8/crlf-one.md')],
+    ['nothing else', 'docs/r8/bom-gone.md', '\ufeffThe old words.\n', 'The new words.\n', exact('docs/r8/bom-gone.md')],
+    ['nothing else', 'docs/r8/bom-kept.md', '\ufeffText.\n\nThe old words.\n', '\ufeffText.\n\nThe new words.\n', null],
+    ['nothing else', 'docs/r8/bom-line.md', '\ufeffThe old words.\n', '\ufeffThe new words.\n', exact('docs/r8/bom-line.md')],
+    ['nothing else', 'docs/r8/return.md', 'a\rb\n\nThe old words.\n', 'a\rb\n\nThe new words.\n', exact('docs/r8/return.md')],
+    // 6. Plain text qualifies only under a documentation name, in any letter case, also with a
+    // language part; every other `.txt` is not recognised, as wording or otherwise.
+    row('names', 'Read the @ guide.\n', words, null, 'txt', 'docs/README.txt'),
+    row('names', 'Read the @ guide.\n', words, null, 'txt', 'docs/Readme.pt-BR.txt'),
+    row('names', 'Read the @ guide.\n', words, null, 'txt', 'site/humans.txt'),
+    row('names', 'Read the @ guide.\n', words, null, 'txt', 'docs/HISTORY.TXT'),
+    row('names', 'Read the @ guide.\n', words, null, 'txt', 'docs/Authors.txt'),
+    row('names', 'Read the @ guide.\n', words, un('docs/readme-first.txt'), 'txt', 'docs/readme-first.txt'),
+    row('names', 'Read the @ guide.\n', words, un('docs/guide.txt'), 'txt', 'docs/guide.txt'),
+    row('names', 'Read the @ guide.\n', words, un('docs/notes.backup.old.txt'), 'txt', 'docs/notes.backup.old.txt'),
+    row('names', '# Read the @ guide.\n', words, exact('docs/INSTALL.txt'), 'txt', 'docs/INSTALL.txt'),
+    row('names', '```\n\nRead the @ guide.\n\n```\n', words, exact('docs/NEWS.txt'), 'txt', 'docs/NEWS.txt'),
+    // 7. Legal texts never qualify, `.md` or `.txt`: the sensitive-area clause, with `license`
+    // for a licence and `legal` for the other names.
+    row('legal', 'You may use the @ tool.\n', words, area('LICENSE-MIT.txt', 'license'), 'txt', 'LICENSE-MIT.txt'),
+    row('legal', 'You may use the @ tool.\n', words, area('docs/licence.md', 'license'), 'md', 'docs/licence.md'),
+    row('legal', 'You may use the @ tool.\n', words, area('Copying.md', 'legal'), 'md', 'Copying.md'),
+    row('legal', 'You may use the @ tool.\n', words, area('NOTICES.txt', 'legal'), 'txt', 'NOTICES.txt'),
+    row('legal', 'You may use the @ tool.\n', words, area('docs/Patents.txt', 'legal'), 'txt', 'docs/Patents.txt'),
+    row('legal', 'You may use the @ tool.\n', words, area('legal.md', 'legal'), 'md', 'legal.md'),
+    row('legal', '# You may use the @ tool.\n', words, area('docs/COPYING.md', 'legal'), 'md', 'docs/COPYING.md'),
+    row('legal', 'You may use the @ tool.\n', words, null, 'md', 'docs/unnoticed.md')
+  ];
+  const base = {};
+  for (const [, p, b] of shapes) {
+    assert.equal(base[p], undefined, `${p} is used once`);
+    base[p] = b;
+  }
+  const root = makeRepo(base);
+  const wrong = [];
+  for (const [item, p, b, n, expected] of shapes) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    const want = expected === null ? STATUS_LINE : refusal(expected);
+    if (res.text !== want) wrong.push(`${item} ${p} ${JSON.stringify(b)}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
+    else if (expected === null) assertChecking(res, [p]);
+  }
+  assert.deepEqual(wrong, []);
+  // The three sentences a person reads, and the cause words the log keeps for them.
+  const said = async (p, content) => {
+    fs.writeFileSync(path.join(root, ...p.split('/')), content);
+    return (await check(root, p)).text;
+  };
+  assert.equal(await said('docs/r8/two-bad.md', 'The new words.\n\n# New title\n'),
+    'I did not treat this as a hotfix because it changes docs/r8/two-bad.md in a way the check cannot read exactly, '
+    + 'and only what it can read exactly qualifies; it goes through a normal plan, and your edits stay in place, not committed.');
+  assert.equal(await said('docs/guide.txt', 'Read the new guide.\n'),
+    'I did not treat this as a hotfix because I do not recognise docs/guide.txt as wording or a colour; '
+    + 'it goes through a normal plan, and your edits stay in place, not committed.');
+  assert.equal(await said('legal.md', 'You may use the new tool.\n'),
+    'I did not treat this as a hotfix because legal.md sits in an area named legal, and such areas are never a hotfix; '
+    + 'it goes through a normal plan, and your edits stay in place, not committed.');
+  assert.deepEqual(logLines(root).slice(-3).map((l) => l.cause), ['unrecognised', 'unrecognised', 'sensitive-area']);
 });

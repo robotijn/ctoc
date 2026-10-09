@@ -1111,50 +1111,82 @@ describe('runFullTests and runSpecificTests — undetermined runs, standard erro
     });
   });
 
-  it('a passing run with a long blank stretch is read in linear time', async () => {
-    const cpuMs = async (fn) => {
-      const start = process.cpuUsage();
-      const res = await fn();
-      const used = process.cpuUsage(start);
-      return { ms: (used.user + used.system) / 1000, res };
+  /**
+   * A timing case in ratio form (the decision at review of 2026-10-09: a bound in milliseconds
+   * passed or failed with the machine's load, where a ratio does not). `at(n)` gives the call
+   * to time on an input of size `n`, built before it is timed. The call is warmed once; `n`
+   * grows until one call costs at least 20 ms or `4n` would pass `limit` (inputs of many
+   * megabytes measure the engine's memory, not the reader); an input that cannot grow that
+   * far is run several times in a row, so that what is timed still costs about 20 ms. Then
+   * the minimum of five runs at `n` and of five runs at `4n` is taken. Work that is linear in
+   * the input gives a ratio near 4, quadratic work one near 16, and the bound is 8. The one
+   * absolute bound is seconds wide and stops a runaway reader early.
+   */
+  async function growth(at, n, limit) {
+    const ms = async (call) => {
+      const start = process.hrtime.bigint();
+      await call();
+      return Number(process.hrtime.bigint() - start) / 1e6;
     };
-    const runWith = (stdout) => () => withExecSpies(() => stdout, async (qa) => {
-      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
-      return { res };
+    let call = at(n);
+    await ms(call); // warm once
+    let once = await ms(call);
+    while (once < 20 && n * 8 <= limit) {
+      n *= once < 5 && n * 16 <= limit ? 4 : 2;
+      call = at(n);
+      once = await ms(call);
+    }
+    assert.ok(once < 5000, `one call at size ${n} took ${once.toFixed(0)} ms`);
+    const times = once < 20 ? Math.min(Math.ceil(20 / Math.max(once, 0.02)), 1000) : 1;
+    const run = async (fn) => {
+      let sum = 0;
+      for (let k = 0; k < times; k++) sum += await ms(fn);
+      return sum;
+    };
+    const least = async (fn) => Math.min(await run(fn), await run(fn), await run(fn), await run(fn), await run(fn));
+    const small = await least(call);
+    const big = await least(at(4 * n));
+    return { n, small, big, ratio: big / Math.max(small, 20) };
+  }
+
+  it('a passing run with a long blank stretch is read in linear time', async () => {
+    // The runner is faked once and answers the output of the call being timed; the quality
+    // agent reads it in this process.
+    let stdout = '';
+    await withExecSpies(() => stdout, async (qa) => {
+      const at = (kb) => {
+        const output = `\u2139 pass 1\n\u2139 fail 0\n${'\n'.repeat(kb * 1024)}done\n`;
+        return async () => {
+          stdout = output;
+          const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+          assert.equal(res.passed, true, JSON.stringify(res));
+          assert.equal(res.passCount, 1);
+        };
+      };
+      const { n, small, big, ratio } = await growth(at, 4, 2048);
+      assert.ok(ratio < 8, `${n} KB of blank lines took ${small.toFixed(1)} ms and ${4 * n} KB took ${big.toFixed(1)} ms`);
+      return {};
     });
-    const head = '\u2139 pass 1\n\u2139 fail 0\n';
-    const small = runWith(`${head}done\n`);
-    const a = await cpuMs(small);
-    const b = await cpuMs(runWith(`${head}${'\n'.repeat(32 * 1024)}done\n`));
-    const c = await cpuMs(small);
-    const extra = b.ms - Math.min(a.ms, c.ms);
-    assert.equal(b.res.res.passed, true, JSON.stringify(b.res.res));
-    assert.equal(b.res.res.passCount, 1);
-    assert.ok(extra < 100, `32 KB of blank lines cost ${extra.toFixed(1)} ms more processor time`);
   });
 
   it('a long run of digits in a run\'s output is read in linear time by the skipped and passed fallbacks', async () => {
     // The re-review of 2026-10-09: `(\d+)\s+skipped` and `(\d+)\s*(passed|passing)` tried
     // every start inside a run of digits, each scanning to its end: quadratic.
-    const cpuMs = async (fn) => {
-      const start = process.cpuUsage();
-      const res = await fn();
-      const used = process.cpuUsage(start);
-      return { ms: (used.user + used.system) / 1000, res };
-    };
-    const runWith = (stdout) => () => withExecSpies(() => stdout, async (qa) => {
-      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
-      return { res };
+    let stdout = '';
+    await withExecSpies(() => stdout, async (qa) => {
+      for (const [label, head] of [['the skipped fallback', '\u2139 pass 1\n\u2139 fail 0\n'], ['the passed fallback', '']]) {
+        const at = (kb) => {
+          const output = `${head}${'7'.repeat(kb * 1024)}x\n`;
+          return async () => {
+            stdout = output;
+            await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+          };
+        };
+        const { n, small, big, ratio } = await growth(at, 4, 2048);
+        assert.ok(ratio < 8, `${label}: ${n} thousand digits took ${small.toFixed(1)} ms and ${4 * n} thousand took ${big.toFixed(1)} ms`);
+      }
+      return {};
     });
-    const digits = '7'.repeat(40 * 1024);
-    for (const [label, head] of [['the skipped fallback', 'ℹ pass 1\nℹ fail 0\n'], ['the passed fallback', '']]) {
-      const small = runWith(`${head}done\n`);
-      const a = await cpuMs(small);
-      const b = await cpuMs(runWith(`${head}${digits}x\n`));
-      const c = await cpuMs(small);
-      const extra = b.ms - Math.min(a.ms, c.ms);
-      assert.ok(extra < 100, `${label}: 40,000 digits cost ${extra.toFixed(1)} ms more processor time`);
-    }
   });
 
   it('runCommandArgv without allowFail throws the shape execFileSync threw', () => {

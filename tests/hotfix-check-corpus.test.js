@@ -1,10 +1,20 @@
 'use strict';
 
-// The classifier corpus: 36 edit shapes that qualify as a hotfix and 213 traps that must
-// not (44 of them the kept cases of the formats the owner's decision of 2026-10-09 removed),
-// plus one mode change, each judged through the menu router's first call (rules 1
-// to 7; no test runs) against ONE committed temporary repository with no test command.
-// A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
+// The classifier corpus: edit shapes that qualify as a hotfix and traps that must not (44 of
+// them the kept cases of the formats the owner's decision of 2026-10-09 removed), plus one
+// mode change, each judged through the menu router's first call (rules 1 to 7; no test runs)
+// against ONE committed temporary repository with no test command. The counts are asserted
+// below the tables. A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
+//
+// MARKDOWN AND PLAIN TEXT (the decision at review of 2026-10-09, under the owner's decision
+// that the check keeps only what it can read exactly). Markdown is not one language: a
+// security run pushed 249,644 edits the check passed through other renderers, and thousands
+// changed a link, an attribute or code under at least one. So a `.md` or `.txt` edit
+// qualifies only as a wording change in pure prose: plain prose lines in a paragraph bounded
+// by empty lines, outside front matter, code fences and whatever follows raw HTML, with
+// nothing else in the file changed. Every row below that relied on structure (a heading, a
+// list, a link, a code span, a table, a quote, inline HTML, front matter) is kept and now
+// asserts the refusal `inexact`; a `.txt` qualifies only under a documentation name.
 // Plan: plans/todo/ctoc-checks-that-a-hotfix-is-really-small-and-safe-s1-the-hotfix-check.md,
 // Step 8, the corpus.
 
@@ -286,7 +296,68 @@ const BASE = {
   '\uff21\uff35\uff34\uff28/index.html': page('<p>Save</p>'),
   'src/pages/AuthPanel.html': page('<p>Save</p>'),
   'src/pages/paymentForm.html': page('<p>Save</p>'),
-  'src/pages/Author.html': page('<p>Save</p>')
+  'src/pages/Author.html': page('<p>Save</p>'),
+  // The eighth round (the decision at review of 2026-10-09): Markdown and plain text as pure
+  // prose. Shapes that qualify.
+  'CHANGES.txt': lines('The old wording of the first release.'),
+  'docs/readme.en.txt': lines('Read the old guide first.', '', 'Then start the tool.'),
+  'docs/plain.md': lines('# Guide', '', 'The \u201cold\u201d way is well-known \u2014 use it; it works,', 'and it\'s safe\u2026', '', 'Wait 30 days.'),
+  'docs/lint.md': lines('<!-- markdownlint-disable -->', '', 'Old words here.'),
+  'docs/span-tag.md': lines('Use `<div>` and ``a ` <b>`` here.', '', 'Old words here.'),
+  'docs/fence-tag.md': lines('```html', '<div>x</div>', '```', '', 'Old words here.'),
+  'docs/eleven.md': lines(...Array.from({ length: 11 }, (_, i) => `Eleven old line ${String.fromCharCode(97 + i)}.`)),
+  // Traps: every finding of the Markdown security run, and what the differential test found.
+  'docs/md-in-html.md': lines('<div markdown="1">', '', 'Read the guide first.', '', '</div>'),
+  'deps.txt': lines('requests'),
+  'templates/email/welcome.txt': lines('Hello {name}, welcome.'),
+  'exclude.txt': lines('build', 'cache'),
+  'cmake/options.txt': lines('option(FAST ON)'),
+  'docs/deep-tab.md': lines('>> > \tamet word'),
+  'docs/fence-nbsp.md': lines('```', 'pip install requests', '```\u00a0', '', 'Run it now.', '', '```'),
+  'docs/list-marker.md': lines('-   Install:', '', '        pip install requests'),
+  'docs/half-link.md': lines('Read docs](guide/setup) first.'),
+  'docs/def-under.md': lines('See teh guide', '[g]: guide/intro'),
+  'docs/domain.md': lines('Visit exmaple.com today.'),
+  'docs/file-name.md': lines('Read README.md first.'),
+  'docs/front-js.md': lines('---js', '{ title: "Old" }', '', 'A plain old line inside', '', '---', '', 'Body text.'),
+  'docs/mid-meta.md': lines('Intro text.', '', '---', 'theme: dark', '', 'A plain old line inside', '', '---', '', 'Body text.'),
+  'docs/template-key.md': lines('Template: main', '', 'Body text.'),
+  'docs/cell-span.md': lines('| a | b |', '| - | - |', '| `x | y` | z |'),
+  'docs/bienvenue.md': lines('## Bienvenue !', '', 'Body text.'),
+  'docs/task.md': lines('- [ ] Write the guide'),
+  'docs/alert.md': lines('> [!NOTE]', '> Read this first.'),
+  'docs/container.md': lines('::: tip', 'Use the old way', ':::'),
+  'docs/admonition.md': lines('!!! note', '    Use the old way'),
+  'docs/wiki.md': lines('See [[Install guide]] first.'),
+  'docs/bom-code.md': '\uFEFF    pip install requests\n',
+  'docs/escaped-script.md': lines('Use \\<script> tags.', '', 'Old words here.'),
+  'LICENCE.txt': lines('Permission is granted to use the old tool.'),
+  'LICENSE.md': lines('Permission is granted to use the old tool.'),
+  'NOTICE.md': lines('This product holds old parts.'),
+  'docs/COPYING.txt': lines('You may copy the old tool.'),
+  'PATENTS.md': lines('The old grant of patents.'),
+  'docs/legal-notes.txt': lines('The old terms apply.'),
+  'docs/under-list.md': lines('- Install the tool', 'Run it then'),
+  'docs/above-rule.md': lines('Install the old tool', '==='),
+  'docs/item-para.md': lines('- Step one.', '', '  Old words here.'),
+  'docs/wrapped-div.md': lines('<div>', '', 'Old words here.', '', '</div>'),
+  'docs/component.md': lines('<run-sql>', '', 'Select name from users', '', '</run-sql>'),
+  'docs/cut-comment.md': lines('> <!-- a', '', '-->', '', 'Old words here.'),
+  'docs/lone-return.md': 'x\r```\n\nOld words here.\n',
+  'docs/item-fence-out.md': lines('1. Step', '', '   ```', 'code', '   ```', '', 'Old words here.'),
+  'docs/long-closer.md': lines('```', 'code', '````', '', 'Old words here.', '', '```'),
+  'docs/def-fence.md': lines('[ref]:', '```', 'code', '```', '', 'Old words here.'),
+  'docs/two-word-info.md': lines('``` foo bar', 'code', '```', '', 'Old words here.', '', '```'),
+  'docs/letter-marker.md': lines('a. Old words here.'),
+  'docs/commit-id.md': lines('The fix landed in abcdefa last week.'),
+  'docs/endings.md': lines('Old words here.', 'More words.'),
+  'docs/trailing.md': lines('Old words here.  ', 'More words.'),
+  'docs/abbreviation.md': lines('Use the old way, e.g. the short one.'),
+  'docs/colon.md': lines('Note: the old way works.'),
+  'docs/brackets.md': lines('The old way (the short one) works.'),
+  'docs/fence-script.md': lines('```html', '<script>', '```', '', 'Old words here.'),
+  'CHANGELOG.txt': lines('- Fixed the old bug'),
+  'docs/tokens.md': lines('# Help', '', 'Old notes.')
 };
 
 const QUALIFY = [
@@ -301,53 +372,53 @@ const QUALIFY = [
   ['src/styles/button.css', lines('.save { background-color: #0b5ed7; }')],
   ['src/styles/link.css', lines('a {', '  color: hsla(210, 50%, 40%, 0.9);', '}')],
   ['README.md', lines('# Fixture', '', 'This project shows the new wording.')],
-  ['notes/todo.txt', lines('Write the start page.')],
   ['docs/intro.md', '# Intro\r\n\r\nThe intro says welcome.\r\n'],
   // 20 changed lines in one file: ten lines reworded, the size limit exactly.
   ['docs/long.md', BASE['docs/long.md'].replace(/Old long line ([a-j])\./g, 'New long line $1.')],
   // 6 changed lines in 3 files: the file limit exactly.
   [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.') }],
-  // A typo fixed on a line that also holds a web address: only the changed word is wording.
-  ['docs/links.md', lines('Read the guide at https://example.org/guide.')],
   // The text of an option with a `value` attribute is wording; the value is what is sent.
   ['src/pages/size-pick.html', page('<select><option value="m">Middle</option></select>')],
   // The third round (2026-10-09). Markdown under `.github/` is documentation again.
   ['.github/CONTRIBUTING.md', lines('# Contributing', '', 'Open a discussion first.')],
-  // Link text is wording; the target is not.
-  ['docs/linktext.md', lines('Read [the new guide](/guide) first.')],
   // A tag whose attributes run over two lines: the whole-file scanner still sees the text.
   ['src/pages/wrapped.html', page(lines('<button', '  class="x">Store</button>').trimEnd())],
   // Prose beside a fenced code block that stays the same.
   ['docs/fenced-ok.md', lines('# Setup', '', 'Run the new installer.', '', '```sh', 'pip install requests', '```')],
   // The commit security review: an issue template under `.github/`.
   ['.github/ISSUE_TEMPLATE/bug.md', lines('Describe the new bug.')],
-  // The fourth round (2026-10-09). A title is wording; a design-token stylesheet with a
-  // real colour property; a paragraph that continues a list item; a React project's `src/hooks/` notes (CTOC's enforcement list
-  // is CTOC's own, and this repository is not CTOC).
+  // The fourth round (2026-10-09). A title is wording; a design-token stylesheet with a real
+  // colour property; a React project's `src/hooks/` notes (CTOC's enforcement list is CTOC's
+  // own, and this repository is not CTOC).
   ['src/pages/titled.html', BASE['src/pages/titled.html'].replace('Save', 'Store')],
   ['src/styles/tokens.css', BASE['src/styles/tokens.css'].replace('#0a58ca', '#0b5ed7')],
-  ['docs/list.md', BASE['docs/list.md'].replace('Old', 'New')],
   ['src/hooks/README.md', BASE['src/hooks/README.md'].replace('Old', 'New')],
-  // The fifth round (2026-10-09). An element name is matched in any letter case; a block
-  // quote's prose is prose; a
-  // custom property named for a colour, holding exactly one colour before and after, is a
-  // colour (the session's decision on the owner's instruction).
+  // The fifth round (2026-10-09). An element name is matched in any letter case; a custom
+  // property named for a colour, holding exactly one colour before and after, is a colour
+  // (the session's decision on the owner's instruction).
   ['src/pages/mixed.html', page('<DIV>Store</div>')],
-  ['docs/quote-prose.md', BASE['docs/quote-prose.md'].replace('Old', 'New')],
   ['src/styles/color-brand.css', BASE['src/styles/color-brand.css'].replace('#0b5ed7', '#1a73e8')],
   ['src/styles/button-colour.css', BASE['src/styles/button-colour.css'].replace('red', 'blue')],
-  // The sixth round (2026-10-09). An autolink is one opaque piece, so a typo in the next
-  // paragraph is wording; a heading whose generated anchor stays the same (capital letters
-  // only); a brace in one paragraph and a typo in a later one; `Author` is not `auth`.
-  ['docs/autolink.md', BASE['docs/autolink.md'].replace('Old', 'New')],
-  ['docs/heading-caps.md', BASE['docs/heading-caps.md'].replace('instal the App', 'Instal the app')],
+  // The sixth round (2026-10-09). A brace in one paragraph and a typo in a later one;
+  // `Author` is not `auth`.
   ['docs/mdx-far.md', BASE['docs/mdx-far.md'].replace('Old', 'New')],
   ['src/pages/Author.html', BASE['src/pages/Author.html'].replace('Save', 'Store')],
   // The seventh round (the decision at review of 2026-10-09). Two false refusals let go, the
   // differential test at zero disagreements: text that runs over several lines of one text
   // node, and a plain character reference (`&amp;`) in the changed sentence. Both were traps.
   ['src/pages/multiline.html', BASE['src/pages/multiline.html'].replace('Save your work', 'Store your work')],
-  ['src/pages/rules.html', page('<p>Terms &amp; conditions</p>')]
+  ['src/pages/rules.html', page('<p>Terms &amp; conditions</p>')],
+  // The eighth round (the decision at review of 2026-10-09): a typo in a plain paragraph
+  // qualifies. Plain text under a documentation name, also with a language part; a paragraph
+  // with typographic quotes, a dash, a hyphenated word, an apostrophe and an ellipsis; a
+  // paragraph below a comment that opens and closes on its own line, below a tag written
+  // inside a code span, and below a tag written inside a code fence.
+  ['CHANGES.txt', lines('The new wording of the first release.')],
+  ['docs/readme.en.txt', BASE['docs/readme.en.txt'].replace('old', 'new')],
+  ['docs/plain.md', BASE['docs/plain.md'].replace('well-known', 'well-liked')],
+  ['docs/lint.md', BASE['docs/lint.md'].replace('Old', 'New')],
+  ['docs/span-tag.md', BASE['docs/span-tag.md'].replace('Old', 'New')],
+  ['docs/fence-tag.md', BASE['docs/fence-tag.md'].replace('Old', 'New')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -417,8 +488,11 @@ const TRAPS = [
   ['symlink', ['link'], unrecognised('link')],
   // A document whose attributes say `-diff` still counts its real lines (13 reworded).
   [{ 'docs/big.md': BASE['docs/big.md'].replace(/Big old line/g, 'Big new line') }, null, 'it changes 26 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
-  // 21 changed lines in one file: 11 removed, 10 added.
-  [{ 'docs/limit.md': lines(...Array.from({ length: 10 }, (_, i) => `Limit new line ${String.fromCharCode(97 + i)}.`)) }, null, 'it changes 21 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
+  // 21 changed lines in one file, 11 removed and 10 added. Since the eighth round a Markdown
+  // file may gain or lose no line, so this refuses before the size is counted; a hotfix that
+  // qualifies changes an even number of lines, and the 22 lines of `docs/eleven.md` below are
+  // the nearest change the size rule itself refuses.
+  [{ 'docs/limit.md': lines(...Array.from({ length: 10 }, (_, i) => `Limit new line ${String.fromCharCode(97 + i)}.`)) }, null, inexact('docs/limit.md')],
   [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.'), 'notes/d.md': lines('Delta new.') }, null, 'it changes 8 lines in 4 files and a hotfix is at most 20 lines in at most 3 files'],
   // The security check's second round (2026-10-08). Code inside an attribute value that
   // holds `>` before the change and `<` plus a letter after it is never visible text.
@@ -438,11 +512,14 @@ const TRAPS = [
   [{ 'config/locales/en.yml': BASE['config/locales/en.yml'].replace('"."', '","') }, null, unrecognised('config/locales/en.yml')],
   // Documentation: a changed web address, e-mail address or number; a script; front matter;
   // the instruction files of other assistants; a release note that ships with the build.
-  [{ 'docs/install.md': BASE['docs/install.md'].replace('get.example.org', 'get.evil.org') }, null, riskMarker('docs/install.md')],
-  [{ 'SECURITY.md': BASE['SECURITY.md'].replace('example.org', 'evil.org') }, null, riskMarker('SECURITY.md')],
-  [{ 'docs/release.md': lines('Install version 2.3.2 of the tool.') }, null, riskMarker('docs/release.md')],
-  [{ 'docs/widget.md': BASE['docs/widget.md'].replace('"old"', '"new"') }, null, unrecognised('docs/widget.md')],
-  [{ 'docs/post.md': BASE['docs/post.md'].replace('layout: post', 'layout: raw') }, null, 'it changes a setting in docs/post.md, and settings changes are a common cause of outages'],
+  // Since the eighth round the first five are no plain prose (an address, a number with a
+  // full stop inside it, a tag, front matter) and get the functional plan's sentence; rule 6
+  // still reads the changed words of plain prose (`docs/plain.md`, `docs/commit-id.md` below).
+  [{ 'docs/install.md': BASE['docs/install.md'].replace('get.example.org', 'get.evil.org') }, null, inexact('docs/install.md')],
+  [{ 'SECURITY.md': BASE['SECURITY.md'].replace('example.org', 'evil.org') }, null, inexact('SECURITY.md')],
+  [{ 'docs/release.md': lines('Install version 2.3.2 of the tool.') }, null, inexact('docs/release.md')],
+  [{ 'docs/widget.md': BASE['docs/widget.md'].replace('"old"', '"new"') }, null, inexact('docs/widget.md')],
+  [{ 'docs/post.md': BASE['docs/post.md'].replace('layout: post', 'layout: raw') }, null, inexact('docs/post.md')],
   [{ 'AGENTS.md': lines('# Agents', '', 'New agent rules.') }, null, unrecognised('AGENTS.md')],
   [{ 'GEMINI.md': lines('# Gemini', '', 'New model rules.') }, null, unrecognised('GEMINI.md')],
   [{ '.github/copilot-instructions.md': lines('# Copilot', '', 'New assistant rules.') }, null, unrecognised('.github/copilot-instructions.md')],
@@ -466,10 +543,10 @@ const TRAPS = [
   [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"\\\\\\\\evil"') }, null, unrecognised('locales/far.json')],
   [{ 'lang/far.properties': lines('link=java\\script:go()') }, null, unrecognised('lang/far.properties')],
   // Markdown: inline HTML, link targets, template braces, code, front matter.
-  [{ 'docs/click.md': BASE['docs/click.md'].replace("'one'", "'two'") }, null, unrecognised('docs/click.md')],
-  [{ 'docs/js-link.md': BASE['docs/js-link.md'].replace('go()', 'stop()') }, null, unrecognised('docs/js-link.md')],
-  [{ 'docs/tpl.md': BASE['docs/tpl.md'].replace('one()', 'two()') }, null, unrecognised('docs/tpl.md')],
-  [{ 'content/post.md': BASE['content/post.md'].replace('false', 'true') }, null, 'it changes a setting in content/post.md, and settings changes are a common cause of outages'],
+  [{ 'docs/click.md': BASE['docs/click.md'].replace("'one'", "'two'") }, null, inexact('docs/click.md')],
+  [{ 'docs/js-link.md': BASE['docs/js-link.md'].replace('go()', 'stop()') }, null, inexact('docs/js-link.md')],
+  [{ 'docs/tpl.md': BASE['docs/tpl.md'].replace('one()', 'two()') }, null, inexact('docs/tpl.md')],
+  [{ 'content/post.md': BASE['content/post.md'].replace('false', 'true') }, null, inexact('content/post.md')],
   // Other assistants' instruction files.
   [{ 'CLAUDE.local.md': BASE['CLAUDE.local.md'].replace('Old', 'New') }, null, unrecognised('CLAUDE.local.md')],
   [{ '.windsurf/rules/style.md': BASE['.windsurf/rules/style.md'].replace('Old', 'New') }, null, unrecognised('.windsurf/rules/style.md')],
@@ -481,19 +558,21 @@ const TRAPS = [
   [{ 'src/styles/commented.css': BASE['src/styles/commented.css'].replace('#add', '#bad') }, null, unrecognised('src/styles/commented.css')],
   // Code blocks, front matter as a JSON object, reference definitions, autolinks, Liquid tags,
   // and a workflow folder's Markdown.
-  [{ 'docs/setup.md': BASE['docs/setup.md'].replace('requests', 'reqests') }, null, unrecognised('docs/setup.md')],
-  [{ 'docs/indented.md': BASE['docs/indented.md'].replace('requests', 'reqests') }, null, unrecognised('docs/indented.md')],
-  [{ 'docs/tilde.md': BASE['docs/tilde.md'].replace('requests', 'reqests') }, null, unrecognised('docs/tilde.md')],
-  [{ 'docs/json-front.md': BASE['docs/json-front.md'].replace('Old', 'New') }, null, 'it changes a setting in docs/json-front.md, and settings changes are a common cause of outages'],
-  [{ 'docs/ref.md': BASE['docs/ref.md'].replace('/guide', '/other') }, null, unrecognised('docs/ref.md')],
-  [{ 'docs/auto.md': BASE['docs/auto.md'].replace('one.example', 'two.example') }, null, unrecognised('docs/auto.md')],
-  [{ 'docs/liquid.md': BASE['docs/liquid.md'].replace('one.html', 'two.html') }, null, unrecognised('docs/liquid.md')],
+  [{ 'docs/setup.md': BASE['docs/setup.md'].replace('requests', 'reqests') }, null, inexact('docs/setup.md')],
+  [{ 'docs/indented.md': BASE['docs/indented.md'].replace('requests', 'reqests') }, null, inexact('docs/indented.md')],
+  [{ 'docs/tilde.md': BASE['docs/tilde.md'].replace('requests', 'reqests') }, null, inexact('docs/tilde.md')],
+  [{ 'docs/json-front.md': BASE['docs/json-front.md'].replace('Old', 'New') }, null, inexact('docs/json-front.md')],
+  [{ 'docs/ref.md': BASE['docs/ref.md'].replace('/guide', '/other') }, null, inexact('docs/ref.md')],
+  [{ 'docs/auto.md': BASE['docs/auto.md'].replace('one.example', 'two.example') }, null, inexact('docs/auto.md')],
+  [{ 'docs/liquid.md': BASE['docs/liquid.md'].replace('one.html', 'two.html') }, null, inexact('docs/liquid.md')],
   [{ '.github/workflows/README.md': BASE['.github/workflows/README.md'].replace('old', 'new') }, null, 'it changes how the project is built or shipped in .github/workflows/README.md'],
   // Attribute shapes: a character reference in a value, an unquoted value.
   [{ 'src/pages/entity.html': BASE['src/pages/entity.html'].replace('a&gt;b', 'a&gt;c') }, null, unrecognised('src/pages/entity.html')],
   [{ 'src/pages/unquoted.html': BASE['src/pages/unquoted.html'].replace('/one', '/two') }, null, unrecognised('src/pages/unquoted.html')],
   // CTOC's own lists: sensitive words in the plural, the secret-file guard, the protected paths.
-  [{ 'tokens.txt': lines('New note.') }, null, 'tokens.txt sits in an area named token, and such areas are never a hotfix'],
+  // Since the eighth round `tokens.txt` carries no documentation name, so rule 4 refuses it
+  // before rule 5 reads its name; `docs/tokens.md` below keeps the plural word pinned.
+  [{ 'tokens.txt': lines('New note.') }, null, unrecognised('tokens.txt')],
   [{ 'config/locales/secrets.yml': lines('title: New') }, null, 'config/locales/secrets.yml sits in an area named secret, and such areas are never a hotfix'],
   [{ 'messages/credentials.json': BASE['messages/credentials.json'].replace('Old', 'New') }, null, 'messages/credentials.json sits in an area named credential, and such areas are never a hotfix'],
   [{ 'src/payments/index.html': page('<p>New</p>') }, null, 'src/payments/index.html sits in an area named payment, and such areas are never a hotfix'],
@@ -523,14 +602,15 @@ const TRAPS = [
   [{ 'src/styles/flags.css': BASE['src/styles/flags.css'].replace('--mode: red', '--mode: lime') }, null, setting('src/styles/flags.css')],
   [{ 'src/styles/custom.css': lines(':root {', '  --accent: blue;', '}') }, null, setting('src/styles/custom.css')],
   [{ 'src/styles/vars.css': lines(':root {', '  --brand: #fafafa;', '}') }, null, setting('src/styles/vars.css')],
-  // Doctest lines are code, in plain text and in Markdown.
+  // Doctest lines are code, in plain text and in Markdown. Since the eighth round the `.txt`
+  // file carries no documentation name, and the Markdown line is no plain prose.
   [{ 'notes/doctest.txt': BASE['notes/doctest.txt'].replace(/old$/m, 'new') }, null, unrecognised('notes/doctest.txt')],
-  [{ 'docs/doctest.md': BASE['docs/doctest.md'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest.md')],
+  [{ 'docs/doctest.md': BASE['docs/doctest.md'].replace(/old$/m, 'new') }, null, inexact('docs/doctest.md')],
   // Text inside an HTML code element is code, in HTML and in Markdown's inline HTML.
-  [{ 'docs/code-el.md': BASE['docs/code-el.md'].replace('requests', 'reqests') }, null, unrecognised('docs/code-el.md')],
+  [{ 'docs/code-el.md': BASE['docs/code-el.md'].replace('requests', 'reqests') }, null, inexact('docs/code-el.md')],
   [{ 'src/pages/code-el.html': BASE['src/pages/code-el.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/code-el.html')],
   // A real indented code block inside a list item: four spaces beyond the content column.
-  [{ 'docs/list-code.md': BASE['docs/list-code.md'].replace('requests', 'reqests') }, null, unrecognised('docs/list-code.md')],
+  [{ 'docs/list-code.md': BASE['docs/list-code.md'].replace('requests', 'reqests') }, null, inexact('docs/list-code.md')],
   // The fifth round (2026-10-09), each trap an answer of `checking` on `6de2f75c`. Host
   // elements are a fixed list: an `is` attribute and an unknown name hold their text.
   [{ 'src/pages/is.html': BASE['src/pages/is.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/is.html')],
@@ -539,18 +619,18 @@ const TRAPS = [
   [{ 'src/pages/stack.html': BASE['src/pages/stack.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/stack.html')],
   [{ 'docs/stack.md': BASE['docs/stack.md'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('docs/stack.md')],
   // Markdown that may be built as MDX: a brace in the changed prose, an `import` line.
-  [{ 'docs/mdx-brace.md': BASE['docs/mdx-brace.md'].replace('name', 'code') }, null, unrecognised('docs/mdx-brace.md')],
-  [{ 'docs/mdx-import.md': BASE['docs/mdx-import.md'].replace('./chart', './other') }, null, unrecognised('docs/mdx-import.md')],
+  [{ 'docs/mdx-brace.md': BASE['docs/mdx-brace.md'].replace('name', 'code') }, null, inexact('docs/mdx-brace.md')],
+  [{ 'docs/mdx-import.md': BASE['docs/mdx-import.md'].replace('./chart', './other') }, null, inexact('docs/mdx-import.md')],
   // A lone backtick in one paragraph pairs with nothing in the next.
-  [{ 'docs/tick-para.md': BASE['docs/tick-para.md'].replace('build', 'dist') }, null, unrecognised('docs/tick-para.md')],
+  [{ 'docs/tick-para.md': BASE['docs/tick-para.md'].replace('build', 'dist') }, null, inexact('docs/tick-para.md')],
   // A block quote is read like the document it quotes: indented code, a fence, a doctest,
   // and indented code under a list item.
-  [{ 'docs/quote-code.md': BASE['docs/quote-code.md'].replace('requests', 'reqests') }, null, unrecognised('docs/quote-code.md')],
-  [{ 'docs/quote-fence.md': BASE['docs/quote-fence.md'].replace('requests', 'reqests') }, null, unrecognised('docs/quote-fence.md')],
-  [{ 'docs/quote-doctest.md': BASE['docs/quote-doctest.md'].replace(/old$/m, 'new') }, null, unrecognised('docs/quote-doctest.md')],
-  [{ 'docs/quote-list.md': BASE['docs/quote-list.md'].replace('requests', 'reqests') }, null, unrecognised('docs/quote-list.md')],
+  [{ 'docs/quote-code.md': BASE['docs/quote-code.md'].replace('requests', 'reqests') }, null, inexact('docs/quote-code.md')],
+  [{ 'docs/quote-fence.md': BASE['docs/quote-fence.md'].replace('requests', 'reqests') }, null, inexact('docs/quote-fence.md')],
+  [{ 'docs/quote-doctest.md': BASE['docs/quote-doctest.md'].replace(/old$/m, 'new') }, null, inexact('docs/quote-doctest.md')],
+  [{ 'docs/quote-list.md': BASE['docs/quote-list.md'].replace('requests', 'reqests') }, null, inexact('docs/quote-list.md')],
   // Link labels fold case as CommonMark does: `[\u1e9e]` names the definition `[SS]`.
-  [{ 'docs/fold.md': BASE['docs/fold.md'].replace('[guide]', '[\u1e9e]') }, null, unrecognised('docs/fold.md')],
+  [{ 'docs/fold.md': BASE['docs/fold.md'].replace('[guide]', '[\u1e9e]') }, null, inexact('docs/fold.md')],
   // `listing` and `tt` are code elements.
   [{ 'src/pages/listing.html': BASE['src/pages/listing.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/listing.html')],
   [{ 'src/pages/tt.html': BASE['src/pages/tt.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/tt.html')],
@@ -576,7 +656,7 @@ const TRAPS = [
   // A colour that is not the whole value of its property (the functional plan's scenario).
   [{ 'src/styles/border.css': BASE['src/styles/border.css'].replace('#0a58ca', '#0b5ed7') }, null, inexact('src/styles/border.css')],
   // Markdown: an `import` line right after a heading; a heading whose generated anchor changes.
-  [{ 'docs/heading-import.md': BASE['docs/heading-import.md'].replace('./chart', './other') }, null, unrecognised('docs/heading-import.md')],
+  [{ 'docs/heading-import.md': BASE['docs/heading-import.md'].replace('./chart', './other') }, null, inexact('docs/heading-import.md')],
   [{ 'docs/heading.md': BASE['docs/heading.md'].replace('Install', 'Setup') }, null, inexact('docs/heading.md')],
   // A sensitive word in full-width letters, and as a camel-case sub-word.
   [{ '\uff21\uff35\uff34\uff28/index.html': BASE['\uff21\uff35\uff34\uff28/index.html'].replace('Save', 'Store') }, null, '\uff21\uff35\uff34\uff28/index.html sits in an area named auth, and such areas are never a hotfix'],
@@ -585,8 +665,110 @@ const TRAPS = [
   // Refused on `5326daae` too, with another sentence: text inside a custom element, and an
   // autolink's own text (one opaque piece, compared exactly).
   [{ 'src/pages/card.html': BASE['src/pages/card.html'].replace('Save', 'Store') }, null, inexact('src/pages/card.html')],
-  [{ 'docs/autolink.md': BASE['docs/autolink.md'].replace('guide', 'other') }, null, unrecognised('docs/autolink.md')]
+  [{ 'docs/autolink.md': BASE['docs/autolink.md'].replace('guide', 'other') }, null, inexact('docs/autolink.md')]
 ];
+
+// The eighth round (the decision at review of 2026-10-09): Markdown and plain text qualify
+// only as a wording change in pure prose. First the rows that qualified until now and relied
+// on structure: plain text under no documentation name, a line that holds a web address, a
+// link's text, a paragraph inside a list item, a quote, a paragraph below an autolink, a
+// heading.
+TRAPS.push(
+  [{ 'notes/todo.txt': lines('Write the start page.') }, null, unrecognised('notes/todo.txt')],
+  [{ 'docs/links.md': lines('Read the guide at https://example.org/guide.') }, null, inexact('docs/links.md')],
+  [{ 'docs/linktext.md': lines('Read [the new guide](/guide) first.') }, null, inexact('docs/linktext.md')],
+  [{ 'docs/list.md': BASE['docs/list.md'].replace('Old', 'New') }, null, inexact('docs/list.md')],
+  [{ 'docs/quote-prose.md': BASE['docs/quote-prose.md'].replace('Old', 'New') }, null, inexact('docs/quote-prose.md')],
+  [{ 'docs/autolink.md': BASE['docs/autolink.md'].replace('Old', 'New') }, null, inexact('docs/autolink.md')],
+  [{ 'docs/heading-caps.md': BASE['docs/heading-caps.md'].replace('instal the App', 'Instal the app') }, null, inexact('docs/heading-caps.md')],
+  // The size rule itself: eleven lines reworded line for line are 22 changed lines.
+  [{ 'docs/eleven.md': BASE['docs/eleven.md'].replace(/Eleven old line/g, 'Eleven new line') }, null, 'it changes 22 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
+  // Rule 6 in plain prose: a changed number, and a changed word of 7 to 40 characters that are
+  // all hexadecimal digits, which sites link as a commit id.
+  [{ 'docs/plain.md': BASE['docs/plain.md'].replace('30 days', '60 days') }, null, riskMarker('docs/plain.md')],
+  [{ 'docs/commit-id.md': BASE['docs/commit-id.md'].replace('abcdefa', 'abcdefb') }, null, riskMarker('docs/commit-id.md')],
+  [{ 'docs/tokens.md': BASE['docs/tokens.md'].replace('Old', 'New') }, null, 'docs/tokens.md sits in an area named token, and such areas are never a hotfix'],
+  // The findings of the Markdown security run, each a pass on `c2c9f86d` or a refusal with
+  // another sentence. Markdown inside `<div markdown="1">` that gains a link.
+  [{ 'docs/md-in-html.md': BASE['docs/md-in-html.md'].replace('the guide', 'the [guide](javascript:alert(1))') }, null, inexact('docs/md-in-html.md')],
+  // Plain text that is no documentation: a dependency name, a template's placeholder, an
+  // exclusion list, build options.
+  [{ 'deps.txt': lines('request') }, null, unrecognised('deps.txt')],
+  [{ 'templates/email/welcome.txt': lines('Hello {nome}, welcome.') }, null, unrecognised('templates/email/welcome.txt')],
+  [{ 'exclude.txt': lines('build', 'cache-old') }, null, unrecognised('exclude.txt')],
+  [{ 'cmake/options.txt': lines('option(SLOW ON)') }, null, unrecognised('cmake/options.txt')],
+  // A tab three containers deep; a closing fence followed by a no-break space; a list marker
+  // above indented code; a bracket that makes a link; a definition under a paragraph line.
+  [{ 'docs/deep-tab.md': lines('>> > \tamet words') }, null, inexact('docs/deep-tab.md')],
+  [{ 'docs/fence-nbsp.md': BASE['docs/fence-nbsp.md'].replace('Run it now.', 'Run it today.') }, null, inexact('docs/fence-nbsp.md')],
+  [{ 'docs/list-marker.md': BASE['docs/list-marker.md'].replace('-   Install:', '- Installing:') }, null, inexact('docs/list-marker.md')],
+  [{ 'docs/half-link.md': lines('Read [docs](guide/setup) first.') }, null, inexact('docs/half-link.md')],
+  [{ 'docs/def-under.md': BASE['docs/def-under.md'].replace('teh', 'the') }, null, inexact('docs/def-under.md')],
+  // A word that becomes a domain; a file name; front matter with a language word, and a
+  // metadata block in the middle of the file (a plain line inside each); a `key: value` line.
+  [{ 'docs/domain.md': lines('Visit example.com today.') }, null, inexact('docs/domain.md')],
+  [{ 'docs/file-name.md': lines('Read READNE.md first.') }, null, inexact('docs/file-name.md')],
+  [{ 'docs/front-js.md': BASE['docs/front-js.md'].replace('A plain old line', 'A plain new line') }, null, inexact('docs/front-js.md')],
+  [{ 'docs/mid-meta.md': BASE['docs/mid-meta.md'].replace('A plain old line', 'A plain new line') }, null, inexact('docs/mid-meta.md')],
+  [{ 'docs/template-key.md': BASE['docs/template-key.md'].replace('main', 'other') }, null, inexact('docs/template-key.md')],
+  // A code span with a pipe in a table cell; a heading; a task box; an alert; a container; an
+  // admonition; a wiki link.
+  [{ 'docs/cell-span.md': BASE['docs/cell-span.md'].replace('| y`', '| w`') }, null, inexact('docs/cell-span.md')],
+  [{ 'docs/bienvenue.md': BASE['docs/bienvenue.md'].replace('## Bienvenue !', '## Bienvenue') }, null, inexact('docs/bienvenue.md')],
+  [{ 'docs/task.md': lines('- [x] Write the guide') }, null, inexact('docs/task.md')],
+  [{ 'docs/alert.md': BASE['docs/alert.md'].replace('[!NOTE]', '[!WARNING]') }, null, inexact('docs/alert.md')],
+  [{ 'docs/container.md': BASE['docs/container.md'].replace('old', 'new') }, null, inexact('docs/container.md')],
+  [{ 'docs/admonition.md': BASE['docs/admonition.md'].replace('old', 'new') }, null, inexact('docs/admonition.md')],
+  [{ 'docs/wiki.md': lines('See [[Setup guide]] first.') }, null, inexact('docs/wiki.md')],
+  // A byte-order mark before indented code; a tag behind a backslash, which some readers
+  // still read as a tag, above the changed paragraph.
+  [{ 'docs/bom-code.md': '\ufeff    pip install request\n' }, null, inexact('docs/bom-code.md')],
+  [{ 'docs/escaped-script.md': BASE['docs/escaped-script.md'].replace('Old', 'New') }, null, inexact('docs/escaped-script.md')],
+  // Legal texts never qualify, `.md` or `.txt`: the sensitive-area clause, naming `license`
+  // for a licence and `legal` for the other legal names.
+  [{ 'LICENCE.txt': BASE['LICENCE.txt'].replace('old', 'new') }, null, 'LICENCE.txt sits in an area named license, and such areas are never a hotfix'],
+  [{ 'LICENSE.md': BASE['LICENSE.md'].replace('old', 'new') }, null, 'LICENSE.md sits in an area named license, and such areas are never a hotfix'],
+  [{ 'NOTICE.md': BASE['NOTICE.md'].replace('old', 'new') }, null, 'NOTICE.md sits in an area named legal, and such areas are never a hotfix'],
+  [{ 'docs/COPYING.txt': BASE['docs/COPYING.txt'].replace('old', 'new') }, null, 'docs/COPYING.txt sits in an area named legal, and such areas are never a hotfix'],
+  [{ 'PATENTS.md': BASE['PATENTS.md'].replace('old', 'new') }, null, 'PATENTS.md sits in an area named legal, and such areas are never a hotfix'],
+  [{ 'docs/legal-notes.txt': BASE['docs/legal-notes.txt'].replace('old', 'new') }, null, 'docs/legal-notes.txt sits in an area named legal, and such areas are never a hotfix'],
+  // A plain line directly under a list line, and directly above an `===` line.
+  [{ 'docs/under-list.md': BASE['docs/under-list.md'].replace('Run it then', 'Run it now') }, null, inexact('docs/under-list.md')],
+  [{ 'docs/above-rule.md': BASE['docs/above-rule.md'].replace('old', 'new') }, null, inexact('docs/above-rule.md')],
+  // What the differential test found against the rule as first written (markdown-it in four
+  // configurations): a paragraph a list item holds; a paragraph inside an element left open
+  // above it, a component among them; a comment cut off where its block quote ends; a
+  // carriage return on its own before a fence; a fence inside a list item that ends early;
+  // a definition that takes the fence line as its destination.
+  [{ 'docs/item-para.md': BASE['docs/item-para.md'].replace('Old', 'New') }, null, inexact('docs/item-para.md')],
+  [{ 'docs/wrapped-div.md': BASE['docs/wrapped-div.md'].replace('Old', 'New') }, null, inexact('docs/wrapped-div.md')],
+  [{ 'docs/component.md': BASE['docs/component.md'].replace('Select name from users', 'Select pass from admins') }, null, inexact('docs/component.md')],
+  [{ 'docs/cut-comment.md': BASE['docs/cut-comment.md'].replace('Old', 'New') }, null, inexact('docs/cut-comment.md')],
+  [{ 'docs/lone-return.md': BASE['docs/lone-return.md'].replace('Old', 'New') }, null, inexact('docs/lone-return.md')],
+  [{ 'docs/item-fence-out.md': BASE['docs/item-fence-out.md'].replace('Old', 'New') }, null, inexact('docs/item-fence-out.md')],
+  [{ 'docs/def-fence.md': BASE['docs/def-fence.md'].replace('Old', 'New') }, null, inexact('docs/def-fence.md')],
+  // What Python-Markdown and pandoc read otherwise (run on this machine, 2026-10-09): a
+  // closing fence longer than its opening one and an opening fence with two words after it
+  // (Python-Markdown reads neither as that fence), and a first word that pandoc reads as a
+  // list marker.
+  [{ 'docs/long-closer.md': BASE['docs/long-closer.md'].replace('Old', 'New') }, null, inexact('docs/long-closer.md')],
+  [{ 'docs/two-word-info.md': BASE['docs/two-word-info.md'].replace('Old', 'New') }, null, inexact('docs/two-word-info.md')],
+  [{ 'docs/letter-marker.md': BASE['docs/letter-marker.md'].replace('Old', 'New') }, null, inexact('docs/letter-marker.md')],
+  // Nothing else in the file may change: no line ending, no byte-order mark, no added line,
+  // no trailing spaces (two of them are a line break).
+  [{ 'docs/endings.md': 'New words here.\r\nMore words.\r\n' }, null, inexact('docs/endings.md')],
+  [{ 'docs/endings.md': '\ufeffNew words here.\nMore words.\n' }, null, inexact('docs/endings.md')],
+  [{ 'docs/endings.md': lines('New words here.', 'More words.', 'And a line.') }, null, inexact('docs/endings.md')],
+  [{ 'docs/trailing.md': lines('New words here.', 'More words.') }, null, inexact('docs/trailing.md')],
+  // Lines that are no plain prose: a full stop inside a word, a colon, round brackets.
+  [{ 'docs/abbreviation.md': BASE['docs/abbreviation.md'].replace('old', 'new') }, null, inexact('docs/abbreviation.md')],
+  [{ 'docs/colon.md': BASE['docs/colon.md'].replace('old', 'new') }, null, inexact('docs/colon.md')],
+  [{ 'docs/brackets.md': BASE['docs/brackets.md'].replace('old', 'new') }, null, inexact('docs/brackets.md')],
+  // Inside a code fence one of the named raw starts still counts (a reader without fences
+  // would run the script); and plain text under a documentation name is held to the same rule.
+  [{ 'docs/fence-script.md': BASE['docs/fence-script.md'].replace('Old', 'New') }, null, inexact('docs/fence-script.md')],
+  [{ 'CHANGELOG.txt': lines('- Fixed the new bug') }, null, inexact('CHANGELOG.txt')]
+);
 
 // The owner's decision of 2026-10-09 (answer "a"): the hotfix check keeps only the formats
 // it can read exactly, because five rounds of security attacks kept finding new ways to get
@@ -642,9 +824,9 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 36, 'the corpus holds 36 shapes that qualify');
+assert.equal(QUALIFY.length, 35, 'the corpus holds 35 shapes that qualify');
 assert.equal(REMOVED_FORMATS.length, 44, 'the corpus holds 44 cases of removed formats');
-assert.equal(TRAPS.length, 213, 'the corpus holds 213 traps, the removed formats among them');
+assert.equal(TRAPS.length, 275, 'the corpus holds 275 traps, the removed formats among them');
 
 let root;
 
@@ -767,17 +949,11 @@ const ALLOWED = {
     '\\': (v) => (/\\[tnrbf]/.test(v) ? 'a backslash that makes a tab, line break or other control character in the shown text'
       : 'a backslash before a letter in a .properties value, which the reader drops')
   },
-  markdown: {
-    // A brace is no longer named: Markdown may be built as MDX, where it starts an expression.
-    ...plain('>"\'()=:/\\#;*|_', 'Markdown punctuation in prose: shown as typed or as emphasis, a heading, a quote or a table cell'),
-    '<': (v, at) => (/[A-Za-z/!?]/.test(v[at + 1] || '') ? null : 'a < that starts no tag is shown as typed'),
-    '[': () => 'a bracket that names no reference definition is shown as typed (link targets are compared exactly)',
-    ']': () => 'a bracket that names no reference definition is shown as typed (link targets are compared exactly)',
-    '`': () => 'a backtick that pairs with no other is shown as typed (code spans are compared exactly)',
-    '&': (v, at) => (/^&(?:#\d+|#[xX][\da-fA-F]+|[A-Za-z][A-Za-z\d]*);/.test(v.slice(at)) ? null
-      : 'an ampersand that starts no character reference is shown as typed')
-  },
-  text: plain('<>"\'{}()=:/\\#;*[]&`|_', 'any punctuation in a plain-text paragraph is shown as typed'),
+  // Since the eighth round (the decision at review of 2026-10-09) a Markdown or plain-text
+  // line is plain prose or nothing: of the inserted characters only the two straight quotes
+  // and the semicolon are prose punctuation, and every renderer shows them as typed.
+  markdown: plain('"\';', 'a straight quote or a semicolon in a plain prose line is shown as typed by every renderer'),
+  text: plain('"\';', 'a straight quote or a semicolon in a plain prose line is shown as typed by every renderer'),
   colour: {}
 };
 const kindOf = (rel) => {
@@ -896,19 +1072,12 @@ function closedAtEnd(kind, cut) {
   const lines = cut.split('\n');
   const tail = lines[lines.length - 1] === '' ? (lines[lines.length - 2] || '') : lines[lines.length - 1];
   const even = (t, c) => t.split(c).length % 2 === 1;
-  const balanced = (t, o, c) => t.split(o).length === t.split(c).length;
   if (cut.trim() === '') return false; // an emptied file is no wording edit
-  if (kind === 'text') return true;
   if (kind === 'catalogue') return even(tail, '"') && !/^\s*[{}[\]]?\s*$/.test(tail) && /[:=]/.test(tail);
-  if (kind === 'markdown') {
-    const fences = lines.filter((l) => /^\s*(```|~~~)/.test(l)).length;
-    const front = lines[0] === '---' && !lines.slice(1).some((l) => l === '---');
-    // An autolink is one closed piece (the sixth round), so its `<` leaves nothing open.
-    const open = tail.replace(/<https?:\/\/[^\s<>]*>/g, '');
-    return fences % 2 === 0 && !front && even(tail, '`') && !open.includes('<') && !tail.includes('{{')
-      && balanced(tail, '[', ']') && balanced(tail, '(', ')');
-  }
-  return false; // markup and stylesheets: a cut always leaves a tag, element or block open
+  // Markup and stylesheets: a cut always leaves a tag, element or block open. Markdown and
+  // plain text (since the eighth round): a cut always removes a line or the last line's
+  // ending, and nothing but the words of a plain paragraph may change in such a file.
+  return false;
 }
 
 test('property: a qualifying file cut short at any point refuses, unless the cut lands in closed plain text at the very end', (t) => {
@@ -936,106 +1105,162 @@ test('property: a qualifying file cut short at any point refuses, unless the cut
   t.diagnostic(`${cuts} cuts, ${passes} pass, each in closed plain text at the very end`);
 });
 
-// Each scanner moves forward only. Inputs built to make a backtracking or rescanning
-// scanner quadratic are judged in well under a quarter of a second (a quadratic scan of
-// these 100,000 to 400,000 characters takes seconds).
-test('the whole-file scanners stay linear on input built against them', () => {
+/**
+ * A timing case in ratio form (the decision at review of 2026-10-09: a bound in milliseconds
+ * passed or failed with the machine's load, where a ratio does not). `at(n)` gives the call to
+ * time on an input of size `n`, built before it is timed. The call is warmed once; `n` grows
+ * until one call costs at least 20 ms or `4n` would pass `limit` (inputs of many megabytes
+ * measure the engine's memory, not the reader); an input that cannot grow that far is run
+ * several times in a row, so that what is timed still costs about 20 ms. Then the minimum of
+ * five runs at `n` and of five runs at `4n` is taken. Work that is linear in the input gives
+ * a ratio near 4, quadratic work one near 16, and the bound is 8. An input the reader does
+ * not read in proportion (a kind it refuses at once) is held to 8 times 20 ms. The one
+ * absolute bound is seconds wide and stops a runaway reader early.
+ * @param {(n: number) => (() => unknown)} at @param {number} n the first size tried @param {number} limit the largest `4n`
+ * @returns {{n: number, small: number, big: number, ratio: number}}
+ */
+function growth(at, n, limit) {
+  const ms = (fn) => {
+    const start = process.hrtime.bigint();
+    fn();
+    return Number(process.hrtime.bigint() - start) / 1e6;
+  };
+  const least = (fn) => Math.min(ms(fn), ms(fn), ms(fn), ms(fn), ms(fn));
+  let call = at(n);
+  call(); // warm once
+  let once = ms(call);
+  while (once < 20 && n * 8 <= limit) {
+    n *= once < 5 && n * 16 <= limit ? 4 : 2;
+    call = at(n);
+    once = ms(call);
+  }
+  assert.ok(once < 5000, `one call at size ${n} took ${once.toFixed(0)} ms`);
+  const times = once < 20 ? Math.min(Math.ceil(20 / Math.max(once, 0.02)), 1000) : 1;
+  const repeated = (fn) => () => { for (let k = 0; k < times; k++) fn(); };
+  const small = least(repeated(call));
+  const big = least(repeated(at(4 * n)));
+  return { n, small, big, ratio: big / Math.max(small, 20) };
+}
+
+// Each scanner moves forward only. Inputs built to make a backtracking or rescanning scanner
+// quadratic are judged at a size `n` and at `4n`, and the time may grow by less than 8 times
+// (the ratio form: see `growth`). Each input is a function of its size, in repeated pieces.
+test('the whole-file scanners stay linear on input built against them', (t) => {
+  /** Runs of backticks of rising length, about `count` backticks in all. */
+  const risingTicks = (count) => Array.from({ length: Math.floor(Math.sqrt(2 * count)) }, (_, i) => `${'`'.repeat(i + 1)} x `).join('');
   const cases = {
-    'docs/brackets.md': `${'['.repeat(400000)}]\nOld words.\n`,
-    'docs/ticks.md': `${Array.from({ length: 450 }, (_, i) => `${'`'.repeat(i + 1)} x `).join('')}\nOld words.\n`,
-    'docs/targets.md': `${']('.repeat(50000)}\nOld words.\n`,
-    'docs/blocks.md': `Old words.\n${'    code\n\n'.repeat(30000)}`,
-    'docs/raws.rst': `Old words.\n${'.. raw:: html\n'.repeat(30000)}`,
-    'src/pages/quotes.html': `<p>Old</p>\n${'<a b="'.repeat(20000)}\n`,
-    'src/pages/escapes.html': `<p>Old</p>\n${'<script><!--'.repeat(20000)}\n`,
-    'src/components/Braces.jsx': `export const P = () => <p>Old</p>;\n${'{'.repeat(100000)}\n`,
-    'src/components/Tags.jsx': `export const P = () => <p>Old</p>;\n${'x = <a>'.repeat(20000)}\n`,
-    'src/components/Nest.vue': `<template>\n<p>Old</p>\n${'<template>'.repeat(30000)}\n</template>\n`,
-    'src/styles/urls.css': `a { color: red; }\n${'url('.repeat(50000)}\n`,
+    'docs/brackets.md': (n) => `${'['.repeat(100 * n)}]\nOld words.\n`,
+    'docs/ticks.md': (n) => `${risingTicks(100 * n)}\nOld words.\n`,
+    'docs/targets.md': (n) => `${']('.repeat(50 * n)}\nOld words.\n`,
+    'docs/blocks.md': (n) => `Old words.\n${'    code\n\n'.repeat(10 * n)}`,
+    'docs/raws.rst': (n) => `Old words.\n${'.. raw:: html\n'.repeat(10 * n)}`,
+    'src/pages/quotes.html': (n) => `<p>Old</p>\n${'<a b="'.repeat(20 * n)}\n`,
+    'src/pages/escapes.html': (n) => `<p>Old</p>\n${'<script><!--'.repeat(10 * n)}\n`,
+    'src/components/Braces.jsx': (n) => `export const P = () => <p>Old</p>;\n${'{'.repeat(100 * n)}\n`,
+    'src/components/Tags.jsx': (n) => `export const P = () => <p>Old</p>;\n${'x = <a>'.repeat(20 * n)}\n`,
+    'src/components/Nest.vue': (n) => `<template>\n<p>Old</p>\n${'<template>'.repeat(10 * n)}\n</template>\n`,
+    'src/styles/urls.css': (n) => `a { color: red; }\n${'url('.repeat(30 * n)}\n`,
     // The fourth round's scanners: nested list items, literal blocks, wrapped reference
     // definitions, reference words, prose directive options, type parameter lists,
     // components and variable declarations.
-    'docs/lists.md': `Old words.\n${'- a\n  - b\n    - c\n'.repeat(20000)}`,
-    'docs/literals.rst': `Old words.\n${'Run::\n\n   code\n'.repeat(30000)}`,
-    'docs/defs.md': `Old words.\n${'[a]:\n\n\n'.repeat(30000)}`,
-    'docs/refs.rst': `Old words.\nx${')'.repeat(200000)}a\n`,
-    'docs/options.rst': `Old words.\n.. note::\n${'   :class: x\n'.repeat(30000)}`,
-    'src/components/Params.tsx': `export const P = () => <p>Old</p>;\n${'x = <T extends A<'.repeat(20000)}\n`,
-    'src/components/Holds.vue': `<template>\n<p>Old</p>\n${'<MyThing>'.repeat(30000)}\n</template>\n`,
-    'src/styles/vars.scss': `a { color: red; }\n${'$a: b;'.repeat(50000)}\n`,
+    'docs/lists.md': (n) => `Old words.\n${'- a\n  - b\n    - c\n'.repeat(8 * n)}`,
+    'docs/literals.rst': (n) => `Old words.\n${'Run::\n\n   code\n'.repeat(8 * n)}`,
+    'docs/defs.md': (n) => `Old words.\n${'[a]:\n\n\n'.repeat(15 * n)}`,
+    'docs/refs.rst': (n) => `Old words.\nx${')'.repeat(100 * n)}a\n`,
+    'docs/options.rst': (n) => `Old words.\n.. note::\n${'   :class: x\n'.repeat(10 * n)}`,
+    'src/components/Params.tsx': (n) => `export const P = () => <p>Old</p>;\n${'x = <T extends A<'.repeat(6 * n)}\n`,
+    'src/components/Holds.vue': (n) => `<template>\n<p>Old</p>\n${'<MyThing>'.repeat(10 * n)}\n</template>\n`,
+    'src/styles/vars.scss': (n) => `a { color: red; }\n${'$a: b;'.repeat(16 * n)}\n`,
     // Every scanner fails closed: catalogue line states over many open quotes and blocks.
-    'i18n/states.yaml': `title: Old\n${'a: "x\n  b: |\n'.repeat(30000)}`,
+    'i18n/states.yaml': (n) => `title: Old\n${'a: "x\n  b: |\n'.repeat(8 * n)}`,
     // The fifth round's scanners: a deep stack of open elements closed by end tags of other
     // names, with and without a holder open; deeply nested and very long block quotes; many
     // paragraphs of backticks; many custom properties.
-    'src/pages/stack.html': `<p>Old</p>\n${'<a>'.repeat(30000)}${'</b>'.repeat(30000)}\n`,
-    'src/pages/held.html': `<p>Old</p>\n<x-y>${'<a>'.repeat(30000)}${'</b>'.repeat(30000)}\n`,
-    'src/pages/names.html': `<p>Old</p>\n${Array.from({ length: 20000 }, (_, i) => `<a${i}>`).join('')}${'</b></a0>'.repeat(20000)}\n`,
-    'docs/quotes.md': `Old words.\n\n${'> '.repeat(40000)}x\n`,
-    'docs/quoted.md': `Old words.\n\n${'> > > a \\` b\n'.repeat(30000)}`,
-    'docs/paragraphs.md': `Old words.\n\n${'a ` b | c\n\n- d ` e\n'.repeat(30000)}`,
-    'docs/items.md': `Old words.\n\n${'- > - > - a\n'.repeat(20000)}`,
-    'docs/markers.md': `Old words.\n\n${'- '.repeat(40000)}a\n`,
-    'src/styles/properties.css': `a { color: red; }\n:root {${'--color-a: red;'.repeat(50000)}}\n`,
+    'src/pages/stack.html': (n) => `<p>Old</p>\n${'<a>'.repeat(15 * n)}${'</b>'.repeat(15 * n)}\n`,
+    'src/pages/held.html': (n) => `<p>Old</p>\n<x-y>${'<a>'.repeat(15 * n)}${'</b>'.repeat(15 * n)}\n`,
+    'src/pages/names.html': (n) => `<p>Old</p>\n${Array.from({ length: 6 * n }, (_, i) => `<a${i}>`).join('')}${'</b></a0>'.repeat(6 * n)}\n`,
+    'docs/quotes.md': (n) => `Old words.\n\n${'> '.repeat(50 * n)}x\n`,
+    'docs/quoted.md': (n) => `Old words.\n\n${'> > > a \\` b\n'.repeat(8 * n)}`,
+    'docs/paragraphs.md': (n) => `Old words.\n\n${'a ` b | c\n\n- d ` e\n'.repeat(6 * n)}`,
+    'docs/items.md': (n) => `Old words.\n\n${'- > - > - a\n'.repeat(8 * n)}`,
+    'docs/markers.md': (n) => `Old words.\n\n${'- '.repeat(50 * n)}a\n`,
+    'src/styles/properties.css': (n) => `a { color: red; }\n:root {${'--color-a: red;'.repeat(6 * n)}}\n`,
     // The sixth round's scanners: foreign content nested deep, many pieces of it, and never
     // closed; comments that hold a comment start; script blocks full of comment marks;
     // autolink starts; placeholders in many paragraphs; braces; headings; one long value.
-    'src/pages/svg-deep.html': `<p>Old</p>\n<svg>${'<g>'.repeat(30000)}${'</g>'.repeat(30000)}</svg>\n`,
-    'src/pages/svg-many.html': `<p>Old</p>\n${'<svg><g/></svg>'.repeat(20000)}\n`,
-    'src/pages/svg-open.html': `<p>Old</p>\n${'<svg>'.repeat(40000)}\n`,
-    'src/pages/comments.html': `<p>Old</p>\n${'<!-- a <!-- b -->'.repeat(20000)}\n`,
-    'src/pages/comment-starts.html': `<p>Old</p>\n${'<!-- a '.repeat(40000)}\n`,
-    'src/pages/script-marks.html': `<p>Old</p>\n<script>${'<!-- --!> '.repeat(30000)}</script>\n`,
-    'src/pages/selects.html': `<p>Old</p>\n<select>${'<b>'.repeat(40000)}</select>\n`,
-    'docs/autolinks.md': `Old words.\n\n${'<https://a '.repeat(40000)}\n`,
-    'docs/mails.md': `Old words.\n\n${'<aaaaaaaa'.repeat(40000)}\n`,
-    'docs/placeholders.md': `Old words.\n\n${'Use <file> here.\n\n'.repeat(30000)}`,
-    'docs/braces.md': `Old words.\n\n${'{a} {"b"}\n\n'.repeat(30000)}${'{'.repeat(100000)}\n`,
-    'docs/headings.md': `Old words.\n\n${'# a\n\nb\nc\n===\n\n'.repeat(20000)}`,
-    'src/styles/value.css': `a { color: red; }\nb { margin:${' 1px'.repeat(100000)} !important; }\n`,
+    'src/pages/svg-deep.html': (n) => `<p>Old</p>\n<svg>${'<g>'.repeat(15 * n)}${'</g>'.repeat(15 * n)}</svg>\n`,
+    'src/pages/svg-many.html': (n) => `<p>Old</p>\n${'<svg><g/></svg>'.repeat(6 * n)}\n`,
+    'src/pages/svg-open.html': (n) => `<p>Old</p>\n${'<svg>'.repeat(20 * n)}\n`,
+    'src/pages/comments.html': (n) => `<p>Old</p>\n${'<!-- a <!-- b -->'.repeat(6 * n)}\n`,
+    'src/pages/comment-starts.html': (n) => `<p>Old</p>\n${'<!-- a '.repeat(15 * n)}\n`,
+    'src/pages/script-marks.html': (n) => `<p>Old</p>\n<script>${'<!-- --!> '.repeat(10 * n)}</script>\n`,
+    'src/pages/selects.html': (n) => `<p>Old</p>\n<select>${'<b>'.repeat(30 * n)}</select>\n`,
+    'docs/autolinks.md': (n) => `Old words.\n\n${'<https://a '.repeat(10 * n)}\n`,
+    'docs/mails.md': (n) => `Old words.\n\n${'<aaaaaaaa'.repeat(10 * n)}\n`,
+    'docs/placeholders.md': (n) => `Old words.\n\n${'Use <file> here.\n\n'.repeat(6 * n)}`,
+    'docs/braces.md': (n) => `Old words.\n\n${'{a} {"b"}\n\n'.repeat(4 * n)}${'{'.repeat(50 * n)}\n`,
+    'docs/headings.md': (n) => `Old words.\n\n${'# a\n\nb\nc\n===\n\n'.repeat(6 * n)}`,
+    'src/styles/value.css': (n) => `a { color: red; }\nb { margin:${' 1px'.repeat(25 * n)} !important; }\n`,
     // The seventh round's readers (the review of 2026-10-09): Markdown read block by block
     // with lazy lines, tables, definitions, link targets, image text and Markdown's own tag
     // grammar; HTML with the end tags that may be left out, the start tags that close an
     // open element, table parts and `<noscript>` content.
-    'docs/lazy.md': `Old words.\n\n${'> a\nb\n'.repeat(30000)}`,
-    'docs/lazy-items.md': `Old words.\n\n${'- a\nb\n\n'.repeat(30000)}`,
-    'docs/tables.md': `Old words.\n\n${'| a | b |\n| - | - |\n| c | d | e | f |\n\n'.repeat(15000)}`,
-    'docs/table-rows.md': `Old words.\n\n| a | b |\n| - | - |\n${'| c | d |\n'.repeat(40000)}`,
-    'docs/tag-starts.md': `Old words.\n\n${'<a b   '.repeat(40000)}\n`,
-    'docs/tag-values.md': `Old words.\n\n${'<a b = "c" d=e '.repeat(20000)}\n`,
-    'docs/link-starts.md': `Old words.\n\n${'[a](b(c'.repeat(40000)}\n`,
-    'docs/link-titles.md': `Old words.\n\n${'[a](b "c'.repeat(40000)}\n`,
-    'docs/image-starts.md': `Old words.\n\n${'![a'.repeat(60000)}\n`,
-    'docs/label-long.md': `Old words.\n\n[${'a'.repeat(300000)}\n`,
-    'docs/def-long.md': `Old words.\n\n[a]: ${'b '.repeat(100000)}\n`,
-    'docs/def-many.md': `Old words.\n\n${'[a]: /b "c"\n'.repeat(30000)}`,
-    'docs/mails-long.md': `Old words.\n\n<${'a'.repeat(150000)}@${'b.'.repeat(50000)}\n`,
-    'docs/nested-quotes.md': `Old words.\n\n${'> > > a\n> > b\n> c\n\n'.repeat(15000)}`,
-    'docs/html-blocks.md': `Old words.\n\n${'<div>\na\n</div>\n\n'.repeat(20000)}`,
-    'docs/tabs.md': `Old words.\n\n${'-\t>\ta\n'.repeat(30000)}`,
-    'src/pages/implied.html': `<p>Old</p>\n<div>${'<p>'.repeat(40000)}</div>\n`,
-    'src/pages/implied-wrong.html': `<p>Old</p>\n<div><span>${'<p>a'.repeat(30000)}${'</div>'.repeat(30000)}\n`,
-    'src/pages/items.html': `<p>Old</p>\n<ul>${'<li>a'.repeat(40000)}</ul>\n`,
-    'src/pages/items-deep.html': `<p>Old</p>\n<ul><li><ol>${'<span>'.repeat(20000)}${'<li></li>'.repeat(20000)}\n`,
-    'src/pages/cells.html': `<p>Old</p>\n<table>${'<tr><td>a<td>b'.repeat(20000)}</table>\n`,
-    'src/pages/noscripts.html': `<p>Old</p>\n${'<noscript><p>x</p></noscript>'.repeat(20000)}\n`,
-    'src/pages/options.html': `<p>Old</p>\n<select>${'<option>a<optgroup>'.repeat(30000)}</select>\n`
+    'docs/lazy.md': (n) => `Old words.\n\n${'> a\nb\n'.repeat(15 * n)}`,
+    'docs/lazy-items.md': (n) => `Old words.\n\n${'- a\nb\n\n'.repeat(15 * n)}`,
+    'docs/tables.md': (n) => `Old words.\n\n${'| a | b |\n| - | - |\n| c | d | e | f |\n\n'.repeat(3 * n)}`,
+    'docs/table-rows.md': (n) => `Old words.\n\n| a | b |\n| - | - |\n${'| c | d |\n'.repeat(10 * n)}`,
+    'docs/tag-starts.md': (n) => `Old words.\n\n${'<a b   '.repeat(15 * n)}\n`,
+    'docs/tag-values.md': (n) => `Old words.\n\n${'<a b = "c" d=e '.repeat(6 * n)}\n`,
+    'docs/link-starts.md': (n) => `Old words.\n\n${'[a](b(c'.repeat(15 * n)}\n`,
+    'docs/link-titles.md': (n) => `Old words.\n\n${'[a](b "c'.repeat(12 * n)}\n`,
+    'docs/image-starts.md': (n) => `Old words.\n\n${'![a'.repeat(30 * n)}\n`,
+    'docs/label-long.md': (n) => `Old words.\n\n[${'a'.repeat(100 * n)}\n`,
+    'docs/def-long.md': (n) => `Old words.\n\n[a]: ${'b '.repeat(50 * n)}\n`,
+    'docs/def-many.md': (n) => `Old words.\n\n${'[a]: /b "c"\n'.repeat(8 * n)}`,
+    'docs/mails-long.md': (n) => `Old words.\n\n<${'a'.repeat(60 * n)}@${'b.'.repeat(20 * n)}\n`,
+    'docs/nested-quotes.md': (n) => `Old words.\n\n${'> > > a\n> > b\n> c\n\n'.repeat(5 * n)}`,
+    'docs/html-blocks.md': (n) => `Old words.\n\n${'<div>\na\n</div>\n\n'.repeat(6 * n)}`,
+    'docs/tabs.md': (n) => `Old words.\n\n${'-\t>\ta\n'.repeat(15 * n)}`,
+    'src/pages/implied.html': (n) => `<p>Old</p>\n<div>${'<p>'.repeat(30 * n)}</div>\n`,
+    'src/pages/implied-wrong.html': (n) => `<p>Old</p>\n<div><span>${'<p>a'.repeat(12 * n)}${'</div>'.repeat(12 * n)}\n`,
+    'src/pages/items.html': (n) => `<p>Old</p>\n<ul>${'<li>a'.repeat(20 * n)}</ul>\n`,
+    'src/pages/items-deep.html': (n) => `<p>Old</p>\n<ul><li><ol>${'<span>'.repeat(8 * n)}${'<li></li>'.repeat(8 * n)}\n`,
+    'src/pages/cells.html': (n) => `<p>Old</p>\n<table>${'<tr><td>a<td>b'.repeat(8 * n)}</table>\n`,
+    'src/pages/noscripts.html': (n) => `<p>Old</p>\n${'<noscript><p>x</p></noscript>'.repeat(4 * n)}\n`,
+    'src/pages/options.html': (n) => `<p>Old</p>\n<select>${'<option>a<optgroup>'.repeat(6 * n)}</select>\n`,
+    // The eighth round's reader of Markdown and plain text (the decision at review of
+    // 2026-10-09): one pass over the lines. Many plain paragraphs, one very long paragraph,
+    // one very long line, many closed fences, metadata blocks, one-line comments and code
+    // spans that hold a tag, backtick runs that close nothing, a long run of spaces, lines
+    // that end like the start of a definition, and the same reader on plain text.
+    'docs/prose-many.md': (n) => `${'Plain words in a line.\n\n'.repeat(5 * n)}Old words.\n`,
+    'docs/prose-paragraph.md': (n) => `${'Plain words in a line,\n'.repeat(5 * n)}Old words.\n`,
+    'docs/prose-line.md': (n) => `${'plain words '.repeat(10 * n)}Old words.\n`,
+    'docs/fences-many.md': (n) => `${'```js\n<b> code\n```\n\n'.repeat(5 * n)}Old words.\n`,
+    'docs/meta-many.md': (n) => `${'---\ntitle: x\n---\n\n'.repeat(5 * n)}Old words.\n`,
+    'docs/comments-many.md': (n) => `${'<!-- a note -->\n\n'.repeat(6 * n)}Old words.\n`,
+    'docs/spans-many.md': (n) => `${'Use `<b>` and ``a ` <i>`` now.\n\n'.repeat(4 * n)}Old words.\n`,
+    'docs/spans-line.md': (n) => `${'`<b>` '.repeat(15 * n)}\n\nOld words.\n`,
+    'docs/ticks-open.md': (n) => `${risingTicks(100 * n)}\n\nOld words.\n`,
+    'docs/spaces-long.md': (n) => `${' '.repeat(100 * n)}x\n\nOld words.\n`,
+    'docs/def-ends.md': (n) => `${`a]:${' '.repeat(40)}\n`.repeat(3 * n)}\nOld words.\n`,
+    'docs/fence-like.md': (n) => `${'x ``` y ~~~\n'.repeat(8 * n)}\nOld words.\n`,
+    'NOTES.txt': (n) => `${'Plain words in a line.\n\n'.repeat(5 * n)}Old words.\n`
   };
-  for (const [rel, old] of Object.entries(cases)) {
-    const changed = /\.s?css$/.test(rel) ? old.replace('red', 'blue') : old.replace('Old', 'New');
-    // Each input is judged twice and the second run is timed (since the review of
-    // 2026-10-09): the first run also pays for the compiling of the reader, which the
-    // processor time of the process counts; the claim is about the scanning.
-    let ms = 0;
-    for (let run = 0; run < 2; run++) {
-      const start = process.cpuUsage();
-      const refused = ruleRefusal(changeOf(rel, old, changed));
-      // The inputs of the removed formats are kept: each is refused as not recognised, at once.
-      if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(refused.cause, 'unrecognised', rel);
-      const used = process.cpuUsage(start);
-      ms = (used.user + used.system) / 1000;
-    }
-    assert.ok(ms < 250, `${rel}: ${old.length} characters took ${ms.toFixed(1)} ms`);
+  for (const [rel, build] of Object.entries(cases)) {
+    const at = (n) => {
+      const old = build(n);
+      const change = changeOf(rel, old, /\.s?css$/.test(rel) ? old.replace('red', 'blue') : old.replace('Old', 'New'));
+      return () => ruleRefusal(change);
+    };
+    // The inputs of the removed formats are kept: each is refused as not recognised, at once.
+    if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(at(1)().cause, 'unrecognised', rel);
+    // The eighth round's inputs that end in a plain paragraph are read to the end and pass.
+    if (/^(?:docs\/(?:prose|fences|meta|comments|spans|ticks-open|spaces|def-ends|fence-like)|NOTES)/.test(rel)) assert.equal(at(1)(), null, rel);
+    // The largest input is about 1.6 million characters, four times the size a quadratic scan took seconds on.
+    const { n, small, big, ratio } = growth(at, 16, Math.floor(1600000 / (build(64).length / 64)));
+    assert.ok(ratio < 8, `${rel}: size ${n} took ${small.toFixed(1)} ms and size ${4 * n} took ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
+    if (ratio > 5) t.diagnostic(`${rel}: ${ratio.toFixed(1)} times as long at 4 times the size (${small.toFixed(1)} ms at size ${n})`);
   }
 });
 
