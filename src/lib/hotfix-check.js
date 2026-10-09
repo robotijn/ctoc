@@ -385,9 +385,7 @@ const DOC_TEXT_NAMES = new Set(['readme', 'changelog', 'changes', 'news', 'histo
 function documentationText(lower) {
   const parts = lower.split('.');
   if (parts.length < 2 || parts.length > 3 || parts[parts.length - 1] !== 'txt' || !DOC_TEXT_NAMES.has(parts[0])) return false;
-  if (parts.length === 2) return true;
-  const [language, ...more] = parts[1].split(/[-_]/);
-  return /^[a-z]{2,3}$/.test(language) && more.length <= 2 && more.every((part) => /^[a-z0-9]{2,8}$/.test(part));
+  return parts.length === 2 || languageTag(parts[1]); // the one reader of a language part, as for a catalogue
 }
 /**
  * Legal texts never qualify, `.md` or `.txt` (the decision at review of 2026-10-09): for each
@@ -449,9 +447,12 @@ const PATH_START = /^[/\\]/;
 /**
  * A bare YAML or properties value that a program reads as a switch, as nothing or as a
  * number that holds no digit, never as wording; and, as a YAML key, a word a YAML reader may
- * read as another type.
+ * read as another type. `y` and `n` are among them (the decision at review of 2026-10-09): a
+ * reader of the older YAML (go-yaml 2) takes them for a switch, js-yaml for a letter.
  */
-const BARE_SCALAR = /^(?:true|false|yes|no|on|off|null|~|[-+]?\.inf|\.nan)$/i;
+/** A key no catalogue holds: a program that merges catalogues writes it onto every object it has. */
+const MACHINERY_KEY = '__proto__';
+const BARE_SCALAR = /^(?:true|false|yes|no|on|off|y|n|null|~|[-+]?\.inf|\.nan)$/i;
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
 /** A character a single-quoted path in the commit command cannot carry, or slice 2's reader refuses. */
 const UNCARRIABLE = /['"$\\`\u0000-\u001f\u007f-\u009f]/;
@@ -722,6 +723,8 @@ function copyIndex(ctx) {
 const LINKING_NAMES = new Set(['claude.md', 'agents.md']);
 /** @param {string} rel a path from the repository's top @returns {string} the path as two spellings of one file compare equal: composed, lower case */
 const foldPath = (rel) => rel.normalize('NFC').toLowerCase();
+/** @param {string} rel @returns {string[]} the path in every form it is asked in ({@link PATH_FORMS}), each folded ({@link foldPath}) */
+const pathKeys = (rel) => PATH_FORMS.map((form) => foldPath(form(rel)));
 
 /**
  * Every destination a Markdown link, an image or a link definition in the text may name:
@@ -774,7 +777,7 @@ function linkTargets(text) {
  * KNOWN LIMITS: a link to a folder governs no file in it, and a path written without a
  * link (in a code span, behind `@`) is not read.
  * @param {Context} ctx
- * @returns {Set<string>} the linked files, each as {@link foldPath} spells it
+ * @returns {Set<string>} the linked files, each in every form a path is asked in ({@link pathKeys})
  */
 function instructionLinks(ctx) {
   const top = /** @type {string} */ (ctx.top);
@@ -798,7 +801,7 @@ function instructionLinks(ctx) {
       const found = target.startsWith('..') || target.startsWith('/') ? ''
         : gitOut(ctx, top, ['ls-tree', '-z', '--full-tree', head, '--', target]).toString('utf8').split('\0')[0];
       e = found === '' ? e : entryOf(found);
-      governed.add(foldPath(e.rel));
+      for (const key of pathKeys(e.rel)) governed.add(key);
       folders.push(path.posix.dirname(e.rel));
     }
     if (e.mode !== '100644' && e.mode !== '100755') throw new Unreadable(`${clean(name)} is a link the check cannot follow`);
@@ -816,7 +819,7 @@ function instructionLinks(ctx) {
       for (const spelling of spellings) {
         for (const folder of spelling.startsWith('/') ? ['.'] : folders) {
           const rel = path.posix.normalize(path.posix.join(folder, spelling.replace(/^\/+/, '')));
-          if (rel !== '.' && !rel.startsWith('..')) governed.add(foldPath(rel));
+          if (rel !== '.' && !rel.startsWith('..')) for (const key of pathKeys(rel)) governed.add(key);
         }
       }
     }
@@ -1010,15 +1013,37 @@ function ruleSameFiles(f) {
   return null;
 }
 
-/** Rule 7 — no test is edited (a test folder in the path from the repository top, or a `*.test.*` / `*.spec.*` name). */
+/** @param {string} text @returns {string} the text as its letters read: compatibility forms taken apart (a full-width letter is the plain one, a letter with a mark its letter and the mark), then every mark and every format character (a zero-width space, a joiner) dropped */
+const lettersOf = (text) => text.normalize('NFKD').replace(/[\p{Cf}\p{M}]/gu, '');
+/**
+ * THE FORMS A PATH IS ASKED IN (the coordinator's point at review, 2026-10-09: a transform
+ * may only add reasons to refuse). git, a file system and the tools that read a file compare
+ * names in ways this check cannot know: one drops a zero-width character, another keeps it.
+ * So every rule about a path asks it as written, with compatibility letters taken for plain
+ * ones (NFKC), and as its letters read ({@link lettersOf}). A rule that REFUSES (a test, a
+ * governing name or folder, a linked file, a dependency, build or settings name, a sensitive
+ * word) refuses when any form says so; the rule that lets a file QUALIFY (its kind) needs the
+ * same kind from every form. Dropping a mark alone would join `auth` and `login` around a
+ * zero-width space into one word that is no sensitive word, which is why the path as written
+ * is always asked too. Letter case is no form: names are compared without regard to it, by
+ * the eighth round's decision, as the file systems and renderers that read them do.
+ * @type {Array<(text: string) => string>}
+ */
+const PATH_FORMS = [(text) => text, (text) => text.normalize('NFKC'), lettersOf];
+
+/** Rule 7 — no test is edited (a test folder in the path from the repository top, or a `*.test.*` / `*.spec.*` name), in any form of the path ({@link PATH_FORMS}). */
 function ruleNoTestEdited(f) {
-  const { base, topFolders } = nameParts(f);
-  const isTest = topFolders.some((p) => TEST_FOLDERS.has(p)) || /\.(test|spec)\./i.test(base);
+  const isTest = PATH_FORMS.some((form) => {
+    const { base, topFolders } = nameParts({ display: form(f.display), topRel: form(f.topRel) });
+    return topFolders.some((p) => TEST_FOLDERS.has(p)) || /\.(test|spec)\./i.test(base);
+  });
   return isTest ? { clause: `it changes a test (${f.display})`, cause: 'test-edited' } : null;
 }
 
-/** @param {string} s @returns {string} the text with a carriage return before each line feed, or at the end, removed */
-const withoutCarriageReturns = (s) => s.replace(/\r\n/g, '\n').replace(/\r$/, '');
+/** @param {string} s @returns {string} the text with a carriage return before each line feed removed */
+const lineFeeds = (s) => s.replace(/\r\n/g, '\n');
+/** @param {string} s @returns {string} the text as git's diff compares it here (`--ignore-cr-at-eol`): {@link lineFeeds}, and no carriage return at the very end */
+const withoutCarriageReturns = (s) => lineFeeds(s).replace(/\r$/, '');
 
 /**
  * Rule 4, first — a modified file whose texts differ (carriage returns aside) but that
@@ -1739,6 +1764,21 @@ const UNSEEN_CHARACTER = /(?![\t\n\f\r])[\p{Cc}\p{Cf}]/u;
  * sign, an `@` or a `/` that it would not see.
  */
 const PLAIN_REFERENCE = /&(?:amp|nbsp|quot|apos|copy|reg|trade|hellip|mdash|ndash|lsquo|rsquo|ldquo|rdquo|laquo|raquo|middot|bull|shy);/g;
+/** The character each plain reference spells. */
+const REFERENCE_CHARACTERS = { amp: '&', nbsp: '\u00a0', quot: '"', apos: "'", copy: '\u00a9', reg: '\u00ae', trade: '\u2122', hellip: '\u2026', mdash: '\u2014',
+  ndash: '\u2013', lsquo: '\u2018', rsquo: '\u2019', ldquo: '\u201c', rdquo: '\u201d', laquo: '\u00ab', raquo: '\u00bb', middot: '\u00b7', bull: '\u2022', shy: '\u00ad' };
+/** @param {string} text a changed markup text, as written @returns {string} the text a browser shows: each plain reference as its character (`&shy;` is a hyphen nobody sees, and rule 6 refuses it as it refuses the character) */
+const referencesRead = (text) => text.replace(PLAIN_REFERENCE, (m) => REFERENCE_CHARACTERS[m.slice(1, -1)]);
+/**
+ * A character set named in a page: the word `charset` anywhere, not followed by `=` and
+ * `utf-8` (the decision at review of 2026-10-09). The check reads every file as UTF-8; under
+ * another character set a browser reads other characters from the same bytes, and in some
+ * (Shift_JIS, GBK) a letter or a brace after a non-ASCII character is the second half of that
+ * character. KNOWN LIMIT: a character set the server names in a header is not seen.
+ */
+const OTHER_CHARSET = /charset(?![ \t\n]*=[ \t\n]*["']?utf-?8(?![\w-]))/i;
+/** The same for a stylesheet: an `@charset` rule that names anything but UTF-8. */
+const OTHER_CSS_CHARSET = /@charset(?![ \t\n]*["']utf-?8["'])/i;
 
 /**
  * Rule 4 (markup) — a changed text token is visible text: not quiet, without template or
@@ -1848,26 +1888,30 @@ const placeholders = (value) => (value.match(PLACEHOLDER) || []).join('\u0000');
 
 /**
  * Rule 4 (message catalogue) — the changed values of a catalogue read as wording, or null.
- * Each pair holds the old and the new value as the program reads them (decoded) and whether
- * they were written without quotes. Both carry the same placeholders in the same order; each
- * is read as a browser reads an address ({@link asAddress}) and needs a letter outside its
+ * Each pair holds the old and the new value twice: as the program reads them (decoded), and
+ * as they are written in the file (the coordinator's point at review, 2026-10-09: the program
+ * that reads the file sees what is written, and a decoder of another kind decodes otherwise,
+ * so the rule holds for both or refuses); and whether they were written without quotes. In
+ * each form both sides carry the same placeholders in the same order; each value is read as
+ * it is and as a browser reads an address ({@link asAddress}) and needs a letter outside its
  * placeholders, no start like a path (`/`, `//`, `\`), no scheme anywhere ({@link SCHEME}),
  * and, written without quotes in YAML or a properties file, it is no switch
  * ({@link BARE_SCALAR}). A change that changes no value is none. Returns what rule 6 reads:
- * the old and the new value of each pair, as written and as an address, without their
- * placeholders.
- * @param {Array<[string, string, boolean]>} changed @returns {(string[]|null)}
+ * every form of the old and the new value of each pair, without their placeholders.
+ * @param {Array<[string, string, boolean, string, string]>} changed @returns {(string[]|null)}
  */
 function catalogueRuns(changed) {
   const runs = [];
-  for (const [before, after, bare] of changed) {
-    if (before === after || placeholders(before) !== placeholders(after)) return null;
-    for (const value of [before, after]) {
-      const v = asAddress(value);
-      if (!/\p{L}/u.test(v.replace(PLACEHOLDER, '')) || PATH_START.test(v) || SCHEME.test(v) || (bare && BARE_SCALAR.test(v))) return null;
-      // Rule 6 reads the value as it is and as an address-reader keeps it: the first still
-      // holds a control character at its end, the second has no tab or line break left inside.
-      runs.push(value.replace(PLACEHOLDER, ''), v.replace(PLACEHOLDER, ''));
+  for (const [before, after, bare, writtenBefore, writtenAfter] of changed) {
+    if (before === after) return null;
+    for (const [a, b] of [[before, after], [writtenBefore, writtenAfter]]) {
+      if (placeholders(a) !== placeholders(b)) return null;
+      for (const value of [a, b]) {
+        for (const v of [value, asAddress(value)]) {
+          if (!/\p{L}/u.test(v.replace(PLACEHOLDER, '')) || PATH_START.test(v) || SCHEME.test(v) || (bare && BARE_SCALAR.test(v))) return null;
+          runs.push(v.replace(PLACEHOLDER, ''));
+        }
+      }
     }
   }
   return changed.length > 0 ? runs : null;
@@ -1877,23 +1921,31 @@ function catalogueRuns(changed) {
  * Rule 4 (message catalogue, JSON) — one side as `JSON.parse` reads it, when the file is
  * exactly what `JSON.stringify` writes of that value with the file's own indentation (the
  * white space that starts its second line), with or without one last line break; or null: a
- * file `JSON.parse` refuses, one written in another form, or one with no indentation (its one
+ * file `JSON.parse` refuses, one written in another form, one with no indentation (its one
  * line would hold every string of the catalogue, and a change to all of them would count as
- * two changed lines). Only a syntax error of the parse is caught; any other fault stops the
- * check.
+ * two changed lines), or one with a key that holds `__proto__` ({@link MACHINERY_KEY}; the
+ * parse itself reports every key, no text is read by hand). Only a syntax error of the parse
+ * is caught; any other fault stops the check. WHY NO SEPARATE SCAN FOR A KEY THAT OCCURS
+ * TWICE: `JSON.stringify` never writes one object's key twice, so a file that is exactly what
+ * it writes holds none; the parse keeps the last of two, the written form is then one entry
+ * shorter than the file, and the comparison refuses.
  * @param {string} text line feeds only
  * @returns {({value: unknown, form: string}|null)} `form`: the indentation and whether a line break ends the file
  */
 function jsonSide(text) {
   let value;
+  let machinery = false;
   try {
-    value = JSON.parse(text);
+    value = JSON.parse(text, (key, held) => {
+      if (key.includes(MACHINERY_KEY)) machinery = true;
+      return held;
+    });
   } catch (err) {
     if (err instanceof SyntaxError) return null;
     throw err;
   }
   const indent = /\n([ \t]+)/.exec(text);
-  if (indent === null) return null;
+  if (indent === null || machinery) return null;
   const written = JSON.stringify(value, null, indent[1]);
   if (text !== written && text !== `${written}\n`) return null;
   return { value, form: `${indent[1]}${text.length - written.length}` };
@@ -1904,17 +1956,18 @@ function jsonSide(text) {
  * catalogues, or null when anything else does: the two must hold the same keys in the same
  * order, lists of the same length, and the same value everywhere but in strings. Walked with
  * a stack of its own, so a deeply nested file cannot exhaust the call stack.
- * @param {unknown} oldValue @param {unknown} newValue @returns {(Array<[string, string, boolean]>|null)}
+ * @param {unknown} oldValue @param {unknown} newValue @returns {(Array<[string, string, boolean, string, string]>|null)}
  */
 function jsonChanges(oldValue, newValue) {
-  /** @type {Array<[string, string, boolean]>} */
+  /** @type {Array<[string, string, boolean, string, string]>} */
   const changed = [];
   /** @type {Array<[any, any]>} */
   const pending = [[oldValue, newValue]];
   while (pending.length > 0) {
     const [a, b] = /** @type {[any, any]} */ (pending.pop());
     if (typeof a === 'string' && typeof b === 'string') {
-      if (a !== b) changed.push([a, b, false]);
+      // As written: the file is what `JSON.stringify` writes, so that is this string between its quotes.
+      if (a !== b) changed.push([a, b, false, JSON.stringify(a).slice(1, -1), JSON.stringify(b).slice(1, -1)]);
     } else if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
       if (a !== b) return null;
     } else {
@@ -1944,16 +1997,16 @@ const YAML_UNSEEN = /(?!\n)[\p{Cc}\u2028\u2029\ufffe\uffff]/u;
  * block scalar `|` or `>`, a complex key `?`, and `-`, `:`, `,`, `#`, `@`, a backtick, `%`,
  * `]`, `}`), holds no ` #` (a comment) and no `: ` (a mapping), and does not end in `:`.
  * @param {string} raw the text behind the key or the item marker, with no white space at its end
- * @returns {({text: string, quote: string}|null)} null: no such scalar
+ * @returns {({text: string, written: string, quote: string}|null)} the scalar as a reader decodes it and as it is written between its quotes; null: no such scalar
  */
 function yamlScalar(raw) {
   if (raw[0] === '"') {
     const text = /^"(?:[^"\\]|\\.)*"$/.test(raw) ? unescapeValue(raw.slice(1, -1), YAML_ESCAPES, { x: 2, u: 4, U: 8 }, false) : null;
-    return text === null ? null : { text, quote: '"' };
+    return text === null ? null : { text, written: raw.slice(1, -1), quote: '"' };
   }
-  if (raw[0] === "'") return /^'(?:[^']|'')*'$/.test(raw) ? { text: raw.slice(1, -1).replace(/''/g, "'"), quote: "'" } : null;
+  if (raw[0] === "'") return /^'(?:[^']|'')*'$/.test(raw) ? { text: raw.slice(1, -1).replace(/''/g, "'"), written: raw.slice(1, -1), quote: "'" } : null;
   if ('!&*[]{}|>?-:,#@`%'.includes(raw[0]) || raw.includes(' #') || raw.includes(': ') || raw.endsWith(':')) return null;
-  return { text: raw, quote: '' };
+  return { text: raw, written: raw, quote: '' };
 }
 
 /**
@@ -1961,6 +2014,7 @@ function yamlScalar(raw) {
  * @property {string} line the line as written
  * @property {string} [head] for a line that carries a value: everything before the value
  * @property {string} [text] the value as the program reads it
+ * @property {string} [written] the value as it is written, between its quotes
  * @property {string} [quote] how a YAML value is quoted: `"`, `'` or not at all
  * @property {number} [tail] how much white space ends the line
  */
@@ -1970,7 +2024,7 @@ function yamlScalar(raw) {
  * null when the file holds anything outside it (the decision at review of 2026-10-09). The
  * subset: an optional `---` as the first line; blank lines; comment lines; `key: value`,
  * `key:` and `- value` lines, the key a plain word ({@link YAML_KEY}) that is none of YAML's
- * switches ({@link BARE_SCALAR}), the value one scalar that ends on its line
+ * switches ({@link BARE_SCALAR}) and holds no `__proto__` ({@link MACHINERY_KEY}), the value one scalar that ends on its line
  * ({@link yamlScalar}). So the file holds no tag, anchor, alias, flow collection, block
  * scalar, scalar over several lines, document marker after the first line, tab, complex key
  * or quoted key. The indentation must be a mapping's or a list's: a line stands as deep as
@@ -2000,7 +2054,7 @@ function yamlEntries(text) {
     const key = YAML_KEY.exec(written);
     const item = key ? null : YAML_ITEM.exec(written);
     const mark = key || item;
-    if (mark === null || (key && BARE_SCALAR.test(key[2]))) return null;
+    if (mark === null || (key && (BARE_SCALAR.test(key[2]) || key[2].includes(MACHINERY_KEY)))) return null;
     const indent = mark[1].length;
     const raw = written.slice(mark[0].length);
     const value = raw === '' ? null : yamlScalar(raw);
@@ -2022,7 +2076,8 @@ function yamlEntries(text) {
       top.keys.add(key[2]);
     }
     parent = key && value === null ? indent : -1;
-    out.push(value === null ? { line, head: written } : { line, head: mark[0], text: value.text, quote: value.quote, tail: line.length - written.length });
+    out.push(value === null ? { line, head: written }
+      : { line, head: mark[0], text: value.text, written: value.written, quote: value.quote, tail: line.length - written.length });
   }
   return out;
 }
@@ -2030,8 +2085,8 @@ function yamlEntries(text) {
 /**
  * Rule 4 (message catalogue, properties) — the lines of a Java properties file in the strict
  * subset, or null when a line ends in a backslash (a line continued on the next, or an
- * escaped backslash that another reader takes for one) or the file holds a carriage return
- * on its own (a line break to Java). A line is blank, a comment (`#` or `!`), or an entry.
+ * escaped backslash that another reader takes for one), the file holds a carriage return
+ * on its own (a line break to Java), or a key holds `__proto__` ({@link MACHINERY_KEY}). A line is blank, a comment (`#` or `!`), or an entry.
  * The key ends at the first unescaped `=`, `:` or white space, as Java reads it. A line
  * CARRIES A VALUE only when its key holds no backslash and `=` or `:` follows it, behind
  * white space at most: where white space alone ends the key, or the key holds an escaped
@@ -2056,6 +2111,7 @@ function propertiesEntries(text) {
     }
     while (at < line.length && !space(line[at]) && line[at] !== '=' && line[at] !== ':') at += line[at] === '\\' ? 2 : 1;
     const key = line.slice(start, at);
+    if (key.includes(MACHINERY_KEY)) return null;
     while (space(line[at])) at++;
     if (key.includes('\\') || (line[at] !== '=' && line[at] !== ':')) {
       out.push({ line });
@@ -2064,7 +2120,7 @@ function propertiesEntries(text) {
     at++;
     while (space(line[at])) at++;
     const value = unescapeValue(line.slice(at), PROPERTIES_ESCAPES, { u: 4 }, true);
-    out.push(value === null ? { line } : { line, head: line.slice(0, at), text: value, quote: '', tail: 0 });
+    out.push(value === null ? { line } : { line, head: line.slice(0, at), text: value, written: line.slice(at), quote: '', tail: 0 });
   }
   return out;
 }
@@ -2074,18 +2130,19 @@ function propertiesEntries(text) {
  * sides, or null when anything else does: the same number of lines, and every line that
  * differs carries a value on both sides, behind the same key and marker, in the same quotes
  * and before the same white space.
- * @param {CatalogueLine[]} a @param {CatalogueLine[]} b @returns {(Array<[string, string, boolean]>|null)}
+ * @param {CatalogueLine[]} a @param {CatalogueLine[]} b @returns {(Array<[string, string, boolean, string, string]>|null)}
  */
 function lineChanges(a, b) {
   if (a.length !== b.length) return null;
-  /** @type {Array<[string, string, boolean]>} */
+  /** @type {Array<[string, string, boolean, string, string]>} */
   const changed = [];
   for (let i = 0; i < a.length; i++) {
     const x = a[i];
     const y = b[i];
     if (x.line === y.line) continue;
-    if (x.text === undefined || y.text === undefined || x.head !== y.head || x.quote !== y.quote || x.tail !== y.tail) return null;
-    changed.push([x.text, y.text, x.quote === '']);
+    if (x.text === undefined || y.text === undefined || x.written === undefined || y.written === undefined
+      || x.head !== y.head || x.quote !== y.quote || x.tail !== y.tail) return null;
+    changed.push([x.text, y.text, x.quote === '', x.written, y.written]);
   }
   return changed;
 }
@@ -2157,7 +2214,7 @@ function blankCss(s) {
       end = e < 0 ? n : e + 2;
     } else if (c === '"' || c === "'") {
       end = Math.min(skipString(s, i), n);
-    } else if ((c === 'u' || c === 'U') && s.slice(i, i + 4).toLowerCase() === 'url(' && !/[\w-]/.test(s[i - 1] || '')) {
+    } else if ((c === 'u' || c === 'U') && asciiLower(s.slice(i, i + 4)) === 'url(' && !/[\w-]/.test(s[i - 1] || '')) {
       let j = i + 4;
       while (j < n && isSpace(s[j])) j++;
       if (s[j] !== '"' && s[j] !== "'") {
@@ -2201,7 +2258,10 @@ function blankCss(s) {
  *     and postcss refuses;
  *   - a declaration with a comment before its name or its colon is a declaration, and this
  *     reader vouches for no property of it: a colour changed in it is not recognised (as
- *     before this reader was strict).
+ *     before this reader was strict);
+ *   - an `@charset` rule names UTF-8 or the file cannot be followed ({@link OTHER_CSS_CHARSET});
+ *   - letters are compared as a browser compares them, ASCII letters without regard to case
+ *     and no other ({@link asciiLower}): the Kelvin sign in `blac<Kelvin sign>` is no `k`.
  */
 
 /**
@@ -2261,6 +2321,7 @@ function cssStatements(blank) {
  * @returns {{blank: string, statements: CssStatement[]}}
  */
 function readCss(text) {
+  if (OTHER_CSS_CHARSET.test(text)) fault('lost'); // read as UTF-8 here, and as something else by a browser
   const blank = blankCss(text);
   const statements = cssStatements(blank);
   const head = /([\s\u0002]*)(--[\w-]+|[A-Za-z-]+)([\s\u0002]*):/y;
@@ -2330,8 +2391,7 @@ function colourSlots(text) {
     const j = i + t.length;
     if (i > 0 && !/[\s:,(]/.test(blank[i - 1])) continue;
     if (j < blank.length && !/[\s;,)}!]/.test(blank[j])) continue;
-    const ok = t[0] === '#' ? [4, 5, 7, 9].includes(t.length) : t.includes('(') ? colourFunction(t) : NAMED_COLOURS.has(t.toLowerCase());
-    if (!ok) continue;
+    if (!oneColour(t)) continue; // the one reader of what a colour is, as for a custom property's value
     while (nextBreak !== -1 && nextBreak < i) {
       lineStart = nextBreak + 1;
       nextBreak = blank.indexOf('\n', lineStart);
@@ -2351,7 +2411,7 @@ function colourSlots(text) {
  * @param {string} x @returns {boolean}
  */
 function colourNumber(x) {
-  if (x.toLowerCase() === 'none') return true;
+  if (asciiLower(x) === 'none') return true;
   let i = x[0] === '+' || x[0] === '-' ? 1 : 0;
   const from = i;
   while (i < x.length && x[i] >= '0' && x[i] <= '9') i++;
@@ -2361,7 +2421,7 @@ function colourNumber(x) {
     while (i < x.length && x[i] >= '0' && x[i] <= '9') i++;
     digits += i - fraction;
   }
-  return digits > 0 && ['', '%', 'deg', 'rad', 'grad', 'turn'].includes(x.slice(i).toLowerCase());
+  return digits > 0 && ['', '%', 'deg', 'rad', 'grad', 'turn'].includes(asciiLower(x.slice(i)));
 }
 
 /** The colour functions that may also be written with commas. */
@@ -2378,7 +2438,7 @@ const SPACE_COLOURS = new Set(['hwb', 'lab', 'lch', 'oklab', 'oklch', 'color']);
  * @param {string} t `name(…)`, no bracket inside @returns {boolean}
  */
 function colourFunction(t) {
-  const name = t.slice(0, t.indexOf('(')).toLowerCase();
+  const name = asciiLower(t.slice(0, t.indexOf('(')));
   const inner = t.slice(t.indexOf('(') + 1, -1).trim();
   if (COMMA_COLOURS.has(name) && inner.includes(',')) {
     const parts = inner.split(',');
@@ -2400,7 +2460,7 @@ function colourFunction(t) {
  */
 function oneColour(v) {
   if (v[0] === '#') return [4, 5, 7, 9].includes(v.length) && /^#[0-9A-Fa-f]+$/.test(v);
-  return NAMED_COLOURS.has(v.toLowerCase()) || (/^[A-Za-z]+\([^()]*\)$/.test(v) && colourFunction(v));
+  return NAMED_COLOURS.has(asciiLower(v)) || (/^[A-Za-z]+\([^()]*\)$/.test(v) && colourFunction(v));
 }
 
 /**
@@ -2409,7 +2469,7 @@ function oneColour(v) {
  * ...) or one of {@link COLOUR_SHORTHANDS}; never a custom property
  */
 const colourMayStand = (prop) => prop !== null && !prop.startsWith('--')
-  && (/(?:^|-)color$/i.test(prop) || COLOUR_SHORTHANDS.has(prop.toLowerCase()));
+  && (/(?:^|-)color$/i.test(prop) || COLOUR_SHORTHANDS.has(asciiLower(prop)));
 
 /**
  * Rule 4 (colour) — every custom property declaration of a whole stylesheet, in order: its
@@ -2446,7 +2506,7 @@ function customProperties(text) {
     if (d !== null && d.at === i) continue; // the declaration's own name
     let k = i;
     while (k > 0 && isSpace(blank[k - 1])) k--;
-    const inVar = blank.slice(Math.max(k - 4, 0), k).toLowerCase() === 'var(' && !/[\w-]/.test(blank[k - 5] || '');
+    const inVar = asciiLower(blank.slice(Math.max(k - 4, 0), k)) === 'var(' && !/[\w-]/.test(blank[k - 5] || '');
     if (!(inVar && d !== null && d.valueAt <= i && colourMayStand(d.name))) read.add(m[0]);
   }
   return { list, read };
@@ -2549,9 +2609,6 @@ function emptyLiterals(line) {
   }
   return out;
 }
-
-/** @param {string} s @returns {string} the text with a carriage return before each line feed removed */
-const lineFeeds = (s) => s.replace(/\r\n/g, '\n');
 
 /*
  * MARKDOWN AND PLAIN TEXT: PURE PROSE (rule 4; the decision at review of 2026-10-09, under the
@@ -2695,7 +2752,7 @@ function rawOutsideSpans(line, unsure) {
   let i = 0;
   while (i < line.length) {
     const c = line[i];
-    if (c === '<' && /[A-Za-z!/]/.test(line[i + 1] || '')) return { raw: true, unsure };
+    if (c === '<' && TAG_START.test(line.slice(i, i + 2))) return { raw: true, unsure };
     if (c === '\\') unsure = true;
     if (c !== '`' || unsure) { i++; continue; }
     let run = i + 1;
@@ -2885,12 +2942,32 @@ function ruleContent(f) {
  * Rule 4, the kind — place one file by its name and its place, before any reader reads its
  * content: the first qualifying kind that fits, or the clause that refuses it. A place that
  * governs the work never qualifies, whatever the kind; a file of no qualifying kind gets the
- * clause of the first other kind it matches.
+ * clause of the first other kind it matches. The path is asked in every form
+ * ({@link PATH_FORMS}): the first form that refuses gives the clause, and the file qualifies
+ * only when every form places it in the same kind.
  * @param {ChangedFile} f
  * @returns {{kind: string}|{clause: string, cause: string}}
  */
 function kindOf(f) {
-  const { base, ext, folders, topFolders } = nameParts(f);
+  let kind = null;
+  for (const form of PATH_FORMS) {
+    const r = kindAs(f, { display: form(f.display), topRel: form(f.topRel) });
+    if ('clause' in r) return r;
+    // A name that is one kind as written and another once folded is no kind this check vouches for.
+    if (kind !== null && r.kind !== kind) return { clause: `I do not recognise ${f.display} as wording or a colour`, cause: 'unrecognised' };
+    kind = r.kind;
+  }
+  return { kind: /** @type {string} */ (kind) };
+}
+
+/**
+ * {@link kindOf} for one form of the file's path ({@link PATH_FORMS}); the clauses name the
+ * path as written.
+ * @param {ChangedFile} f @param {{display: string, topRel: string}} spelt the path in that form
+ * @returns {{kind: string}|{clause: string, cause: string}}
+ */
+function kindAs(f, spelt) {
+  const { base, ext, folders, topFolders } = nameParts(spelt);
   const d = f.display;
   const lowerBase = base.toLowerCase();
   const unrecognised = { clause: `I do not recognise ${d} as wording or a colour`, cause: 'unrecognised' };
@@ -2957,7 +3034,7 @@ function readKind(f) {
   if (kind === 'documentation') {
     // Rule 2 has already refused a file with a missing side, so both texts are present.
     const runs = proseChange(/** @type {string} */ (f.oldText), /** @type {string} */ (f.newText));
-    return runs ? { runs } : inexact;
+    return runs && runs.length > 0 ? { runs } : inexact; // a file with no changed word is no pass of nothing
   }
   // A byte-order mark stands on both sides or on neither, and the number of carriage returns
   // stays (the decision at review of 2026-10-09): the diff the size is counted from ignores a
@@ -2967,12 +3044,20 @@ function readKind(f) {
   const newText = /** @type {string} */ (f.newText);
   const marked = (text) => text[0] === '\uFEFF';
   const returns = (text) => text.split('\r').length;
-  if (marked(oldText) !== marked(newText) || returns(oldText) !== returns(newText)) return unrecognised;
+  /** @param {string} text @returns {string} for each line, whether a carriage return ends it */
+  const endings = (text) => text.split('\n').map((line) => (line.endsWith('\r') ? 'r' : 'n')).join('');
+  const [oldEnds, newEnds] = [endings(oldText), endings(newText)];
+  // As many carriage returns, and, where no line comes or goes, the same ending on every line:
+  // one that moves from a line to another is a change the diff does not show either.
+  if (marked(oldText) !== marked(newText) || returns(oldText) !== returns(newText) || (oldEnds.length === newEnds.length && oldEnds !== newEnds)) return unrecognised;
   const body = (text) => lineFeeds(text).slice(marked(text) ? 1 : 0);
   if (kind === 'markup') {
     if (!equalHunks(f.hunks)) return unrecognised;
+    // The bytes were read as UTF-8; a page that names another character set is read otherwise by a browser.
+    if (OTHER_CHARSET.test(oldText) || OTHER_CHARSET.test(newText)) outside();
     const texts = changedTexts(scanMarkup(body(oldText)), scanMarkup(body(newText)), markupWording);
-    return texts.runs ? { runs: texts.runs } : texts.inexact ? inexact : unrecognised;
+    // Rule 6 reads each changed text as written and as its character references spell it.
+    return texts.runs ? { runs: [...texts.runs, ...texts.runs.map(referencesRead)] } : texts.inexact ? inexact : unrecognised;
   }
   if (kind === 'catalogue') {
     if (!equalHunks(f.hunks)) return unrecognised;
@@ -3006,21 +3091,20 @@ function sensitiveWord(part) {
   return null;
 }
 
-/** @param {string} text @returns {string} the text as its letters read: compatibility forms taken apart (a full-width letter is the plain one, a letter with a mark its letter and the mark), then every mark and every format character (a zero-width space, a joiner) dropped */
-const lettersOf = (text) => text.normalize('NFKD').replace(/[\p{Cf}\p{M}]/gu, '');
-
 /**
  * Rule 5 — not in a sensitive area: no letter run of the path from the repository top is a
  * sensitive word, and no camel-case sub-word of one (`AuthPanel` holds `auth`, `APIKey`
- * holds `key`, `Author` and `APIKeyboard` hold none). The path is folded first
- * ({@link lettersOf}: `pay<zero-width space>ment` and a `payment` written with an accent
- * or in full-width letters read as `payment`), split at every character that is no letter,
- * and each run again where a capital letter follows a small one and where the last capital
- * of a run of capitals starts a word (the decision at review of 2026-10-09). The words count
+ * holds `key`, `Author` and `APIKeyboard` hold none). The path is asked in every form
+ * ({@link PATH_FORMS}): as written (`auth<zero-width space>login` is `auth` and `login`),
+ * with compatibility letters as plain ones, and as its letters read
+ * (`pay<zero-width space>ment` and a `payment` written with an accent read as `payment`);
+ * a word in any form refuses. Each form is split at every character that is no letter, and
+ * each run again where a capital letter follows a small one and where the last capital of a
+ * run of capitals starts a word (the decision at review of 2026-10-09). The words count
  * also in the plural; in a stylesheet's own file name one plural does not, `tokens`
  * (`design-tokens.css` holds design tokens; `payments.css` and `keys.css` name their area).
  * The path is no secret-bearing file by CTOC's own secret-file guard (`isSecretTarget`: the
- * word `secret`), asked with the path as written and as folded, and, in CTOC's own
+ * word `secret`), asked with the path in every form, and, in CTOC's own
  * repository only, no part of CTOC's enforcement by its protected-paths list
  * (`isProtectedEnforcementPath`: the word `enforcement`), which names CTOC's own files
  * (`src/hooks/`, ...), not another project's. Both lists are CTOC's, read where they live,
@@ -3032,17 +3116,19 @@ function ruleSensitiveArea(f, ctoc) {
   const nameAt = f.topRel.lastIndexOf('/') + 1;
   /** @param {string} text @param {boolean} stylesheet the text is a stylesheet's own name @returns {string|null} the first sensitive word among its letter runs and their camel-case sub-words */
   const wordIn = (text, stylesheet) => {
-    for (const run of lettersOf(text).split(/\P{L}+/u)) {
-      for (const piece of [run, ...run.split(/(?<=\p{Ll})(?=\p{Lu})|(?<=\p{Lu})(?=\p{Lu}\p{Ll})/u)]) {
-        const part = piece.toLowerCase();
-        const found = stylesheet && part === 'tokens' ? null : sensitiveWord(part);
-        if (found) return found;
+    for (const form of PATH_FORMS) {
+      for (const run of form(text).split(/\P{L}+/u)) {
+        for (const piece of [run, ...run.split(/(?<=\p{Ll})(?=\p{Lu})|(?<=\p{Lu})(?=\p{Lu}\p{Ll})/u)]) {
+          const part = piece.toLowerCase();
+          const found = stylesheet && part === 'tokens' ? null : sensitiveWord(part);
+          if (found) return found;
+        }
       }
     }
     return null;
   };
   let word = wordIn(f.topRel.slice(0, nameAt), false) || wordIn(f.topRel.slice(nameAt), nameParts(f).ext === '.css');
-  if (!word && (isSecretTarget(f.topRel) || isSecretTarget(lettersOf(f.topRel)))) word = 'secret';
+  if (!word && PATH_FORMS.some((form) => isSecretTarget(form(f.topRel)))) word = 'secret';
   if (!word && ctoc && isProtectedEnforcementPath(f.topRel)) word = 'enforcement';
   return word ? { clause: `${f.display} sits in an area named ${word}, and such areas are never a hotfix`, cause: 'sensitive-area' } : null;
 }
@@ -3083,7 +3169,7 @@ function ruleRefusal(change) {
   const governed = change.governed;
   if (change.top && !(governed instanceof Set)) throw new Error('the change carries no list of the files the instruction files link to');
   for (const f of change.files) {
-    f.linked = governed instanceof Set && governed.has(foldPath(f.topRel));
+    f.linked = governed instanceof Set && pathKeys(f.topRel).some((key) => governed.has(key));
     const r = kindOf(f);
     if ('clause' in r) return r;
     f.kind = r.kind;
