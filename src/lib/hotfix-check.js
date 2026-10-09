@@ -1031,7 +1031,8 @@ const isSpace = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r' || c 
 
 /**
  * Skip a quoted string from its opening quote: to the matching unescaped quote, or to the
- * end of the line (an unclosed string) or of the text.
+ * end of the line (an unclosed string; a carriage return and a form feed end a line too) or
+ * of the text.
  * @param {string} s @param {number} i @returns {number} the index after it
  */
 function skipString(s, i) {
@@ -1041,7 +1042,7 @@ function skipString(s, i) {
     const c = s[j];
     if (c === '\\') j += 2;
     else if (c === q) return j + 1;
-    else if (c === '\n') { fault('lost'); return j; }
+    else if (c === '\n' || c === '\r' || c === '\f') { fault('lost'); return j; } // each ends a line for a stylesheet's reader
     else j++;
   }
   fault('open');
@@ -1956,10 +1957,20 @@ function catalogueChange(oldText, newText, ext) {
   return changed === null ? null : catalogueRuns(changed);
 }
 
+/** What a blanked stylesheet holds in place of a comment: white space to its structure, and no part of a value that is one colour. */
+const CSS_COMMENT = '\u0002';
+/** What a blanked stylesheet holds in place of a string, an unquoted `url(…)` and an escaped character: something, and no structure. */
+const CSS_HELD = '\u0003';
+
 /**
- * Rule 4 (colour) — the stylesheet with every string, every `/* … *\/` comment and every
- * unquoted `url(…)` replaced by a filler character of the same length (line breaks kept),
- * so neither a `;`, `{` or `}` nor a colour inside them counts. One pass.
+ * Rule 4 (colour) — the stylesheet with every `/* … *\/` comment, every string, every
+ * unquoted `url(…)` and every character behind a backslash replaced by a filler character
+ * of the same length (line breaks kept), so neither a `;`, `{` or `}` nor a colour inside
+ * them counts, and an escaped bracket or colon (`.w-\[calc\(1px\)\]`, `.sm\:flex`) is no
+ * structure. The backslash itself stays (a declaration that holds one is not read:
+ * {@link escapedStatement}). A backslash cannot be followed before a line break or the end
+ * of the file, where it escapes nothing, and before a brace, a semicolon, a quote or the
+ * `/` of `/*`: what this reader's earlier form read as structure may not be escaped. One pass.
  * @param {string} s @returns {string}
  */
 function blankCss(s) {
@@ -1970,7 +1981,18 @@ function blankCss(s) {
   while (i < n) {
     const c = s[i];
     let end = -1;
+    let filler = CSS_HELD;
+    if (c === '\\') {
+      const x = s[i + 1];
+      const held = x !== undefined && x !== '\n';
+      if (!held || '{};"\''.includes(x) || (x === '/' && s[i + 2] === '*')) fault('lost');
+      parts.push(s.slice(at, i + 1), held ? CSS_HELD : '');
+      i += held ? 2 : 1;
+      at = i;
+      continue;
+    }
     if (c === '/' && s[i + 1] === '*') {
+      filler = CSS_COMMENT;
       const e = s.indexOf('*/', i + 2);
       if (e < 0) fault('open');
       end = e < 0 ? n : e + 2;
@@ -1989,7 +2011,7 @@ function blankCss(s) {
       i++;
       continue;
     }
-    parts.push(s.slice(at, i), s.slice(i, end).replace(/[^\n]/g, '\u0002'));
+    parts.push(s.slice(at, i), s.slice(i, end).replace(/[^\n]/g, filler));
     at = end;
     i = end;
   }
@@ -1997,28 +2019,128 @@ function blankCss(s) {
   return parts.join('');
 }
 
+/*
+ * STYLESHEETS: A STRICT SUBSET (rule 4; the decisions at review of 2026-10-09), held to a real
+ * parser by the differential test (`tests/hotfix-check-differential.test.js`: postcss and
+ * postcss-value-parser must read every edit this reader passes as a change to exactly one
+ * declaration's value, exactly one colour on both sides). One reader, {@link readCss}, reads
+ * the whole file once; a stylesheet with anything outside the subset "holds something I
+ * cannot follow" ({@link fault}). Inside the subset:
+ *   - comments, strings, unquoted `url(…)` and escaped characters are blanked first
+ *     ({@link blankCss}); a comment is white space to everything below;
+ *   - a statement runs to the `{`, `;` or `}` that ends it, and none of those ends it inside
+ *     round or square brackets (`--shape: (a; color: red; b)` is one declaration). Inside
+ *     brackets a brace cannot be followed, and neither can a closing bracket of another kind
+ *     or with nothing open;
+ *   - a statement that ends in `{` is a rule's or an at-rule's head, and starts with no `--`
+ *     (a custom property whose value opens a block). Every other statement is
+ *     blank, an at-rule with a name (`@import "x";`, `@apply x;`), or a declaration: a plain
+ *     property name (letters and hyphens, or a custom property's `--name`), a colon, a value.
+ *     Outside every block only a custom property is one. A declaration whose value holds a
+ *     colon outside round brackets is two declarations with a semicolon missing. Anything else (a
+ *     stray word, `*zoom: 1`, text after the last block) a browser drops by rules of its own
+ *     and postcss refuses;
+ *   - a declaration with a comment before its name or its colon is a declaration, and this
+ *     reader vouches for no property of it: a colour changed in it is not recognised (as
+ *     before this reader was strict).
+ */
+
+/**
+ * @typedef {Object} CssStatement one statement of a blanked stylesheet
+ * @property {number} start @property {number} end where it stands in the text
+ * @property {string} term what ends it: `{`, `;`, `}` or nothing (the end of the file)
+ * @property {number} depth how many blocks are open where it starts
+ * @property {({name: string, at: number, valueAt: number}|null)} decl the declaration it is: its property, where the name and the value start
+ * @property {boolean} [escaped] it holds a backslash (asked once: {@link escapedStatement})
+ * @property {string} [value] its value without `!important` (asked once, in {@link colourSlots})
+ */
+
 /**
  * Rule 4 (colour) — the statements of a blanked stylesheet: each runs to the `{`, `;` or
- * `}` that ends it (`term`), at the brace depth it starts in.
+ * `}` that ends it (`term`), at the brace depth it starts in. None of the three ends a
+ * statement inside round or square brackets; a brace there, a closing bracket that does not
+ * match the one open, and a `}` with no block open cannot be followed.
  * @param {string} blank
- * @returns {Array<{start: number, end: number, term: string, depth: number}>}
+ * @returns {CssStatement[]}
  */
 function cssStatements(blank) {
+  /** @type {CssStatement[]} */
   const out = [];
+  /** @type {string[]} the closing bracket each open bracket waits for, the innermost last */
+  const brackets = [];
   let depth = 0;
   let start = 0;
   for (let i = 0; i < blank.length; i++) {
     const c = blank[i];
-    if (c !== '{' && c !== ';' && c !== '}') continue;
-    out.push({ start, end: i, term: c, depth });
-    if (c === '{') depth++;
-    else if (c === '}' && depth > 0) depth--;
-    else if (c === '}') fault('lost'); // a `}` with nothing open
-    start = i + 1;
+    if (c === '(' || c === '[') {
+      brackets.push(c === '(' ? ')' : ']');
+    } else if (c === ')' || c === ']') {
+      if (brackets.pop() !== c) fault('lost'); // nothing open, or a bracket of the other kind
+    } else if (c === '{' || c === ';' || c === '}') {
+      if (brackets.length > 0) {
+        if (c !== ';') fault('lost'); // a block inside brackets
+        continue;
+      }
+      out.push({ start, end: i, term: c, depth, decl: null });
+      if (c === '{') depth++;
+      else if (c === '}' && depth > 0) depth--;
+      else if (c === '}') fault('lost'); // a `}` with nothing open
+      start = i + 1;
+    }
   }
-  if (depth > 0) fault('open');
-  out.push({ start, end: blank.length, term: '', depth });
+  if (depth > 0 || brackets.length > 0) fault('open');
+  out.push({ start, end: blank.length, term: '', depth, decl: null });
   return out;
+}
+
+/**
+ * Rule 4 (colour) — one stylesheet, read once: the text with strings, comments and `url(…)`
+ * blanked, its statements, and for each statement the declaration it is. The one place that
+ * decides what a declaration is (the colour tokens, the custom properties and the reads of a
+ * custom property all ask it), and where a statement outside the strict subset is met.
+ * @param {string} text line feeds only
+ * @returns {{blank: string, statements: CssStatement[]}}
+ */
+function readCss(text) {
+  const blank = blankCss(text);
+  const statements = cssStatements(blank);
+  const head = /([\s\u0002]*)(--[\w-]+|[A-Za-z-]+)([\s\u0002]*):/y;
+  for (const st of statements) {
+    const body = blank.slice(st.start, st.end).replaceAll(CSS_COMMENT, ' ').trim();
+    if (body === '') continue;
+    head.lastIndex = st.start;
+    const h = head.exec(blank);
+    const custom = h !== null && h[2].startsWith('--');
+    if (body[0] === '@') {
+      if (!/^@[\w-]/.test(body)) fault('lost'); // an at-rule with no name
+    } else if (st.term === '{') {
+      if (body.startsWith('--')) fault('lost'); // a custom property whose value opens a block (`--x: {`, and `-->:{` to postcss): its inside would read as declarations
+    } else if (h !== null && (st.depth > 0 || custom)) {
+      if (!custom && colonOutside(blank, head.lastIndex, st.end)) fault('lost'); // a semicolon is missing
+      if (!h[1].includes(CSS_COMMENT) && !h[3].includes(CSS_COMMENT)) st.decl = { name: h[2], at: st.start + h[1].length, valueAt: head.lastIndex };
+    } else {
+      fault('lost'); // neither a declaration nor an at-rule
+    }
+  }
+  return { blank, statements };
+}
+
+/** @param {string} blank @param {number} from @param {number} to @returns {boolean} a colon stands between the two, outside round brackets (a colon in square brackets counts: postcss reads that one as a missing semicolon too) */
+function colonOutside(blank, from, to) {
+  let open = 0;
+  for (let i = from; i < to; i++) {
+    const c = blank[i];
+    if (c === '(') open++;
+    else if (c === ')') open--;
+    else if (c === ':' && open === 0) return true;
+  }
+  return false;
+}
+
+/** @param {string} blank @param {CssStatement} st @returns {boolean} the statement holds a backslash: an escape may spell what this reader does not see (`\75 rl(` is `url(`) */
+function escapedStatement(blank, st) {
+  if (st.escaped === undefined) st.escaped = blank.slice(st.start, st.end).includes('\\');
+  return st.escaped;
 }
 
 /**
@@ -2026,19 +2148,17 @@ function cssStatements(blank) {
  * the separators the plan names, with the property whose declaration value it stands in,
  * or null. Strings, comments and `url(…)` are blanked first ({@link blankCss}), so a
  * fragment address such as `url(#fade)` is never a colour. Whether text is a selector or a
- * declaration is read from the whole file ({@link cssStatements}): a statement that ends in
- * `{` is a selector or a rule's head, wherever its `{` stands; a declaration starts with
- * `name:`, and at depth 0 only a custom property (`--x`) is one. The property's name must
- * stand on the token's own line. `whole`: the token is the declaration's whole value (an
- * `!important` after it aside). A colour function is read only in its written forms
- * ({@link colourFunction}). One forward pass.
+ * declaration is read from the whole file ({@link readCss}): a statement that ends in `{` is
+ * a selector or a rule's head, wherever its `{` stands; a declaration starts with `name:`,
+ * and at depth 0 only a custom property (`--x`) is one. The property's name must stand on
+ * the token's own line. `whole`: the token is the declaration's whole value (an `!important`
+ * after it aside). `escaped`: its statement holds a backslash. A colour function is read
+ * only in its written forms ({@link colourFunction}). One forward pass.
  * @param {string} text
- * @returns {Array<{t: string, i: number, j: number, prop: (string|null), whole: boolean}>}
+ * @returns {Array<{t: string, i: number, j: number, prop: (string|null), whole: boolean, escaped: boolean}>}
  */
 function colourSlots(text) {
-  const blank = blankCss(text);
-  const statements = cssStatements(blank);
-  const head = /\s*(--[\w-]+|[A-Za-z-]+)\s*:/y;
+  const { blank, statements } = readCss(text);
   const re = /#[0-9A-Fa-f]+|(?:rgba?|hsla?)\([^()]*\)|[A-Za-z]+/g;
   const out = [];
   let si = 0;
@@ -2058,17 +2178,10 @@ function colourSlots(text) {
       nextBreak = blank.indexOf('\n', lineStart);
     }
     while (statements[si].end < i) si++;
-    const st = /** @type {{start: number, end: number, term: string, depth: number, decl?: ({name: string, at: number, valueAt: number}|null), value?: string}} */ (statements[si]);
-    if (st.decl === undefined) {
-      head.lastIndex = st.start;
-      const h = st.term === '{' ? null : head.exec(blank);
-      st.decl = h && (st.depth > 0 || h[1].startsWith('--'))
-        ? { name: h[1], at: st.start + h[0].length - h[0].trimStart().length, valueAt: head.lastIndex }
-        : null;
-    }
+    const st = statements[si];
     const d = st.decl;
     if (d && st.value === undefined) st.value = blank.slice(d.valueAt, st.end).replace(/![ \t\n]*important[ \t\n]*$/i, '').trim();
-    out.push({ t, i, j, prop: d && d.valueAt <= i && d.at >= lineStart ? d.name : null, whole: Boolean(d) && st.value === t });
+    out.push({ t, i, j, prop: d && d.valueAt <= i && d.at >= lineStart ? d.name : null, whole: Boolean(d) && st.value === t, escaped: escapedStatement(blank, st) });
   }
   return out;
 }
@@ -2142,48 +2255,69 @@ const colourMayStand = (prop) => prop !== null && !prop.startsWith('--')
 /**
  * Rule 4 (colour) — every custom property declaration of a whole stylesheet, in order: its
  * name, its value as written (comments and strings included, trimmed) and where that value
- * stands. A script reads a custom property (`getComputedStyle`), so a change to one is a
- * setting unless it is a colour by {@link colourNamedEdit}. A custom property whose value
- * opens a block (`--x: { … }`) cannot be followed: its inside would read as declarations.
- * @param {string} text @returns {Array<{name: string, value: string, from: number, to: number}>}
+ * stands; and `read`, the custom properties that something in the file names other than
+ * their own declaration and a `var()` in the value of a real colour property. A script reads
+ * a custom property (`getComputedStyle`), so a change to one is a setting unless it is a
+ * colour by {@link colourNamedEdit}; and what an animation name, a width, another custom
+ * property, a style query (`@container style(--x: red)`) or an `@property` rule reads is no
+ * colour, whatever it is named. A custom property whose value opens a block (`--x: { … }`)
+ * cannot be followed ({@link readCss}). KNOWN LIMIT: only this file is read; a `var()` in
+ * another stylesheet, or a script, is not seen.
+ * @param {string} text
+ * @returns {{list: Array<{name: string, value: string, from: number, to: number}>, read: Set<string>}}
  */
 function customProperties(text) {
-  const blank = blankCss(text);
-  const head = /\s*(--[\w-]+)\s*:/y;
-  const out = [];
-  for (const st of cssStatements(blank)) {
-    head.lastIndex = st.start;
-    const h = head.exec(blank);
-    if (!h || head.lastIndex > st.end) continue;
-    if (st.term === '{') fault('lost');
-    const raw = text.slice(head.lastIndex, st.end);
-    const from = head.lastIndex + raw.length - raw.trimStart().length;
-    out.push({ name: h[1], value: raw.trim(), from, to: from + raw.trim().length });
+  const { blank, statements } = readCss(text);
+  const list = [];
+  for (const st of statements) {
+    if (st.decl === null || !st.decl.name.startsWith('--')) continue;
+    const raw = text.slice(st.decl.valueAt, st.end);
+    const from = st.decl.valueAt + raw.length - raw.trimStart().length;
+    list.push({ name: st.decl.name, value: raw.trim(), from, to: from + raw.trim().length });
   }
-  return out;
+  /** @type {Set<string>} */
+  const read = new Set();
+  const names = /(?<![\w-])--[\w-]+/g;
+  let si = 0;
+  let m;
+  while ((m = names.exec(blank)) !== null) {
+    const i = m.index;
+    while (statements[si].end < i) si++;
+    const d = statements[si].decl;
+    if (d !== null && d.at === i) continue; // the declaration's own name
+    let k = i;
+    while (k > 0 && isSpace(blank[k - 1])) k--;
+    const inVar = blank.slice(Math.max(k - 4, 0), k).toLowerCase() === 'var(' && !/[\w-]/.test(blank[k - 5] || '');
+    if (!(inVar && d !== null && d.valueAt <= i && colourMayStand(d.name))) read.add(m[0]);
+  }
+  return { list, read };
 }
 
 /**
  * Rule 4 (colour) — a change to custom properties that is a colour change (the session's
  * decision of 2026-10-09, on the owner's instruction): the same properties in the same
- * order, and every one whose value changed has `color` or `colour` in its name and holds
- * exactly one colour before and after ({@link oneColour}). Returns the two stylesheets
- * with each such value replaced by one same colour, for the rest of the comparison (every
- * other character must still be identical, or a colour in a real colour property); or
- * `inexact`: a property named for a colour changed, and its value is not exactly one colour
- * before and after; or null: any other custom-property change is a setting.
+ * order, and every one whose value changed has `color` or `colour` in its name, holds
+ * exactly one colour before and after ({@link oneColour}), and is read, in this file on
+ * either side, by nothing but colour properties ({@link customProperties}; the decision at
+ * review of 2026-10-09). Returns the two stylesheets with each such value replaced by one
+ * same colour, for the rest of the comparison (every other character must still be
+ * identical, or a colour in a real colour property); or `inexact`: a property named for a
+ * colour changed, and its value is not exactly one colour before and after; or null: any
+ * other custom-property change is a setting.
  * @param {string} o @param {string} n @returns {([string, string]|'inexact'|null)}
  */
 function colourNamedEdit(o, n) {
-  const a = customProperties(o);
-  const b = customProperties(n);
+  const before = customProperties(o);
+  const after = customProperties(n);
+  const a = before.list;
+  const b = after.list;
   if (a.length !== b.length) return null;
   const changed = [];
   let inexact = false;
   for (let k = 0; k < a.length; k++) {
     if (a[k].name !== b[k].name) return null;
     if (a[k].value === b[k].value) continue;
-    if (!/colou?r/i.test(a[k].name)) return null;
+    if (!/colou?r/i.test(a[k].name) || before.read.has(a[k].name) || after.read.has(a[k].name)) return null;
     if (!oneColour(a[k].value) || !oneColour(b[k].value)) inexact = true;
     changed.push(k);
   }
@@ -2219,7 +2353,9 @@ function masked(text, toks) {
  * identical (strings and comments included), at least one token differs, and every changed
  * token stands, on both sides, in the value of a real colour property
  * ({@link colourSlots}, {@link colourMayStand}), so `animation: red 2s` and `width: #fff`
- * are never a colour. `inexact`: a changed colour stands in a real colour property on both
+ * are never a colour, in a declaration that holds no backslash (the decision at review of
+ * 2026-10-09: an escape may spell what this reader does not see, `\75 rl(a;color:red;b)`
+ * is a `url(`). `inexact`: a changed colour stands in a real colour property on both
  * sides but is not its whole value (`border: 1px solid red`), which the functional plan
  * refuses as a change the check cannot read exactly. Linear in the files' length.
  * @param {string} o @param {string} n @returns {(boolean|'inexact')}
@@ -2233,7 +2369,7 @@ function colourEdit(o, n) {
   for (let k = 0; k < a.length; k++) {
     if (a[k].t === b[k].t) continue;
     changed++;
-    if (!colourMayStand(a[k].prop) || !colourMayStand(b[k].prop)) return false;
+    if (!colourMayStand(a[k].prop) || !colourMayStand(b[k].prop) || a[k].escaped || b[k].escaped) return false;
     if (!a[k].whole || !b[k].whole) inexact = true;
   }
   return inexact ? 'inexact' : changed > 0;
