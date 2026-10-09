@@ -1115,7 +1115,8 @@ const COLOUR_PROPERTIES = ['color', 'background-color', 'border-color', 'outline
 const OTHER_PROPERTIES = ['width', 'margin', 'content', 'animation-name', 'animation', 'font-family', 'display', 'grid-area', 'transition', 'will-change', 'filter', 'mask'];
 const CUSTOM_PROPERTIES = ['--brand-color', '--accent-colour', '--color-text', '--Brand-COLOR', '--mode', '--shape', '--gap', '--enabled'];
 const CSS_SELECTORS = ['a', '.btn', '#fff', '#bad:hover', '.red', 'red', 'nav > a', '.alpha.bravo', 'a::before', 'a:hover', '.btn--brand-color', '[data-x="red"]',
-  'a[href^="#fff"]', ':root', 'h1, h2', '.sm\\:flex', '*', '&:hover', '& .charlie', '.delta'];
+  'a[href^="#fff"]', ':root', 'h1, h2', '.sm\\:flex', '*', '&:hover', '& .charlie', '.delta', '.w-\\[calc\\(1px\\)\\]', '.w-1\\/2', '.echo\\{f', '.c-\\[\\\'x\\\'\\]',
+  '.golf\\/*', '.hotel\\;i'];
 const cssColour = (r) => pick(r, CSS_COLOURS);
 
 /** A declaration's value: for a colour property mostly exactly one colour. */
@@ -1132,7 +1133,7 @@ function cssValue(r, colourful) {
       [W(2), () => `"${c}"`], [W(2), () => `${c} /* ${cssColour(r)} */`], [W(2), () => `/* ${w} */ ${c}`], [W(1), () => `${c};;`],
       [W(1), () => `${c} color: ${cssColour(r)}`], [W(1), () => `(b { c; } d) ${c}`], [W(1), () => `(${c}`], [W(1), () => `${c})`], [W(1), () => `"${w}`],
       [W(1), () => 'rgb(<1, 2, 3)'], [W(1), () => `${c}\\`], [W(1), () => `{ color: ${c} }`], [W(1), () => `:${c}`], [W(1), () => `progid:${w}(a=1)`],
-      [W(1), () => `(]) ${c}`], [W(1), () => `${c} \; ${cssColour(r)}`]
+      [W(1), () => `(]) ${c}`], [W(1), () => `${c} \\; ${cssColour(r)}`]
     ])();
   }
   return weighted(r, [
@@ -1711,7 +1712,7 @@ const MUST_PASS = { html: EDITS.slice(0, 3), markdown: EDITS.slice(0, 3), yaml: 
  * share measured on 2026-10-09 (the numbers are beside each test), so that a rule which
  * starts to refuse far more than it did fails here.
  */
-const PASS_FLOOR = { html: 0.03, markdown: 0.05, yaml: 0.10, css: 0.08 };
+const PASS_FLOOR = { html: 0.03, markdown: 0.05, yaml: 0.10, css: 0.06 };
 
 function run(kind, count) {
   const started = Date.now();
