@@ -2048,8 +2048,8 @@ const lineFeeds = (s) => s.replace(/\r\n/g, '\n');
  *      prose, the prefix identical on both sides.
  *   2  A PLAIN PARAGRAPH is the run of non-blank lines around a changed line; every line of it
  *      is a plain prose line or a list item of plain prose, on both sides, and an empty line
- *      or the file's start or end bounds it (a line of spaces counts as empty, a line of other
- *      white space does not). The brief for (c) would let another item's line bound the run
+ *      or the file's start or end bounds it (a line of spaces or of other white space is not
+ *      empty: {@link isBlank}). The brief for (c) would let another item's line bound the run
  *      too; the run stays bounded by empty lines only, because renderers do not agree on what
  *      ends an item (a `2.` under a bullet, a `1)`, a list right under a paragraph), and with
  *      every line of the run plain, whichever way a renderer divides it only words change.
@@ -2107,8 +2107,14 @@ const FENCE_WORD = /^\.?[A-Za-z0-9_#.+-]*$/;
 const TAG_START = /<[A-Za-z!/]/;
 /** A word of 7 to 40 hexadecimal digits: sites link such a word as a commit id. */
 const HEX_WORD = /(?<![\p{L}\p{N}])[0-9a-f]{7,40}(?![\p{L}\p{N}])/iu;
-/** @param {string} line @returns {boolean} an empty line, or one of spaces only */
-const isBlank = (line) => /^ *$/.test(line);
+/**
+ * @param {string} line @returns {boolean} an empty line. A line of spaces is not one (the
+ * decision at review of 2026-10-09; until then it was): one renderer (marked 4.3.0, found in
+ * the ninth round's sample of passed edits) reads on over a line of spaces to a `---` or
+ * `===` below it and makes a heading of the whole, so such a line is a line of its paragraph,
+ * and no plain one.
+ */
+const isBlank = (line) => line === '';
 
 /**
  * @param {string} text
