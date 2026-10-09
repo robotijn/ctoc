@@ -1375,7 +1375,7 @@ function assertRun(t, kind, count) {
   if (stats.cases >= 10000) assert.deepEqual(missing, [], `the check passed no edit in a document with: ${missing.join(', ')}`);
 }
 
-// Measured on 2026-10-09, seed 20261009, default size: 47,352 edits, 2,857 passed (6.0%).
+// Measured on 2026-10-09, seed 20261009, default size: 47,352 edits, 2,850 passed (6.0%).
 test('HTML: every edit the check passes is a change to plain visible text for the HTML parser', (t) => {
   assertRun(t, 'html', HTML_CASES);
 });
