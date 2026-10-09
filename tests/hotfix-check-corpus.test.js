@@ -359,7 +359,15 @@ const BASE = {
   'docs/brackets.md': lines('The old way (the short one) works.'),
   'docs/fence-script.md': lines('```html', '<script>', '```', '', 'Old words here.'),
   'CHANGELOG.txt': lines('- Fixed the old bug'),
-  'docs/tokens.md': lines('# Help', '', 'Old notes.')
+  'docs/tokens.md': lines('# Help', '', 'Old notes.'),
+  // The ninth round (decisions at review of 2026-10-09): a raw start tag anywhere, and the
+  // pure-prose rule widened by a colon, parentheses and list items.
+  'docs/comment-below.md': lines('Old words here.', '', '<!-- a note -->'),
+  'docs/script-span.md': lines('Use `<script>` tags.', '', 'Old words here.'),
+  'docs/colon-later.md': lines('# Notes', '', 'Note: the old way works, and so does this: the short one.'),
+  'docs/steps.md': lines('# Steps', '', '1. Open the old page.', '2. Press the button (the blue one).', '   Then wait.'),
+  'docs/steps-code.md': lines('- Run `npm test` first.', '- Then read the old notes.'),
+  'docs/key-value.md': lines('Title: The old guide', '', 'Body text.')
 };
 
 const QUALIFY = [
@@ -418,8 +426,16 @@ const QUALIFY = [
   ['CHANGES.txt', lines('The new wording of the first release.')],
   ['docs/readme.en.txt', BASE['docs/readme.en.txt'].replace('old', 'new')],
   ['docs/plain.md', BASE['docs/plain.md'].replace('well-known', 'well-liked')],
-  ['docs/lint.md', BASE['docs/lint.md'].replace('Old', 'New')],
-  ['docs/span-tag.md', BASE['docs/span-tag.md'].replace('Old', 'New')]
+  ['docs/span-tag.md', BASE['docs/span-tag.md'].replace('Old', 'New')],
+  // The ninth round (decisions at review of 2026-10-09), each a refusal on `4212d9ff`:
+  // parentheses, a list item whose text is plain prose (in a documentation text file too), a
+  // plain line right under a list item, a colon after a word outside the first paragraph, and
+  // a numbered step with a second line.
+  ['docs/brackets.md', BASE['docs/brackets.md'].replace('old', 'new')],
+  ['CHANGELOG.txt', lines('- Fixed the new bug')],
+  ['docs/under-list.md', BASE['docs/under-list.md'].replace('Run it then', 'Run it now')],
+  ['docs/colon-later.md', BASE['docs/colon-later.md'].replace('old', 'new')],
+  ['docs/steps.md', BASE['docs/steps.md'].replace('old', 'new')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -489,11 +505,11 @@ const TRAPS = [
   ['symlink', ['link'], unrecognised('link')],
   // A document whose attributes say `-diff` still counts its real lines (13 reworded).
   [{ 'docs/big.md': BASE['docs/big.md'].replace(/Big old line/g, 'Big new line') }, null, 'it changes 26 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
-  // 21 changed lines in one file, 11 removed and 10 added. Since the eighth round a Markdown
-  // file may gain or lose no line, so this refuses before the size is counted; a hotfix that
-  // qualifies changes an even number of lines, and the 22 lines of `docs/eleven.md` below are
-  // the nearest change the size rule itself refuses.
-  [{ 'docs/limit.md': lines(...Array.from({ length: 10 }, (_, i) => `Limit new line ${String.fromCharCode(97 + i)}.`)) }, null, inexact('docs/limit.md')],
+  // 21 changed lines in one file, 11 removed and 10 added. The eighth round's reader refuses a
+  // Markdown file that gains or loses a line and answered before the size rule; since the ninth
+  // round (the decision at review of 2026-10-09) the size rule runs before any reader reads a
+  // file's content, so this change gets the size clause again.
+  [{ 'docs/limit.md': lines(...Array.from({ length: 10 }, (_, i) => `Limit new line ${String.fromCharCode(97 + i)}.`)) }, null, 'it changes 21 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
   [{ 'notes/a.md': lines('Alpha new.'), 'notes/b.md': lines('Bravo new.'), 'notes/c.md': lines('Charlie new.'), 'notes/d.md': lines('Delta new.') }, null, 'it changes 8 lines in 4 files and a hotfix is at most 20 lines in at most 3 files'],
   // The security check's second round (2026-10-08). Code inside an attribute value that
   // holds `>` before the change and `<` plus a letter after it is never visible text.
@@ -733,8 +749,8 @@ TRAPS.push(
   [{ 'docs/COPYING.txt': BASE['docs/COPYING.txt'].replace('old', 'new') }, null, 'docs/COPYING.txt sits in an area named legal, and such areas are never a hotfix'],
   [{ 'PATENTS.md': BASE['PATENTS.md'].replace('old', 'new') }, null, 'PATENTS.md sits in an area named legal, and such areas are never a hotfix'],
   [{ 'docs/legal-notes.txt': BASE['docs/legal-notes.txt'].replace('old', 'new') }, null, 'docs/legal-notes.txt sits in an area named legal, and such areas are never a hotfix'],
-  // A plain line directly under a list line, and directly above an `===` line.
-  [{ 'docs/under-list.md': BASE['docs/under-list.md'].replace('Run it then', 'Run it now') }, null, inexact('docs/under-list.md')],
+  // A plain line directly above an `===` line (the one directly under a list line qualifies
+  // since the ninth round).
   [{ 'docs/above-rule.md': BASE['docs/above-rule.md'].replace('old', 'new') }, null, inexact('docs/above-rule.md')],
   // What the differential test found against the rule as first written (markdown-it in four
   // configurations): a paragraph a list item holds; a paragraph inside an element left open
@@ -761,10 +777,10 @@ TRAPS.push(
   [{ 'docs/endings.md': '\ufeffNew words here.\nMore words.\n' }, null, inexact('docs/endings.md')],
   [{ 'docs/endings.md': lines('New words here.', 'More words.', 'And a line.') }, null, inexact('docs/endings.md')],
   [{ 'docs/trailing.md': lines('New words here.', 'More words.') }, null, inexact('docs/trailing.md')],
-  // Lines that are no plain prose: a full stop inside a word, a colon, round brackets.
+  // Lines that are no plain prose: a full stop inside a word, and a colon in the file's first
+  // paragraph (round brackets are prose since the ninth round).
   [{ 'docs/abbreviation.md': BASE['docs/abbreviation.md'].replace('old', 'new') }, null, inexact('docs/abbreviation.md')],
   [{ 'docs/colon.md': BASE['docs/colon.md'].replace('old', 'new') }, null, inexact('docs/colon.md')],
-  [{ 'docs/brackets.md': BASE['docs/brackets.md'].replace('old', 'new') }, null, inexact('docs/brackets.md')],
   // A tag inside a code fence holds what follows like any other: a renderer that knows no
   // fences reads it as HTML (a `<script>` would run there), and a block tag left open holds
   // the rest of the file. `docs/fence-tag.md` qualified until Python-Markdown without its
@@ -777,7 +793,15 @@ TRAPS.push(
   // Only white space may stand before the doctype (the decision at review of 2026-10-09): a
   // comment there leaves a current browser in standards mode, and is refused all the same.
   [{ 'src/pages/lead-comment.html': BASE['src/pages/lead-comment.html'].replace('Save', 'Store') }, null, inexact('src/pages/lead-comment.html')],
-  [{ 'CHANGELOG.txt': lines('- Fixed the new bug') }, null, inexact('CHANGELOG.txt')]
+  // The ninth round (decisions at review of 2026-10-09). A raw start tag anywhere refuses the
+  // file: a comment alone on its line above the paragraph (it qualified until now), a comment
+  // below it, and `<script>` written inside a code span.
+  [{ 'docs/lint.md': BASE['docs/lint.md'].replace('Old', 'New') }, null, inexact('docs/lint.md')],
+  [{ 'docs/comment-below.md': BASE['docs/comment-below.md'].replace('Old', 'New') }, null, inexact('docs/comment-below.md')],
+  [{ 'docs/script-span.md': BASE['docs/script-span.md'].replace('Old', 'New') }, null, inexact('docs/script-span.md')],
+  // A list whose other item holds a code span; `Key: value` in the file's first paragraph.
+  [{ 'docs/steps-code.md': BASE['docs/steps-code.md'].replace('old', 'new') }, null, inexact('docs/steps-code.md')],
+  [{ 'docs/key-value.md': BASE['docs/key-value.md'].replace('old', 'new') }, null, inexact('docs/key-value.md')]
 );
 
 // The owner's decision of 2026-10-09 (answer "a"): the hotfix check keeps only the formats
@@ -834,16 +858,19 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 34, 'the corpus holds 34 shapes that qualify');
+assert.equal(QUALIFY.length, 38, 'the corpus holds 38 shapes that qualify');
 assert.equal(REMOVED_FORMATS.length, 44, 'the corpus holds 44 cases of removed formats');
-assert.equal(TRAPS.length, 278, 'the corpus holds 278 traps, the removed formats among them');
+assert.equal(TRAPS.length, 280, 'the corpus holds 280 traps, the removed formats among them');
 
 let root;
 
 
+// `maintenance.auto=false` and `gc.auto=0`: git 2.54 starts `git maintenance run --auto --detach`
+// after a commit, and that detached process may still write into the repository while the
+// test removes its folder (seen 2026-10-09: ENOTEMPTY in the `after` hook).
 function git(args) {
   const r = spawnSync('git', ['-c', 'user.name=Hotfix Test', '-c', 'user.email=hotfix@test.invalid',
-    '-c', 'commit.gpgsign=false', ...args], { cwd: root, encoding: 'utf8' });
+    '-c', 'commit.gpgsign=false', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0', ...args], { cwd: root, encoding: 'utf8' });
   if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`);
   return r.stdout;
 }
@@ -885,7 +912,7 @@ test.before(() => {
 });
 
 test.after(() => {
-  if (root) fs.rmSync(root, { recursive: true, force: true });
+  if (root) fs.rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
 });
 
 /** The first call: rules 1 to 7, no test run. */
@@ -962,8 +989,15 @@ const ALLOWED = {
   // Since the eighth round (the decision at review of 2026-10-09) a Markdown or plain-text
   // line is plain prose or nothing: of the inserted characters only the two straight quotes
   // and the semicolon are prose punctuation, and every renderer shows them as typed.
-  markdown: plain('"\';', 'a straight quote or a semicolon in a plain prose line is shown as typed by every renderer'),
-  text: plain('"\';', 'a straight quote or a semicolon in a plain prose line is shown as typed by every renderer'),
+  // Since the ninth round (the decisions at review of 2026-10-09) a parenthesis is prose too (no
+  // link forms without a bracket), and so is a colon that follows a word and stands before a
+  // space or the end of the line, outside the file's first paragraph.
+  markdown: { ...plain('"\';', 'a straight quote or a semicolon in a plain prose line is shown as typed by every renderer'),
+    ...plain('()', 'a parenthesis in a plain prose line is shown as typed: no link forms without a bracket'),
+    ':': () => 'a colon after a word and before a space, outside the first paragraph, is shown as typed' },
+  text: { ...plain('"\';', 'a straight quote or a semicolon in a plain prose line is shown as typed by every renderer'),
+    ...plain('()', 'a parenthesis in a plain prose line is shown as typed: no link forms without a bracket'),
+    ':': () => 'a colon after a word and before a space, outside the first paragraph, is shown as typed' },
   colour: {}
 };
 const kindOf = (rel) => {
@@ -1263,7 +1297,14 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     'docs/spaces-long.md': (n) => `${' '.repeat(100 * n)}x\n\nOld words.\n`,
     'docs/def-ends.md': (n) => `${`a]:${' '.repeat(40)}\n`.repeat(3 * n)}\nOld words.\n`,
     'docs/fence-like.md': (n) => `${'x ``` y ~~~\n'.repeat(8 * n)}\nOld words.\n`,
-    'NOTES.txt': (n) => `${'Plain words in a line.\n\n'.repeat(5 * n)}Old words.\n`
+    'NOTES.txt': (n) => `${'Plain words in a line.\n\n'.repeat(5 * n)}Old words.\n`,
+    // The ninth round's prose reader: near-misses of the raw start tags inside code spans, long runs of list
+    // items, of colons and of parentheses, and one very long run of items around the change.
+    'docs/raw-near.md': (n) => `${'Use `<scrip>`, `<styl>`, `<pr>`, `<!-x>` and `<![CDAT>` now.\n\n'.repeat(3 * n)}Old words.\n`,
+    'docs/items-many.md': (n) => `${'- a plain item\n1. a numbered one (short): yes\n   and a second line\n\n'.repeat(3 * n)}Old words.\n`,
+    'docs/items-run.md': (n) => `Text.\n\n${'- a plain item: yes (short)\n'.repeat(5 * n)}- Old words.\n`,
+    'docs/colons-line.md': (n) => `Text.\n\n${'a: (b) '.repeat(20 * n)}Old words.\n`,
+    'docs/markers-line.md': (n) => `Text.\n\n${'1'.repeat(100 * n)}. Old words.\n`
   };
   for (const [rel, build] of Object.entries(cases)) {
     const at = (n) => {
@@ -1274,7 +1315,8 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     // The inputs of the removed formats are kept: each is refused as not recognised, at once.
     if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(at(1)().cause, 'unrecognised', rel);
     // The eighth round's inputs that end in a plain paragraph are read to the end and pass.
-    if (/^(?:docs\/(?:prose|fences-many|meta|comments|spans|ticks-open|spaces|def-ends|fence-like)|NOTES)/.test(rel)) assert.equal(at(1)(), null, rel);
+    // (`docs/comments-many.md` passed until the ninth round; a `<!--` anywhere now refuses the file.)
+    if (/^(?:docs\/(?:prose|fences-many|meta|spans|ticks-open|spaces|def-ends|fence-like|raw-near|items|colons)|NOTES)/.test(rel)) assert.equal(at(1)(), null, rel);
     // The largest input is about 1.6 million characters, four times the size a quadratic scan took seconds on.
     const { n, small, big, ratio } = growth(at, 16, Math.floor(1600000 / (build(64).length / 64)));
     assert.ok(ratio < 8, `${rel}: size ${n} took ${small.toFixed(1)} ms and size ${4 * n} took ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);

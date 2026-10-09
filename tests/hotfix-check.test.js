@@ -99,7 +99,11 @@ test.afterEach(() => {
   assert.deepEqual(leftovers(), [], 'no temporary copy of the check remains');
 });
 
-const GIT_IDENTITY = ['-c', 'user.name=Hotfix Test', '-c', 'user.email=hotfix@test.invalid', '-c', 'commit.gpgsign=false'];
+// `maintenance.auto=false` and `gc.auto=0`: git 2.54 starts `git maintenance run --auto --detach`
+// after a commit, and that detached process may still write into a fixture repository while a
+// test reads or removes it.
+const GIT_IDENTITY = ['-c', 'user.name=Hotfix Test', '-c', 'user.email=hotfix@test.invalid', '-c', 'commit.gpgsign=false',
+  '-c', 'maintenance.auto=false', '-c', 'gc.auto=0'];
 function git(cwd, args, input) {
   const r = spawnSync('git', [...GIT_IDENTITY, ...args], { cwd, encoding: 'utf8', input });
   if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`);
@@ -274,7 +278,8 @@ function runCommit(root, commit, what = 'reword') {
   const env = {
     ...process.env, GIT_AUTHOR_NAME: 'Hotfix Test', GIT_AUTHOR_EMAIL: 'hotfix@test.invalid',
     GIT_COMMITTER_NAME: 'Hotfix Test', GIT_COMMITTER_EMAIL: 'hotfix@test.invalid',
-    GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'commit.gpgsign', GIT_CONFIG_VALUE_0: 'false'
+    GIT_CONFIG_COUNT: '3', GIT_CONFIG_KEY_0: 'commit.gpgsign', GIT_CONFIG_VALUE_0: 'false',
+    GIT_CONFIG_KEY_1: 'maintenance.auto', GIT_CONFIG_VALUE_1: 'false', GIT_CONFIG_KEY_2: 'gc.auto', GIT_CONFIG_VALUE_2: '0'
   };
   for (const cmd of [commit.add, commit.message.replace('<what changed>', what)]) {
     const r = process.platform === 'win32'
@@ -392,12 +397,14 @@ test('case 10: more than 20 changed lines is refused with the counts', async () 
   fs.writeFileSync(path.join(root, 'docs/two.md'), lines('New', 6));
   await refusedUntouched(root, ['docs/one.md', 'docs/two.md'],
     'it changes 26 lines in 2 files and a hotfix is at most 20 lines in at most 3 files');
-  // The functional plan's own numbers, 13 lines removed and 12 added (25 lines in 2 files). Since
-  // the eighth round (the decision at review of 2026-10-09) a Markdown file may gain or lose no
-  // line, and no other kind ever could, so rule 4 refuses this change before rule 3 counts it:
-  // the refusal stays, with the sentence for a change the check cannot read exactly.
+  // The functional plan's own numbers, 13 lines removed and 12 added (25 lines in 2 files). The
+  // eighth round's reader refuses a Markdown file that gains or loses a line, and it answered
+  // before the size rule, so this change read "cannot read exactly". Since the ninth round (the
+  // decision at review of 2026-10-09) the size rule runs once the kind of every file is known
+  // and before any reader reads a file's content, so the scenario gets its own clause again.
   fs.writeFileSync(path.join(root, 'docs/one.md'), lines('New', 6));
-  await refusedUntouched(root, ['docs/one.md', 'docs/two.md'], inexact('docs/one.md'));
+  await refusedUntouched(root, ['docs/one.md', 'docs/two.md'],
+    'it changes 25 lines in 2 files and a hotfix is at most 20 lines in at most 3 files');
 });
 
 test('case 11: a new file is refused', async () => {
@@ -1923,7 +1930,9 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
     // Since the sixth round a brace is a plain character to the HTML reader; in Markdown it
     // reaches its own paragraph, so this change beside one is "not recognised", no longer "open".
     ['docs/brace-open.md', 'Old words {{ x\n', 'New words {{ x\n', inexact('docs/brace-open.md')],
-    ['docs/comment-open.md', 'Old words.\n\n<!-- note\n', 'New words.\n\n<!-- note\n', null],
+    // Since the ninth round (the decision at review of 2026-10-09) a raw start tag anywhere in a
+    // Markdown file refuses it, `<!--` among them, also below the changed paragraph.
+    ['docs/comment-open.md', 'Old words.\n\n<!-- note\n', 'New words.\n\n<!-- note\n', inexact('docs/comment-open.md')],
     // One side well-formed and the other not.
     ['src/pages/one-side.html', '<p>Save</p>\n<!-- c -->\n', '<p>Store</p>\n<!-- c --\n', inexact('src/pages/one-side.html')],
     ['docs/one-side.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n``\n', inexact('docs/one-side.md')],
@@ -2506,7 +2515,9 @@ test('round 7: names, frames, options, noscript, end tags, text over lines and b
     row(10, 'docs/comment-code.md', '<!-- note -->\n    @\n', pip, exact('docs/comment-code.md')),
     row(10, 'docs/table-code.md', '| a | b |\n| - | - |\n| c | d |\n    @\n', pip, exact('docs/table-code.md')),
     row(10, 'docs/lazy-quote.md', '> A quote that\nruns @ lazily.\n\nAfter.\n', ['on', 'along'], exact('docs/lazy-quote.md')),
-    row(10, 'docs/lazy-item.md', '- an item that\nruns @ lazily\n- the next item\n', ['on', 'along'], exact('docs/lazy-item.md')),
+    // Since the ninth round (the decision at review of 2026-10-09) a run of plain list items and
+    // plain lines qualifies: whichever way a renderer divides it, only words change.
+    row(10, 'docs/lazy-item.md', '- an item that\nruns @ lazily\n- the next item\n', ['on', 'along'], null),
     row(10, 'docs/lazy-none.md', '> ```\n> code\n> ```\n@ words.\n', words, exact('docs/lazy-none.md')),
     // Under a quote inside a quote, a line four columns in that would start a block:
     // markdown-it ends both quotes and reads it as code, CommonMark's text makes it a lazy line (red).
@@ -2576,12 +2587,16 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     ['not plain', 'docs/r8/brackets-gone.md', 'See [the old guide] now.\n', 'See the old guide now.\n', exact('docs/r8/brackets-gone.md')],
     // Not plain: white space other than a space, punctuation that is not prose, a character
     // of the control or format categories; and the limits on the punctuation that is prose.
-    ...['a\tb', 'a\u00a0b', 'a.b', 'a,b', 'a;b', 'what?!', 'a -b', 'a- b', 'a--b', 'pre-2', 'a: b', '(a)', 'a/b', 'a_b', '*a*', '#a', '`a`',
+    ...['a\tb', 'a\u00a0b', 'a.b', 'a,b', 'a;b', 'what?!', 'a -b', 'a- b', 'a--b', 'pre-2', 'a: b', 'a/b', 'a_b', '*a*', '#a', '`a`',
       'a\\b', '~a', 'a@b', 'a&b', 'a=b', 'a+b', 'a%', '$a', '{a}', '[a]', 'a|b', 'a^b', 'a<b', 'a>b', 'a\u200bb', 'a\u202eb', 'a\u00adb',
       'a\u2028b', 'a\u0007b', '\u00aba\u00bb', 'a\u2019b.c']
       .map((bad) => row('not plain', `Some ${bad} and the @ words.\n`, words, true)),
     row('not plain', '12 @ words.\n', words, true),
-    row('not plain', '- the @ words\n', words, true),
+    // Since the ninth round (the decision at review of 2026-10-09): parentheses are prose, and a
+    // list item whose text is plain prose qualifies (`Some a: b …` above stays refused because
+    // it stands in the file's first paragraph, where a metadata reader takes `Key: value`).
+    row('plain since round 9', 'Some (a) and the @ words.\n', words, null),
+    row('plain since round 9', '- the @ words\n', words, null),
     row('not plain', '\u2026the @ words\n', words, true),
     row('not plain', '    the @ words\n', words, true),
     // The first line of a changed paragraph is not indented (found by the differential test:
@@ -2595,7 +2610,7 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     // 2. The paragraph: every line of it is plain, and an empty line or the file's start or end
     // bounds it; a line of spaces counts as empty, a line of other white space does not.
     row('paragraph', '# Title\nThe @ words.\n', words, true),
-    row('paragraph', 'The @ words.\n- an item\n', words, true),
+    row('paragraph', 'The @ words.\n- an item\n', words, null), // a plain list item is prose since the ninth round
     row('paragraph', 'The @ words.\nSee [a link](/x).\n', words, true),
     row('paragraph', 'Text.\n   \nThe @ words.\n', words, null),
     row('paragraph', 'Text.\n\t\nThe @ words.\n', words, true),
@@ -2663,7 +2678,8 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     // that knows no fences reads it as HTML, and a block tag left open there holds the rest of
     // the file (found with Python-Markdown without its fenced-code extension, 2026-10-09). A
     // fence that holds no tag, and a fence with a tag below the paragraph, hold nothing.
-    row('raw, closed', '<!-- a note -->   \n<!---->\n\nThe @ words.\n', words, null),
+    // A comment alone on its line held nothing until the ninth round; a `<!--` anywhere now refuses the file.
+    row('raw, closed', '<!-- a note -->   \n<!---->\n\nThe @ words.\n', words, true),
     row('raw, closed', ' <!-- a note -->\n\nThe @ words.\n', words, true),
     row('raw, closed', '<!-- a -- b -->\n\nThe @ words.\n', words, true),
     row('raw, closed', '<!-- a --> x\n\nThe @ words.\n', words, true),
@@ -2767,4 +2783,131 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     'I did not treat this as a hotfix because legal.md sits in an area named legal, and such areas are never a hotfix; '
     + 'it goes through a normal plan, and your edits stay in place, not committed.');
   assert.deepEqual(logLines(root).slice(-3).map((l) => l.cause), ['unrecognised', 'unrecognised', 'sensitive-area']);
+});
+
+// The ninth round (2026-10-09, decisions at review). Markdown: the size rule runs before any
+// reader reads a file's content; a raw start tag anywhere refuses the file; and the pure-prose
+// rule is widened by three things proven with the differential test: a colon after a word and
+// before a space (never in the file's first paragraph), parentheses, and list items whose text
+// is plain prose. Every row marked `red` answered otherwise on `4212d9ff`; the others are guards.
+// [item, path, base content, new content, the clause, or null for `checking`]
+test('round 9: Markdown — size before content, a raw start tag anywhere, colons, parentheses and list items', async () => {
+  const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
+  const size = (n, m) => `it changes ${n} lines in ${m} ${m === 1 ? 'file' : 'files'} and a hotfix is at most 20 lines in at most 3 files`;
+  const words = ['old', 'new'];
+  let count = 0;
+  const row = (item, template, [o, n], expected, name = null) => {
+    const p = name || `docs/r9/${String(item).replace(/[^a-z0-9]+/gi, '-')}-${++count}.md`;
+    return [item, p, template.replace('@', o), template.replace('@', n), expected === true ? exact(p) : expected];
+  };
+  const reworded = (n, wrap = (l) => l) => [Array.from({ length: n }, (_, i) => wrap(`Old line ${String.fromCharCode(97 + i)}`)).join('\n'),
+    Array.from({ length: n }, (_, i) => wrap(`New line ${String.fromCharCode(97 + i)}`)).join('\n')];
+  const [oldEleven, newEleven] = reworded(11);
+  const [oldPages, newPages] = reworded(11, (l) => `<p>${l}</p>`);
+  const [oldColours, newColours] = [Array.from({ length: 11 }, (_, i) => `.a${i} { color: red; }`).join('\n'),
+    Array.from({ length: 11 }, (_, i) => `.a${i} { color: blue; }`).join('\n')];
+  const shapes = [
+    // 1. The size rule runs before the content rules (red): a change over the limit that a
+    // reader would also refuse gets the size clause; under the limit it gets the reader's.
+    ['size', 'docs/r9/grown.md', 'A line.\n', `A line.\n${'One more line.\n'.repeat(21)}`, size(21, 1)],
+    ['size', 'docs/r9/held.md', `<div>\n\n${oldEleven}\n`, `<div>\n\n${newEleven}\n`, size(22, 1)],
+    ['size', 'src/pages/r9-open.html', `<div>\n${oldPages}\n`, `<div>\n${newPages}\n`, size(22, 1)],
+    ['size', 'src/styles/r9-extra.css', `${oldColours}\n}\n`, `${newColours}\n}\n`, size(22, 1)],
+    ['size', 'docs/r9/small-held.md', '<div>\n\nThe old words.\n', '<div>\n\nThe new words.\n', exact('docs/r9/small-held.md')],
+    // The kind of a file is still named ahead of its size (guards).
+    ['size', 'src/r9/cart.js', `${oldEleven}\n`, `${newEleven}\n`, 'it changes program logic in src/r9/cart.js, and only wording and colours qualify'],
+    ['size', 'src/r9/Page.vue', `${oldEleven}\n`, `${newEleven}\n`, gone('src/r9/Page.vue')],
+    ['size', 'agents/r9.md', `${oldEleven}\n`, `${newEleven}\n`, gone('agents/r9.md')],
+    // 2. A raw start tag anywhere refuses the file, in any letter case (red: below the changed
+    // paragraph, inside a code span and inside a fence each passed).
+    ...['<script>', '<STYLE>', '<pre>', '<textarea>', '<xmp>', '<plaintext>', '<Title>', '<noscript>', '<iframe src="x">', '<!-- note -->', '<![CDATA[x]]>', '<?php ?>']
+      .map((tag) => row('raw start below', `The @ words.\n\n${tag}\n`, words, true)),
+    row('raw start in a span', 'The @ words.\n\nUse `<script>` here.\n', words, true),
+    row('raw start in a fence', 'The @ words.\n\n```\n<pre>\n```\n', words, true),
+    row('raw start alone', '<!-- markdownlint-disable -->\n\nThe @ words.\n', words, true),
+    // The shape on which one renderer (Python-Markdown) gave four different pages by the length
+    // of the paragraph above it: a script in a block quote, its end tag outside the quote.
+    row('raw start below', 'The @ words here.\n\n> <script>\n> <!--<script>\n> </script>\n>\n> Bravo then.\n>\n</script>\n', words, true),
+    // Other tags below the paragraph hold nothing, as before (guards).
+    row('other tag below', 'The @ words.\n\n<div>\n\n<b>x</b> and `<i>`\n', words, null),
+    // 3. A colon that follows a letter, a digit, a closing quote or a closing parenthesis and
+    // stands before a space or the end of the line (red), outside the file's first paragraph.
+    row('colon', 'Text.\n\nNote: the @ way works.\n', words, null),
+    row('colon', 'Text.\n\nThe @ steps are:\nfirst this, then that.\n', words, null),
+    row('colon', 'Text.\n\nStep 2: the @ way.\n', words, null),
+    row('colon', 'Text.\n\nHe said "go": the @ way, and “stop”: no.\n', words, null),
+    row('colon', 'Text.\n\nThe way (short): the @ one.\n', words, null),
+    // In the first paragraph a metadata reader takes `Key: value` lines.
+    row('colon, first paragraph', 'Note: the @ way works.\n', words, true),
+    row('colon, first paragraph', 'Title of the page\nAuthor: the @ one\n\nText.\n', words, true),
+    row('colon, first paragraph', '\n\nNote: the @ way works.\n', words, true),
+    row('colon, first paragraph', 'Note: a way.\n\nThe @ words.\n', words, null),
+    // Never at a line start, never before anything but a space, never after anything else.
+    row('colon, not plain', 'Text.\n\n: the @ way\n', words, true),
+    row('colon, not plain', 'Text.\n\nRatio a:b in the @ way.\n', words, true),
+    row('colon, not plain', 'Text.\n\nAt 10:30 the @ way.\n', words, true),
+    row('colon, not plain', 'Text.\n\nSee http://x for the @ way.\n', words, true),
+    row('colon, not plain', 'Text.\n\nWait : the @ way.\n', words, true),
+    row('colon, not plain', 'Text.\n\nWait:: the @ way.\n', words, true),
+    row('colon, not plain', 'Text.\n\nWait, : the @ way.\n', words, true),
+    row('colon, not plain', 'Text.\n\nSmile :) the @ way.\n', words, true),
+    // 4. Parentheses (red). No link or tag can form: the paragraph holds no bracket and no `<`.
+    row('parentheses', 'The @ way (the short one) works.\n', words, null),
+    row('parentheses', 'See the item(s) and (see above.) Then the @ way.\n', words, null),
+    row('parentheses', 'The way ("quoted") and the @ one (c).\n', words, null),
+    row('parentheses, not plain', '(a) The @ way.\n', words, true),
+    row('parentheses, not plain', 'See [the guide](the @ way).\n', words, true),
+    row('parentheses, not plain', 'The way.(the @ one)\n', words, true),
+    // 5. List items (red): 0 to 3 spaces, a bullet or one to nine digits and `.` or `)`, 1 to 4
+    // spaces, then plain prose; every line of the run of non-blank lines is such a line or a
+    // plain prose line.
+    row('list item', '- the @ words\n- more words\n', words, null),
+    row('list item', '* the @ words\n  and a second line\n', words, null),
+    row('list item', '+ a plain item\n+ the @ item\n', words, null),
+    row('list item', '1. the first step\n2. the @ step\n', words, null),
+    row('list item', '1) the @ step\n', words, null),
+    row('list item', '123456789. the @ step\n', words, null),
+    row('list item', '-    the @ words\n', words, null),
+    row('list item', 'Text.\n\n   - the @ words\n', words, null),
+    row('list item', 'The steps\n- the @ step\nand a lazy line\n', words, null),
+    row('list item', '- "the" @ words (short): yes\n', words, true), // a colon in the first paragraph
+    row('list item', 'Text.\n\n- "the" @ words (short): yes\n', words, null),
+    row('list item, not plain', '-     the @ words\n', words, true),
+    row('list item, not plain', '    - the @ words\n', words, true),
+    row('list item, not plain', '1234567890. the @ step\n', words, true),
+    row('list item, not plain', '- [ ] the @ task\n', words, true),
+    row('list item, not plain', '- the @ words\n-\n', words, true),
+    row('list item, not plain', '- the @ words\n- \n', words, true),
+    row('list item, not plain', '-the @ words\n', words, true),
+    row('list item, not plain', '- - the @ words\n', words, true),
+    row('list item, not plain', '- 12 @ words\n', words, true),
+    row('list item, not plain', '- a `code` item\n- the @ item\n', words, true),
+    row('list item, not plain', '- a [link](/x) item\n- the @ item\n', words, true),
+    row('list item, not plain', '- the @ item\n===\n', words, true),
+    // A first word that pandoc reads as a list marker, at the start of an item's text and of
+    // any line of a run that holds an item.
+    row('list item, not plain', '- i. the @ words\n', words, true),
+    row('list item, not plain', '- the first item\n  a. the @ words\n', words, true),
+    // The prefix is identical on both sides.
+    ['list item, prefix', 'docs/r9/marker.md', '- the old words\n', '* the new words\n', exact('docs/r9/marker.md')],
+    ['list item, prefix', 'docs/r9/marker-space.md', '- the old words\n', '-  the new words\n', exact('docs/r9/marker-space.md')],
+    ['list item, prefix', 'docs/r9/number.md', '1. the old words\n', '2. the new words\n', exact('docs/r9/number.md')],
+    ['list item, prefix', 'docs/r9/became-item.md', 'A the old words\n', '- the new words\n', exact('docs/r9/became-item.md')]
+  ];
+  const base = {};
+  for (const [, p, b] of shapes) {
+    assert.equal(base[p], undefined, `${p} is used once`);
+    base[p] = b;
+  }
+  const root = makeRepo(base);
+  const wrong = [];
+  for (const [item, p, b, n, expected] of shapes) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    const want = expected === null ? STATUS_LINE : refusal(expected);
+    if (res.text !== want) wrong.push(`${item} ${p} ${JSON.stringify(b)}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
+    else if (expected === null) assertChecking(res, [p]);
+  }
+  assert.deepEqual(wrong, []);
 });

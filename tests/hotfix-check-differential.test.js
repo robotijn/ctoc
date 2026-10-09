@@ -16,8 +16,9 @@
 //             `html: true`; `linkify: true`; `html: true, linkify: true, typographer: true`)
 //             and each result is parsed by parse5, with scripting enabled and disabled. In
 //             EVERY configuration the two trees must be identical except for the data of text
-//             nodes whose ancestors are only `p` (and `body` and `html`). No tag, attribute,
-//             code or structure may differ.
+//             nodes whose ancestors are only `p`, `li`, `ul` and `ol` (and `body` and `html`):
+//             the words of a paragraph or of a list item. No tag, attribute, code or structure
+//             may differ. (Until the ninth round only `p`: a list item's text was no prose.)
 // Anything else is a disagreement: the check called a change wording that a real parser
 // reads as something else.
 //
@@ -693,6 +694,14 @@ function plainLine(r) {
     else if (roll < 0.23) w += '\u2026';
     else if (roll < 0.25) w = `${w}'s`;
     else if (roll < 0.27) w += ` ${1 + int(r, 30)}`;
+    // The ninth round: a colon after a word, a quote, a digit or a parenthesis; words in
+    // parentheses; and, seldom, the forms of each that are no prose.
+    else if (roll < 0.31) w += ':';
+    else if (roll < 0.34) w = `(${w})`;
+    else if (roll < 0.36) w = `(${w} ${pick(r, FILLER)})${pick(r, ['', ':', ',', '.'])}`;
+    else if (roll < 0.37) w = `"${w}":`;
+    else if (roll < 0.38) w += ` ${1 + int(r, 9)}:`;
+    else if (roll < 0.38 + 0.012 * wild) w = pick(r, [`${w}:${word(r)}`, `${w} :`, `${w}::`, `:${w}`, `${w}(`, `${w}.(x)`, `${w}:)`, `http://${w}`]);
     parts.push(w);
   }
   let out = parts.join(' ');
@@ -704,6 +713,25 @@ function plainParagraph(r) {
   const lines = [];
   for (let n = 1 + int(r, 3); n > 0; n--) lines.push(plainLine(r));
   return lines.map((l, i) => (i > 0 && chance(r, 0.1) ? `${' '.repeat(1 + int(r, 3))}${l}` : l) + (chance(r, 0.05) ? '  ' : ''));
+}
+
+/** The markers of a plain list item, and seldom one that is none for some reader. */
+const ITEM_MARKERS = ['- ', '- ', '- ', '* ', '+ ', '1. ', '1. ', '2. ', '1) ', '10. ', '-  ', '-    ', ' - ', '   * ', '123456789. '];
+const ODD_MARKERS = ['-     ', '    - ', '-\t', '- [ ] ', '1234567890. ', '-', '1.', '- - ', '- # ', '- > ', 'a. ', '(1) ', '#. '];
+/**
+ * A list of plain items (the ninth round): one to four items of plain prose, one marker
+ * mostly, sometimes a second line under an item (indented or lazy), and seldom an item that is
+ * no plain prose or a marker some reader reads otherwise.
+ */
+function plainList(r) {
+  const marker = pick(r, ITEM_MARKERS);
+  const lines = [];
+  for (let n = 1 + int(r, 4); n > 0; n--) {
+    const m = chance(r, 0.85) ? marker : chance(r, 0.6 / Math.max(wild, 0.2)) ? pick(r, ITEM_MARKERS) : pick(r, ODD_MARKERS);
+    lines.push(m + (chance(r, 1 - 0.08 * wild) ? plainLine(r) : inlineLine(r)));
+    if (chance(r, 0.25)) lines.push(' '.repeat(pick(r, [0, 2, 2, 3, 1, 4])) + plainLine(r));
+  }
+  return lines;
 }
 
 function inlinePiece(r) {
@@ -911,6 +939,11 @@ function block(r, depth) {
     [2, () => [plainLine(r), '', pick(r, ['===', '---'])]],
     [8, () => (depth >= 2 ? paragraph(r) : listLines(r, blocks(r, depth + 1, 1 + int(r, 2))))],
     [4, () => [...listLines(r, plainParagraph(r)), ...listLines(r, plainParagraph(r))]],
+    [16 / wild, () => plainList(r)],
+    [4, () => [plainLine(r), ...plainList(r)]],
+    [3, () => [...plainList(r), plainLine(r)]],
+    [2, () => [...plainList(r), pick(r, ['===', '---', '-', '* * *', '    code', '> quote', '| a | b |'])]],
+    [2, () => [`${pick(r, ['Title', 'Author', 'Tags'])}: ${plainLine(r)}`, plainLine(r)]],
     [3, () => [`${pick(r, ['- ', '1. ', '* ', '-   '])}${w}`, '', `${' '.repeat(int(r, 4))}${plainLine(r)}`]],
     [2, () => [`${pick(r, ['- ', '1. ', '* '])}${w}`, plainLine(r)]],
     [2, () => [`-   ${w}:`, '', `        ${x} ${w}`]],
@@ -1182,14 +1215,14 @@ function htmlOracle(oldText, newText) {
   return null;
 }
 
-/** The only elements a changed Markdown text node may stand in. */
-const PROSE_ANCESTORS = new Set(['html', 'body', 'p']);
+/** The only elements a changed Markdown text node may stand in: a paragraph, and (since the ninth round) a list item. */
+const PROSE_ANCESTORS = new Set(['html', 'body', 'p', 'ul', 'ol', 'li']);
 
 /**
  * What the Markdown readers say about one edit of a Markdown document: null when, in every
  * configuration and with scripting enabled and disabled, the two rendered trees are
- * identical except for the data of text nodes whose ancestors are only `p`, `body` and
- * `html`; or the configuration and the first reason they are not.
+ * identical except for the data of text nodes whose ancestors are only `p`, `li`, `ul`, `ol`,
+ * `body` and `html`; or the configuration and the first reason they are not.
  */
 function markdownOracle(oldText, newText) {
   for (const [name, reader] of MARKDOWN_READERS) {
@@ -1285,7 +1318,9 @@ const INGREDIENTS = {
   markdown: {
     'a heading': /^#{1,6} /m, 'a list': /^(?:[-*+]|\d+[.)]) /m, 'a block quote': /^>/m, 'a table': /^\|.*\|$/m, 'a code fence': /^(?:```|~~~)/m,
     'indented code': /^ {4}\S/m, 'front matter that is closed': /^---\n[^\n]+\n(?:---|\.\.\.)\n/, 'a link': /\]\(/, 'a code span': /`[^`\n]+`/,
-    'a tag below the edit': /<[a-z!]/, 'a comment alone on its line': /^<!--[^<>]*-->$/m, 'a tag inside a code span': /`[^`\n]*<[a-z][^`\n]*`/,
+    'a tag in the document': /<[a-z]/, 'a tag inside a code span': /`[^`\n]*<[a-z][^`\n]*`/,
+    'a colon in a plain line': /^[A-Z"][^\n<>[\]`*_#|]*[a-z)"]: [^\n<>[\]`*_#|]*$/m, 'parentheses in a plain line': /^[A-Z"][^\n<>[\]`*_#|]*\([a-z ]+\)[^\n<>[\]`*_#|]*$/m,
+    'a plain list item': /^ {0,3}(?:[-*+]|\d{1,9}[.)]) {1,4}[A-Z"][^\n<>[\]`*_#|]*$/m, 'a second line under a list item': /^(?:[-*+]|\d{1,9}[.)]) [^\n]+\n {0,3}[A-Z"][^\n<>[\]`*_#|]*$/m,
     'two plain paragraphs': /^[A-Z"][^\n<>[\]`*_#|:()]+\n\n[A-Z"][^\n<>[\]`*_#|:()]+\n/m,
     'a line break of two spaces': / {2}\n\S/, 'a number': /\d/, 'typographic marks': /[\u2014\u2026\u201c]/, 'a thematic break': /^(?:\*\*\*|___|\* \* \*)$/m,
     'a definition': /^\[[^\]]+\]: /m
@@ -1577,7 +1612,17 @@ const BY_HAND = {
     '<pre>\n<!-- </pre> -->\n\nThe alpha words.\n', '<xmp>\n\n`</xmp>`\n\nThe alpha words.\n', '<!alpha\n\nThe bravo words.\n>\n', '<hr>\n<https://alpha.example/x>\n\nThe bravo words.\n',
     '---\ntext: |\n  ```\n---\n\nThe alpha words.\n\n```\n', '---\ntitle: <hr>\n<https://alpha.example/x>\n---\n\nThe bravo words.\n', '---\nThe alpha: [\n---\nText bravo here\n\nMore charlie words.\n\n---\n',
     '----\nRow alpha here\n\nRow bravo here\n----\n', '----------- -------\nFirst       alpha\n\nSecond bravo words\n\nThird charlie\n----------- -------\n',
-    'a. The alpha words.\n', 'import Chart from "alpha"\n', 'export default alpha\n', 'The fix landed in alpha last week.\n'
+    'a. The alpha words.\n', 'import Chart from "alpha"\n', 'export default alpha\n', 'The fix landed in alpha last week.\n',
+    // The ninth round (decisions at review of 2026-10-09): plain lists, colons and parentheses
+    // qualify; a metadata reader takes `Key: value` in the first paragraph; a raw start tag
+    // anywhere refuses the file, the shape on which Python-Markdown gave four pages among them.
+    '- alpha item\n- bravo item\n', '1. Step alpha.\n2. Step bravo (the short one).\n   Then charlie.\n', 'The alpha steps\n- bravo item\ncharlie words\n',
+    '# Title\n\nNote: the alpha way works, and so does this: the bravo one.\n', 'Title: alpha\nAuthor: bravo\n\nThe charlie words.\n',
+    'The alpha way (the bravo one) works.\n', '- alpha `code` item\n- bravo item\n', '- [ ] alpha task\n- bravo item\n', '- alpha\n-\n- bravo\n',
+    '- alpha item\n===\n', '* alpha\n* * *\n* bravo\n', '- alpha:\n\n      bravo\n', 'Term alpha\n: bravo words\n', '- i. alpha words\n', '(a) alpha words\n',
+    'The alpha words here.\n\n> <script>\n> <!--<script>\n> </script>\n>\n> Bravo then.\n>\n</script>\n', 'The alpha words.\n\n<!-- bravo -->\n',
+    'Use `<script>` now.\n\nThe alpha words.\n', '1. alpha\n1. bravo\n8. charlie\n', '- alpha\n  - bravo\n    - charlie\n', '-    alpha\n     bravo\n',
+    'Intro alpha\n* bravo words\n* charlie words\n', 'Text.\n\n- alpha: bravo\n- charlie (delta): alpha\n'
   ]
 };
 
@@ -1627,8 +1672,9 @@ test('the real menu route answers a sample of the generated edits as the rules d
   }
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hotfix-differential-'));
   const git = (args) => {
+    // `maintenance.auto=false` and `gc.auto=0`: git 2.54 starts a detached maintenance run after a commit.
     const r = spawnSync('git', ['-c', 'user.name=Hotfix Test', '-c', 'user.email=hotfix@test.invalid',
-      '-c', 'commit.gpgsign=false', '-c', 'core.autocrlf=false', ...args], { cwd: root, encoding: 'utf8' });
+      '-c', 'commit.gpgsign=false', '-c', 'core.autocrlf=false', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0', ...args], { cwd: root, encoding: 'utf8' });
     if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`);
   };
   try {
@@ -1652,6 +1698,6 @@ test('the real menu route answers a sample of the generated edits as the rules d
     }
     t.diagnostic(`${sample.length} edits through the real menu route, each answered as the rules answered it`);
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
 });
