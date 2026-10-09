@@ -2658,8 +2658,11 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     row('raw', '---\ntitle: <b>\n---\n\nThe @ words.\n', words, true),
     row('raw', 'A < b and <3\n\nThe @ words.\n', words, null),
     row('raw', 'The @ words.\n\n<div>\n', words, null),
-    // Three shapes are read as closed by every renderer: a comment alone on its line, a tag
-    // inside a code span on one line, a tag inside a code fence (but one of the twelve raw starts).
+    // Two shapes are read as closed by every renderer: a comment alone on its line, and a tag
+    // inside a code span on one line. A tag inside a code fence is not one of them: a renderer
+    // that knows no fences reads it as HTML, and a block tag left open there holds the rest of
+    // the file (found with Python-Markdown without its fenced-code extension, 2026-10-09). A
+    // fence that holds no tag, and a fence with a tag below the paragraph, hold nothing.
     row('raw, closed', '<!-- a note -->   \n<!---->\n\nThe @ words.\n', words, null),
     row('raw, closed', ' <!-- a note -->\n\nThe @ words.\n', words, true),
     row('raw, closed', '<!-- a -- b -->\n\nThe @ words.\n', words, true),
@@ -2673,7 +2676,11 @@ test('round 8: Markdown and plain text qualify only as a wording change in pure 
     row('raw, closed', 'Use `<a>\n` now.\n\nThe @ words.\n', words, true),
     row('raw, closed', 'A ` alone.\nUse `<a>` now.\n\nThe @ words.\n', words, true),
     row('raw, closed', 'Use `x | <a>` now.\n\nThe @ words.\n', words, true),
-    row('raw, closed', '```\n<div> <b>\n```\n\nThe @ words.\n', words, null),
+    row('raw, closed', '```\n<div> <b>\n```\n\nThe @ words.\n', words, true),
+    row('raw, closed', '```html\n<div>x</div>\n```\n\nThe @ words.\n', words, true),
+    row('raw, closed', '~~~\n<option>One\n~~~\n\nThe @ words.\n', words, true),
+    row('raw, closed', '```\nif (a < b) return\n```\n\nThe @ words.\n', words, null),
+    row('raw, closed', 'The @ words.\n\n```\n<div>\n```\n', words, null),
     row('raw, closed', '```\n<!-- a -->\n```\n\nThe @ words.\n', words, true),
     row('raw, closed', '```\n<?php\n```\n\nThe @ words.\n', words, true),
     row('raw, closed', '```\n<TextArea>\n```\n\nThe @ words.\n', words, true),

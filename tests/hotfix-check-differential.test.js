@@ -1286,7 +1286,7 @@ const INGREDIENTS = {
     'a heading': /^#{1,6} /m, 'a list': /^(?:[-*+]|\d+[.)]) /m, 'a block quote': /^>/m, 'a table': /^\|.*\|$/m, 'a code fence': /^(?:```|~~~)/m,
     'indented code': /^ {4}\S/m, 'front matter that is closed': /^---\n[^\n]+\n(?:---|\.\.\.)\n/, 'a link': /\]\(/, 'a code span': /`[^`\n]+`/,
     'a tag below the edit': /<[a-z!]/, 'a comment alone on its line': /^<!--[^<>]*-->$/m, 'a tag inside a code span': /`[^`\n]*<[a-z][^`\n]*`/,
-    'a tag inside a code fence': /^```[a-z]*\n(?:[^\n]*\n)*?[^\n]*<[a-z]/m, 'two plain paragraphs': /^[A-Z"][^\n<>[\]`*_#|:()]+\n\n[A-Z"][^\n<>[\]`*_#|:()]+\n/m,
+    'two plain paragraphs': /^[A-Z"][^\n<>[\]`*_#|:()]+\n\n[A-Z"][^\n<>[\]`*_#|:()]+\n/m,
     'a line break of two spaces': / {2}\n\S/, 'a number': /\d/, 'typographic marks': /[\u2014\u2026\u201c]/, 'a thematic break': /^(?:\*\*\*|___|\* \* \*)$/m,
     'a definition': /^\[[^\]]+\]: /m
   }
@@ -1415,8 +1415,9 @@ const WITNESSES = [
   ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '<?x?><p>alpha</p>'],
   ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '</ x><p>alpha</p>'],
   ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '<!DOCTYPE html PUBLIC "x"><p>alpha</p>'],
-  ['only white space and comments stand before the doctype', 'Draft<!DOCTYPE html><p>alpha</p>'],
-  ['only white space and comments stand before the doctype', '<br><!DOCTYPE html><p>alpha</p>'],
+  ['only white space stands before the doctype', 'Draft<!DOCTYPE html><p>alpha</p>'],
+  ['only white space stands before the doctype', '<br><!DOCTYPE html><p>alpha</p>'],
+  ['only white space stands before the doctype', '<!-- c --><!DOCTYPE html><p>alpha</p>'],
   // Raw text: a script block's comment marks.
   ['in a script, `<!--` is not followed at once by `>` or `->`', '<script><!--> x</script><p>alpha</p>'],
   ['in a script, a `<!--` holds no second `<!--`', '<script><!-- a <!-- b --></script><p>alpha</p>'],

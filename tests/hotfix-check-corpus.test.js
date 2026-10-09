@@ -305,6 +305,8 @@ const BASE = {
   'docs/lint.md': lines('<!-- markdownlint-disable -->', '', 'Old words here.'),
   'docs/span-tag.md': lines('Use `<div>` and ``a ` <b>`` here.', '', 'Old words here.'),
   'docs/fence-tag.md': lines('```html', '<div>x</div>', '```', '', 'Old words here.'),
+  'docs/fence-open-tag.md': lines('```', '<div>', '```', '', 'Old words here.'),
+  'src/pages/lead-comment.html': '<!-- Draft -->\n<!DOCTYPE html>\n<p>Save</p>\n',
   'docs/eleven.md': lines(...Array.from({ length: 11 }, (_, i) => `Eleven old line ${String.fromCharCode(97 + i)}.`)),
   // Traps: every finding of the Markdown security run, and what the differential test found.
   'docs/md-in-html.md': lines('<div markdown="1">', '', 'Read the guide first.', '', '</div>'),
@@ -411,14 +413,13 @@ const QUALIFY = [
   // The eighth round (the decision at review of 2026-10-09): a typo in a plain paragraph
   // qualifies. Plain text under a documentation name, also with a language part; a paragraph
   // with typographic quotes, a dash, a hyphenated word, an apostrophe and an ellipsis; a
-  // paragraph below a comment that opens and closes on its own line, below a tag written
-  // inside a code span, and below a tag written inside a code fence.
+  // paragraph below a comment that opens and closes on its own line, and below a tag written
+  // inside a code span.
   ['CHANGES.txt', lines('The new wording of the first release.')],
   ['docs/readme.en.txt', BASE['docs/readme.en.txt'].replace('old', 'new')],
   ['docs/plain.md', BASE['docs/plain.md'].replace('well-known', 'well-liked')],
   ['docs/lint.md', BASE['docs/lint.md'].replace('Old', 'New')],
-  ['docs/span-tag.md', BASE['docs/span-tag.md'].replace('Old', 'New')],
-  ['docs/fence-tag.md', BASE['docs/fence-tag.md'].replace('Old', 'New')]
+  ['docs/span-tag.md', BASE['docs/span-tag.md'].replace('Old', 'New')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -764,9 +765,18 @@ TRAPS.push(
   [{ 'docs/abbreviation.md': BASE['docs/abbreviation.md'].replace('old', 'new') }, null, inexact('docs/abbreviation.md')],
   [{ 'docs/colon.md': BASE['docs/colon.md'].replace('old', 'new') }, null, inexact('docs/colon.md')],
   [{ 'docs/brackets.md': BASE['docs/brackets.md'].replace('old', 'new') }, null, inexact('docs/brackets.md')],
-  // Inside a code fence one of the named raw starts still counts (a reader without fences
-  // would run the script); and plain text under a documentation name is held to the same rule.
+  // A tag inside a code fence holds what follows like any other: a renderer that knows no
+  // fences reads it as HTML (a `<script>` would run there), and a block tag left open holds
+  // the rest of the file. `docs/fence-tag.md` qualified until Python-Markdown without its
+  // fenced-code extension was run against the edits this reader passes (2026-10-09), and
+  // `docs/fence-open-tag.md` is the smallest case that run found. Plain text under a
+  // documentation name is held to the same rule as Markdown.
   [{ 'docs/fence-script.md': BASE['docs/fence-script.md'].replace('Old', 'New') }, null, inexact('docs/fence-script.md')],
+  [{ 'docs/fence-tag.md': BASE['docs/fence-tag.md'].replace('Old', 'New') }, null, inexact('docs/fence-tag.md')],
+  [{ 'docs/fence-open-tag.md': BASE['docs/fence-open-tag.md'].replace('Old', 'New') }, null, inexact('docs/fence-open-tag.md')],
+  // Only white space may stand before the doctype (the decision at review of 2026-10-09): a
+  // comment there leaves a current browser in standards mode, and is refused all the same.
+  [{ 'src/pages/lead-comment.html': BASE['src/pages/lead-comment.html'].replace('Save', 'Store') }, null, inexact('src/pages/lead-comment.html')],
   [{ 'CHANGELOG.txt': lines('- Fixed the new bug') }, null, inexact('CHANGELOG.txt')]
 );
 
@@ -824,9 +834,9 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 35, 'the corpus holds 35 shapes that qualify');
+assert.equal(QUALIFY.length, 34, 'the corpus holds 34 shapes that qualify');
 assert.equal(REMOVED_FORMATS.length, 44, 'the corpus holds 44 cases of removed formats');
-assert.equal(TRAPS.length, 275, 'the corpus holds 275 traps, the removed formats among them');
+assert.equal(TRAPS.length, 278, 'the corpus holds 278 traps, the removed formats among them');
 
 let root;
 
@@ -1242,7 +1252,9 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     'docs/prose-many.md': (n) => `${'Plain words in a line.\n\n'.repeat(5 * n)}Old words.\n`,
     'docs/prose-paragraph.md': (n) => `${'Plain words in a line,\n'.repeat(5 * n)}Old words.\n`,
     'docs/prose-line.md': (n) => `${'plain words '.repeat(10 * n)}Old words.\n`,
-    'docs/fences-many.md': (n) => `${'```js\n<b> code\n```\n\n'.repeat(5 * n)}Old words.\n`,
+    // (Until a tag inside a fence held what follows, these fences held `<b> code`; a `<` before a space is no tag.)
+    'docs/fences-many.md': (n) => `${'```js\nif (a < b) code\n```\n\n'.repeat(5 * n)}Old words.\n`,
+    'docs/fences-tags.md': (n) => `${'```js\n<b> code\n```\n\n'.repeat(5 * n)}Old words.\n`,
     'docs/meta-many.md': (n) => `${'---\ntitle: x\n---\n\n'.repeat(5 * n)}Old words.\n`,
     'docs/comments-many.md': (n) => `${'<!-- a note -->\n\n'.repeat(6 * n)}Old words.\n`,
     'docs/spans-many.md': (n) => `${'Use `<b>` and ``a ` <i>`` now.\n\n'.repeat(4 * n)}Old words.\n`,
@@ -1262,7 +1274,7 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     // The inputs of the removed formats are kept: each is refused as not recognised, at once.
     if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(at(1)().cause, 'unrecognised', rel);
     // The eighth round's inputs that end in a plain paragraph are read to the end and pass.
-    if (/^(?:docs\/(?:prose|fences|meta|comments|spans|ticks-open|spaces|def-ends|fence-like)|NOTES)/.test(rel)) assert.equal(at(1)(), null, rel);
+    if (/^(?:docs\/(?:prose|fences-many|meta|comments|spans|ticks-open|spaces|def-ends|fence-like)|NOTES)/.test(rel)) assert.equal(at(1)(), null, rel);
     // The largest input is about 1.6 million characters, four times the size a quadratic scan took seconds on.
     const { n, small, big, ratio } = growth(at, 16, Math.floor(1600000 / (build(64).length / 64)));
     assert.ok(ratio < 8, `${rel}: size ${n} took ${small.toFixed(1)} ms and size ${4 * n} took ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
