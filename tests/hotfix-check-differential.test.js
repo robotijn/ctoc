@@ -15,7 +15,8 @@
 // nothing under src/ requires either. parse5 is published as an ECMAScript module only, so
 // this file needs a Node.js that can `require` one (20.19 or later, 22.12 or later).
 //
-// Size: by default a sample that takes about 15 seconds. The long soak (6 million HTML and
+// Size: by default 50,000 HTML and 12,000 Markdown cases, about 15 seconds under the test
+// gate's coverage run and about 3 seconds by itself. The long soak (6 million HTML and
 // 1 million Markdown cases) runs with HOTFIX_DIFFERENTIAL_SOAK=1. Every case is a pure
 // function of the seed and its index, so a failure names both and reproduces:
 //   HOTFIX_DIFFERENTIAL_SEED=<seed>   another seed (default 20261009)
@@ -41,9 +42,9 @@ const { ruleRefusal } = require('../src/lib/hotfix-check');
 const SOAK = process.env.HOTFIX_DIFFERENTIAL_SOAK === '1';
 const SEED = Number(process.env.HOTFIX_DIFFERENTIAL_SEED || 20261009);
 const FROM = Number(process.env.HOTFIX_DIFFERENTIAL_FROM || 0);
-const HTML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_HTML || (SOAK ? 6000000 : 80000));
+const HTML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_HTML || (SOAK ? 6000000 : 50000));
 const SHOW = Number(process.env.HOTFIX_DIFFERENTIAL_SHOW || 0);
-const MARKDOWN_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_MARKDOWN || (SOAK ? 1000000 : 25000));
+const MARKDOWN_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_MARKDOWN || (SOAK ? 1000000 : 12000));
 
 const markdown = new MarkdownIt({ html: true });
 
