@@ -835,8 +835,8 @@ function commonEnds(o, n) {
  *     (`<!--`, not followed at once by `>` or `->`, holding no `<!--` and no `--!>`, not
  *     ending in `<!-`, closed by the first `-->`); `<![CDATA[`, `<?` and `</` before anything
  *     but a letter; the same comment rule inside a script block;
- *   - anything but white space and comments before the doctype (it then counts for nothing,
- *     and a browser reads the page in quirks mode);
+ *   - anything but white space before the doctype (text or a tag there puts a browser in
+ *     quirks mode; a comment does not, and the decision refuses it all the same);
  *   - an unfinished tag, attribute quote or comment; an attribute name that starts with `<`,
  *     `"`, `'` or `=`;
  *   - inside `<svg>` or `<math>`: an end tag that does not close the element on top, any
@@ -1264,10 +1264,11 @@ const TABLE_TEXT_MOVES = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr']);
  * where the raw text ends and finds the `<noscript>` on top of the stack (as every end tag
  * must find its element); anything else is outside the subset.
  * THE DOCTYPE counts only before everything else: text or a tag before it leaves a browser
- * in quirks mode, so only white space and comments may stand there. Without a doctype a
- * `<table>` leaves an open `<p>` open (quirks mode). After `</body>` or `</html>` only white
- * space, comments and those two end tags may follow (a browser puts anything else back into
- * the body, inside whatever is still open there).
+ * in quirks mode, and the decision lets only white space stand there (one byte-order mark is
+ * taken off before the scan), so a comment before the doctype refuses the file too. Without
+ * a doctype a `<table>` leaves an open `<p>` open (quirks mode). After `</body>` or `</html>`
+ * only white space, comments and those two end tags may follow (a browser puts anything else
+ * back into the body, inside whatever is still open there).
  * @param {string} s the whole file, line feeds only, without a leading byte-order mark
  * @returns {Tok[]}
  */
@@ -1288,7 +1289,7 @@ function scanMarkup(s) {
   let held = 0;
   let components = 0;
   let ended = false; // `</body>` or `</html>` has been read
-  let initial = true; // nothing but white space and comments has been read
+  let initial = true; // nothing but white space has been read
   let quirks = true; // no `<!DOCTYPE html>` leads the file: a browser then leaves a `<p>` open at a `<table>`
   let noscriptEnd = -1; // where the raw text of the `<noscript>` last opened ends
   /** For lists and for `<dl>`: how many items are open in each open one, the innermost last. */
@@ -1446,11 +1447,11 @@ function scanMarkup(s) {
     } else if (d === '!' || d === '?' || d === '/') {
       text(i); // what stands before a doctype counts, so it is read first
       const end = declarationEnd(s, i);
-      if (!s.startsWith('<!--', i)) { // the doctype: only white space and comments may stand before it
+      if (!s.startsWith('<!--', i)) { // the doctype: only white space may stand before it
         if (!initial) outside();
         quirks = false;
-        initial = false;
       }
+      initial = false;
       take('comment', end);
     } else {
       i++;
@@ -2062,8 +2063,8 @@ const CODE_WORD = /^(?:import|export) /;
 const FENCE_LIKE = /^(\s*)(`{3,}|~{3,})(.*)$/su;
 /** What may follow an opening fence: one word at most (Python-Markdown reads no fence with two). */
 const FENCE_WORD = /^\.?[A-Za-z0-9_#.+-]*$/;
-/** The raw starts the decision names; inside a code fence only these count. */
-const RAW_START = /<(?:script|style|pre|textarea|xmp|plaintext|title|noscript|iframe|!--|!\[CDATA\[|\?)/i;
+/** A `<` before a letter, `!`, `?` or `/`: where a renderer may start a tag, a comment or a declaration. */
+const TAG_START = /<[A-Za-z!?/]/;
 /** A word of 7 to 40 hexadecimal digits: sites link such a word as a commit id. */
 const HEX_WORD = /(?<![\p{L}\p{N}])[0-9a-f]{7,40}(?![\p{L}\p{N}])/iu;
 /** @param {string} line @returns {boolean} an empty line, or one of spaces only */
@@ -2169,11 +2170,13 @@ function rawOutsideSpans(line, unsure) {
  *   RAW HTML ABOVE. The decision names twelve raw starts and their closers. Found: a closer
  *   can be escaped by the Markdown around it, a block quote or list item can end before it,
  *   and any element left open holds the paragraphs below it. So every `<` before a letter,
- *   `!`, `?` or `/` holds every line from there on, front matter included. Three shapes are
+ *   `!`, `?` or `/` holds every line from there on, front matter included. Two shapes are
  *   closed for every renderer and hold nothing: a comment alone on its line
- *   ({@link commentLine}), a tag inside a code span on one line ({@link rawOutsideSpans}),
- *   and a tag inside a code fence, unless it is one of the twelve raw starts (a reader
- *   without fences would run a `<script>` there).
+ *   ({@link commentLine}) and a tag inside a code span on one line
+ *   ({@link rawOutsideSpans}). A tag inside a code fence holds what follows like any other
+ *   (found, Python-Markdown without its fenced-code extension: a renderer that knows no
+ *   fences reads the fence's lines as Markdown, runs a `<script>` there, and lets a block
+ *   tag left open hold the rest of the file).
  * @param {string[]} lines @returns {(boolean[]|null)}
  */
 function proseHeld(lines) {
@@ -2210,7 +2213,7 @@ function proseHeld(lines) {
       held[i] = true;
     }
     if (isBlank(line)) unsure = false;
-    if (!raw && fence !== null) raw = RAW_START.test(line);
+    if (!raw && fence !== null) raw = TAG_START.test(line);
     else if (!raw && !commentLine(line)) ({ raw, unsure } = rawOutsideSpans(line, unsure));
     if (raw) held[i] = true;
   }
