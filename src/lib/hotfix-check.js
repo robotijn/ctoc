@@ -32,8 +32,11 @@
  * new text and changed lines the rules read come from it (`cat-file`, `diff --cached`), so
  * the rules judge the bytes `git add` stages. A judged file that git's index marks
  * assume-unchanged (which `core.ignoreStat` also sets) or skip-worktree is refused as
- * unreadable: git would then read its index instead of the file. No language model is
- * involved; the same change always gets the same answer.
+ * unreadable: git would then read its index instead of the file. A change that adds or
+ * deletes a path is refused by rule 2 whatever it holds, so nothing of it is staged (the
+ * decision at review of 2026-10-09: with no file named, staging would write every untracked
+ * file into the repository's object store); only its changed lines are counted, for the log.
+ * No language model is involved; the same change always gets the same answer.
  *
  * THE RULES. They run in this order: 1, 2, 7, the kind of each file (the first half of rule
  * 4), 3, the content of each file (the rest of rule 4), 5, 6, and 8 last. The first that
@@ -53,10 +56,13 @@
  *                                          reStructuredText, Sass, Less or gettext file is a kind it
  *                                          does not recognise; never in a place that governs the work
  *                                          (`CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`,
- *                                          `GEMINI.md`, `CONVENTIONS.md`, GitHub's assistant
+ *                                          `GEMINI.md`, `CONVENTIONS.md`, `IRON_LOOP.md`,
+ *                                          `SKILL.md`, `MEMORY.md`, GitHub's assistant
  *                                          files, `.cursor/`, `.windsurf/`, `.clinerules/`,
  *                                          `.roo/`, `.kiro/`, `.junie/`, `.amazonq/`,
- *                                          `.continue/` and the governing folders), never in a
+ *                                          `.continue/`, the governing folders, `prompts/` and
+ *                                          `output-styles/` among them, and every file a `CLAUDE.md`
+ *                                          or `AGENTS.md` of the last commit links to), never in a
  *                                          build folder (`.github/` but its Markdown outside
  *                                          `workflows/`, `.changeset/`, ...); `robots.txt` and
  *                                          its kind are settings; a `.txt` named like
@@ -91,38 +97,56 @@
  *                                          element that holds its text: a code element, a
  *                                          `<template>`, an element with an `is` attribute, a custom
  *                                          element and every name outside the fixed list of 111 HTML
- *                                          elements; a `<title>` is text); stylesheets by statements
- *                                          across the whole file (strings, comments and `url(…)`
- *                                          blanked), a colour only as the whole value of a real
- *                                          colour property on its line, and a change to a custom
- *                                          property a setting unless the property is named for a
- *                                          colour and holds exactly one colour before and after;
+ *                                          elements; a `<title>` is text; a page that names another
+ *                                          character set than UTF-8 is refused); stylesheets by
+ *                                          statements across the whole file, in a STRICT SUBSET held
+ *                                          to postcss by the same differential test (strings,
+ *                                          comments, `url(…)` and escaped characters blanked; a
+ *                                          semicolon ends no statement inside brackets; a statement
+ *                                          that is no declaration, at-rule or rule head refuses the
+ *                                          file), a colour only as the whole value of a real colour
+ *                                          property on its line, and a change to a custom property
+ *                                          a setting unless the property is named for a colour,
+ *                                          holds exactly one colour before and after, and is read
+ *                                          in its file by colour properties only;
  *                                          Markdown and plain text as PURE PROSE (the decision at
  *                                          review of 2026-10-09: Markdown is not one language, and
  *                                          no reader agrees with every renderer on structure): only
- *                                          the words of plain prose lines may change, in a paragraph
- *                                          bounded by empty lines, outside front matter, code fences
- *                                          and whatever follows raw HTML, with nothing else in the
- *                                          file changed (held to markdown-it in four configurations
- *                                          by the same differential test); a
- *                                          catalogue value is decoded as its format reads it and
- *                                          read as a browser reads an address, each line only where
- *                                          it starts an entry.
+ *                                          the words of plain prose lines may change (a colon,
+ *                                          parentheses and list items of plain prose among them), in
+ *                                          a paragraph bounded by empty lines, outside front matter,
+ *                                          code fences and whatever follows raw HTML, in a file that
+ *                                          holds no raw start tag, with nothing else in the file
+ *                                          changed (held to markdown-it in four configurations by
+ *                                          the same differential test); a message catalogue is one
+ *                                          only under a catalogue folder with a language tag or a
+ *                                          wording bundle's name, never under a dependency, build or
+ *                                          settings name, and each format has ONE reader of the whole
+ *                                          file: JSON by `JSON.parse`, the file being exactly what
+ *                                          `JSON.stringify` writes; YAML and properties in a strict
+ *                                          subset (YAML held to js-yaml by the differential test);
+ *                                          a changed value is read as the program reads it AND as it
+ *                                          is written, and as a browser reads an address.
  *                                          EVERY SCANNER FAILS CLOSED: a side that ends inside an
  *                                          unfinished construct, or holds one its scanner cannot
  *                                          follow, makes the change unreadable
  *   5  not in a sensitive area           — 33 whole words, also in the plural, in the path from
  *                                          the repository top (auth, login, ...; in a stylesheet's
- *                                          own file name not in the plural), the path folded first
- *                                          (Unicode NFKC, lower case), split at every character that
- *                                          is no letter, and each camel-case sub-word read too
- *                                          (`AuthPanel` is `auth`, `Author` is not); CTOC's own secret-file guard,
+ *                                          own file name `tokens` alone is no such word), the path
+ *                                          asked as written, with compatibility letters as plain
+ *                                          ones, and with marks and unseen characters dropped, each
+ *                                          form split at every character that is no letter, and each
+ *                                          camel-case sub-word read too (`AuthPanel` is `auth`,
+ *                                          `APIKey` is `key`, `Author` is not); CTOC's own secret-file guard,
  *                                          and in CTOC's own repository its protected paths; the test,
  *                                          governing, build and database folders are read from
  *                                          the top too
- *   6  no risk marker in wording         — no number, currency, %, address, e-mail, code;
- *                                          in documentation, in the changed words only, and
- *                                          there also no word of 7 to 40 hexadecimal digits
+ *   6  no risk marker in wording         — no number of any kind, currency, %, address (a bare
+ *                                          host and a scheme among them), e-mail, code, and no
+ *                                          character nobody sees; markup text is read as written and
+ *                                          as its references spell it; in documentation, in the
+ *                                          changed words only, and there also no word of 7 to 40
+ *                                          hexadecimal digits
  *   3  size                              — at most 20 changed lines in at most 3 files
  *   8  the existing tests pass           — only in the `--run-tests` call, in a copy
  * Rule 7 and the kind of each file (rule 4: where it is placed by its name and its place) run
@@ -132,6 +156,37 @@
  * over the limit gets the size clause the functional plan's scenario expects whatever its
  * content holds. All of 2 to 7 read the same diff, so the order costs nothing, and the tests
  * still run last.
+ *
+ * A TRANSFORM ONLY ADDS REASONS TO REFUSE (the coordinator's point at review, 2026-10-09).
+ * The program that later reads a file sees its raw bytes, so every place where the check
+ * folds, strips, decodes or skips before it decides is listed here with what keeps it on the
+ * refusing side:
+ *   the bytes read as UTF-8                 a zero byte or bytes that are no UTF-8 refuse (rule 1);
+ *                                           a page or stylesheet that names another character set
+ *                                           refuses
+ *   a byte-order mark skipped               only for markup and stylesheets, and only when it
+ *                                           stands on both sides; in a catalogue it refuses
+ *   `\r\n` read as `\n`                     the same ending on every line of both sides, and as many
+ *                                           carriage returns; Markdown compares each line's ending
+ *   names compared without letter case      a table that refuses gains matches; the tables that let
+ *                                           a file qualify (extension, catalogue folder, language
+ *                                           tag, bundle and documentation name) are compared so by
+ *                                           the eighth round's decision, as file systems compare
+ *   a path folded (NFKC; marks and unseen   every rule that refuses asks the path as written and in
+ *   characters dropped)                     each folded form, and refuses when one says so; the kind
+ *                                           must be the same in every form ({@link PATH_FORMS})
+ *   a link target percent-decoded           adds a spelling of a governing file, never removes one
+ *   a catalogue value decoded               the wording rule runs on the decoded value and on the
+ *                                           value as written ({@link catalogueRuns})
+ *   a value read as an address              tested as it is and as an address; either refuses
+ *   placeholders taken out before rule 6    the placeholders are the same, in the same order, on
+ *                                           both sides, so nothing inside one changes
+ *   a character reference decoded           rule 6 reads the text as written and as decoded; only a
+ *                                           short list of plain references may stand in changed text
+ *   CSS comments, strings, `url(…)` and     structure only: the two files are compared on their own
+ *   escapes blanked; a value trimmed        text, every character outside a colour identical
+ *   CSS keywords in ASCII lower case        as a browser compares them; no other letter folds
+ *   JSON written back by `JSON.stringify`   a comparison that can only refuse
  *
  * NO CODE OF THE REPOSITORY'S RUNS. The check's temporary folder (`mkdtemp` under the
  * system's temporary folder) and its empty `no-hooks` folder are made before the first git
