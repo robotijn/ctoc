@@ -1,7 +1,7 @@
 'use strict';
 
-// The classifier corpus: 34 edit shapes that qualify as a hotfix and 211 traps that must
-// not (42 of them the kept cases of the formats the owner's decision of 2026-10-09 removed),
+// The classifier corpus: 36 edit shapes that qualify as a hotfix and 213 traps that must
+// not (44 of them the kept cases of the formats the owner's decision of 2026-10-09 removed),
 // plus one mode change, each judged through the menu router's first call (rules 1
 // to 7; no test runs) against ONE committed temporary repository with no test command.
 // A qualifying shape ends at `verdict: 'checking'`: rules 1 to 7 held.
@@ -49,6 +49,11 @@ const BASE = {
   'src/styles/button.css': lines('.save { background-color: #0a58ca; }'),
   'src/styles/theme.scss': lines('$brand: #0a58ca;'),
   'src/styles/accent.less': lines('@accent: red;'),
+  // The review of 2026-10-09: the corpus itself holds an indented Sass file, a gettext file
+  // under `locales/` and a `<math>` trap.
+  'src/styles/indented.sass': lines('.save', '  color: #0a58ca'),
+  'locales/de.po': lines('msgid "Save"', 'msgstr "Speichern"'),
+  'src/pages/formula.html': page('<p>Area</p><math><mtext>Save</mtext></math>'),
   'src/styles/link.css': lines('a {', '  color: hsl(210, 50%, 40%);', '}'),
   'src/styles/vars.css': lines(':root {', '  --brand: #ffffff;', '}'),
   'src/styles/custom.css': lines(':root {', '  --accent: red;', '}'),
@@ -337,7 +342,12 @@ const QUALIFY = [
   ['docs/autolink.md', BASE['docs/autolink.md'].replace('Old', 'New')],
   ['docs/heading-caps.md', BASE['docs/heading-caps.md'].replace('instal the App', 'Instal the app')],
   ['docs/mdx-far.md', BASE['docs/mdx-far.md'].replace('Old', 'New')],
-  ['src/pages/Author.html', BASE['src/pages/Author.html'].replace('Save', 'Store')]
+  ['src/pages/Author.html', BASE['src/pages/Author.html'].replace('Save', 'Store')],
+  // The seventh round (the decision at review of 2026-10-09). Two false refusals let go, the
+  // differential test at zero disagreements: text that runs over several lines of one text
+  // node, and a plain character reference (`&amp;`) in the changed sentence. Both were traps.
+  ['src/pages/multiline.html', BASE['src/pages/multiline.html'].replace('Save your work', 'Store your work')],
+  ['src/pages/rules.html', page('<p>Terms &amp; conditions</p>')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -377,9 +387,10 @@ const TRAPS = [
   [{ 'src/pages/script-block.html': BASE['src/pages/script-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/script-block.html')],
   [{ 'src/pages/style-block.html': BASE['src/pages/style-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/style-block.html')],
   [{ 'src/pages/textarea-block.html': BASE['src/pages/textarea-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/textarea-block.html')],
-  [{ 'src/pages/multiline.html': BASE['src/pages/multiline.html'].replace('Save your work', 'Store your work') }, null, unrecognised('src/pages/multiline.html')],
+  // Text that moves across a tag: one text node gains words and the next is emptied.
   [{ 'src/pages/crossing.html': page('<b>Save now</b>') }, null, unrecognised('src/pages/crossing.html')],
-  [{ 'src/pages/rules.html': page('<p>Terms &amp; conditions</p>') }, null, unrecognised('src/pages/rules.html')],
+  // A character reference that is none of the plain ones may spell a digit, a price or an address.
+  [{ 'src/pages/rules.html': page('<p>Terms &commat; rules</p>') }, null, unrecognised('src/pages/rules.html')],
   [{ 'locales/keys.json': BASE['locales/keys.json'].replace('"save":', '"store":') }, null, unrecognised('locales/keys.json')],
   [{ 'locales/count.json': BASE['locales/count.json'].replace('{count}', '{total}') }, null, unrecognised('locales/count.json')],
   [{ 'locales/promo.json': BASE['locales/promo.json'].replace('"Save now"', '"Save 5 euro now"') }, null, riskMarker('locales/promo.json')],
@@ -501,9 +512,11 @@ const TRAPS = [
   // the component makes of it (a query, an action name), never wording.
   [{ 'src/pages/widget.html': BASE['src/pages/widget.html'].replace('>x<', '>y<') }, null, inexact('src/pages/widget.html')],
   // A reference definition whose destination, or title, stands on the next line.
-  [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '/u/delete') }, null, unrecognised('docs/wrapped-ref.md')],
-  [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '//evil.example/x') }, null, unrecognised('docs/wrapped-ref.md')],
-  [{ 'docs/wrapped-title.md': BASE['docs/wrapped-title.md'].replace('Old title', 'New title') }, null, unrecognised('docs/wrapped-title.md')],
+  // Since the review of 2026-10-09 a definition whose destination or title stands on a line
+  // of its own is outside what the check reads exactly: the plan's clause, on the same refusal.
+  [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '/u/delete') }, null, inexact('docs/wrapped-ref.md')],
+  [{ 'docs/wrapped-ref.md': BASE['docs/wrapped-ref.md'].replace('/u/profile', '//evil.example/x') }, null, inexact('docs/wrapped-ref.md')],
+  [{ 'docs/wrapped-title.md': BASE['docs/wrapped-title.md'].replace('Old title', 'New title') }, null, inexact('docs/wrapped-title.md')],
   // A custom property that is not named for a colour is a setting a script can read,
   // whatever colour it holds (the earlier qualifying shapes, now traps).
   [{ 'src/styles/flags.css': BASE['src/styles/flags.css'].replace('green', 'red') }, null, setting('src/styles/flags.css')],
@@ -558,6 +571,7 @@ const TRAPS = [
   [{ 'src/pages/svg-pre.html': BASE['src/pages/svg-pre.html'].replace('requests', 'reqests') }, null, inexact('src/pages/svg-pre.html')],
   [{ 'src/pages/unknown.html': BASE['src/pages/unknown.html'].replace('Save', 'Store') }, null, inexact('src/pages/unknown.html')],
   [{ 'src/pages/svg-text.html': BASE['src/pages/svg-text.html'].replace('Save', 'Store') }, null, inexact('src/pages/svg-text.html')],
+  [{ 'src/pages/formula.html': BASE['src/pages/formula.html'].replace('Save', 'Store') }, null, inexact('src/pages/formula.html')],
   [{ 'src/pages/open-div.html': BASE['src/pages/open-div.html'].replace('Save', 'Store') }, null, inexact('src/pages/open-div.html')],
   // A colour that is not the whole value of its property (the functional plan's scenario).
   [{ 'src/styles/border.css': BASE['src/styles/border.css'].replace('#0a58ca', '#0b5ed7') }, null, inexact('src/styles/border.css')],
@@ -612,6 +626,8 @@ const REMOVED_FORMATS = [
   [{ 'src/components/Pay.svelte': BASE['src/components/Pay.svelte'].replace('>charge<', '>refund<') }, null, unrecognised('src/components/Pay.svelte')],
   [{ 'src/styles/theme.scss': lines('$brand: rgb(11, 94, 215);') }, null, unrecognised('src/styles/theme.scss')],
   [{ 'src/styles/accent.less': lines('@accent: tomato;') }, null, unrecognised('src/styles/accent.less')],
+  [{ 'src/styles/indented.sass': lines('.save', '  color: #0b5ed7') }, null, unrecognised('src/styles/indented.sass')],
+  [{ 'locales/de.po': lines('msgid "Save"', 'msgstr "Sichern"') }, null, unrecognised('locales/de.po')],
   [{ 'docs/literal.rst': BASE['docs/literal.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/literal.rst')],
   [{ 'docs/expanded.rst': BASE['docs/expanded.rst'].replace('requests', 'reqests') }, null, unrecognised('docs/expanded.rst')],
   [{ 'docs/doctest.rst': BASE['docs/doctest.rst'].replace(/old$/m, 'new') }, null, unrecognised('docs/doctest.rst')],
@@ -626,9 +642,9 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 34, 'the corpus holds 34 shapes that qualify');
-assert.equal(REMOVED_FORMATS.length, 42, 'the corpus holds 42 cases of removed formats');
-assert.equal(TRAPS.length, 211, 'the corpus holds 211 traps, the removed formats among them');
+assert.equal(QUALIFY.length, 36, 'the corpus holds 36 shapes that qualify');
+assert.equal(REMOVED_FORMATS.length, 44, 'the corpus holds 44 cases of removed formats');
+assert.equal(TRAPS.length, 213, 'the corpus holds 213 traps, the removed formats among them');
 
 let root;
 
@@ -976,16 +992,49 @@ test('the whole-file scanners stay linear on input built against them', () => {
     'docs/placeholders.md': `Old words.\n\n${'Use <file> here.\n\n'.repeat(30000)}`,
     'docs/braces.md': `Old words.\n\n${'{a} {"b"}\n\n'.repeat(30000)}${'{'.repeat(100000)}\n`,
     'docs/headings.md': `Old words.\n\n${'# a\n\nb\nc\n===\n\n'.repeat(20000)}`,
-    'src/styles/value.css': `a { color: red; }\nb { margin:${' 1px'.repeat(100000)} !important; }\n`
+    'src/styles/value.css': `a { color: red; }\nb { margin:${' 1px'.repeat(100000)} !important; }\n`,
+    // The seventh round's readers (the review of 2026-10-09): Markdown read block by block
+    // with lazy lines, tables, definitions, link targets, image text and Markdown's own tag
+    // grammar; HTML with the end tags that may be left out, the start tags that close an
+    // open element, table parts and `<noscript>` content.
+    'docs/lazy.md': `Old words.\n\n${'> a\nb\n'.repeat(30000)}`,
+    'docs/lazy-items.md': `Old words.\n\n${'- a\nb\n\n'.repeat(30000)}`,
+    'docs/tables.md': `Old words.\n\n${'| a | b |\n| - | - |\n| c | d | e | f |\n\n'.repeat(15000)}`,
+    'docs/table-rows.md': `Old words.\n\n| a | b |\n| - | - |\n${'| c | d |\n'.repeat(40000)}`,
+    'docs/tag-starts.md': `Old words.\n\n${'<a b   '.repeat(40000)}\n`,
+    'docs/tag-values.md': `Old words.\n\n${'<a b = "c" d=e '.repeat(20000)}\n`,
+    'docs/link-starts.md': `Old words.\n\n${'[a](b(c'.repeat(40000)}\n`,
+    'docs/link-titles.md': `Old words.\n\n${'[a](b "c'.repeat(40000)}\n`,
+    'docs/image-starts.md': `Old words.\n\n${'![a'.repeat(60000)}\n`,
+    'docs/label-long.md': `Old words.\n\n[${'a'.repeat(300000)}\n`,
+    'docs/def-long.md': `Old words.\n\n[a]: ${'b '.repeat(100000)}\n`,
+    'docs/def-many.md': `Old words.\n\n${'[a]: /b "c"\n'.repeat(30000)}`,
+    'docs/mails-long.md': `Old words.\n\n<${'a'.repeat(150000)}@${'b.'.repeat(50000)}\n`,
+    'docs/nested-quotes.md': `Old words.\n\n${'> > > a\n> > b\n> c\n\n'.repeat(15000)}`,
+    'docs/html-blocks.md': `Old words.\n\n${'<div>\na\n</div>\n\n'.repeat(20000)}`,
+    'docs/tabs.md': `Old words.\n\n${'-\t>\ta\n'.repeat(30000)}`,
+    'src/pages/implied.html': `<p>Old</p>\n<div>${'<p>'.repeat(40000)}</div>\n`,
+    'src/pages/implied-wrong.html': `<p>Old</p>\n<div><span>${'<p>a'.repeat(30000)}${'</div>'.repeat(30000)}\n`,
+    'src/pages/items.html': `<p>Old</p>\n<ul>${'<li>a'.repeat(40000)}</ul>\n`,
+    'src/pages/items-deep.html': `<p>Old</p>\n<ul><li><ol>${'<span>'.repeat(20000)}${'<li></li>'.repeat(20000)}\n`,
+    'src/pages/cells.html': `<p>Old</p>\n<table>${'<tr><td>a<td>b'.repeat(20000)}</table>\n`,
+    'src/pages/noscripts.html': `<p>Old</p>\n${'<noscript><p>x</p></noscript>'.repeat(20000)}\n`,
+    'src/pages/options.html': `<p>Old</p>\n<select>${'<option>a<optgroup>'.repeat(30000)}</select>\n`
   };
   for (const [rel, old] of Object.entries(cases)) {
     const changed = /\.s?css$/.test(rel) ? old.replace('red', 'blue') : old.replace('Old', 'New');
-    const start = process.cpuUsage();
-    const refused = ruleRefusal(changeOf(rel, old, changed));
-    // The inputs of the removed formats are kept: each is refused as not recognised, at once.
-    if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(refused.cause, 'unrecognised', rel);
-    const used = process.cpuUsage(start);
-    const ms = (used.user + used.system) / 1000;
+    // Each input is judged twice and the second run is timed (since the review of
+    // 2026-10-09): the first run also pays for the compiling of the reader, which the
+    // processor time of the process counts; the claim is about the scanning.
+    let ms = 0;
+    for (let run = 0; run < 2; run++) {
+      const start = process.cpuUsage();
+      const refused = ruleRefusal(changeOf(rel, old, changed));
+      // The inputs of the removed formats are kept: each is refused as not recognised, at once.
+      if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(refused.cause, 'unrecognised', rel);
+      const used = process.cpuUsage(start);
+      ms = (used.user + used.system) / 1000;
+    }
     assert.ok(ms < 250, `${rel}: ${old.length} characters took ${ms.toFixed(1)} ms`);
   }
 });

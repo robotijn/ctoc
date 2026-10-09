@@ -1257,8 +1257,9 @@ test('edge shapes of every kind give the exact verdict', async () => {
   // [path, base content, new content, expected clause, or null for the pass of the test call]
   const shapes = [
     ['src/pages/lead.html', 'Welcome <b>home</b>\n', 'Hello <b>home</b>\n', un('src/pages/lead.html')],
-    ['src/pages/gt.html', '>Save</b>\n', '>Store</b>\n', un('src/pages/gt.html')],
-    ['src/pages/comment.html', '<!-- c -->Save</p>\n', '<!-- c -->Store</p>\n', un('src/pages/comment.html')],
+    // Since the review of 2026-10-09 an end tag with nothing to close is outside the strict subset.
+    ['src/pages/gt.html', '>Save</b>\n', '>Store</b>\n', inexact('src/pages/gt.html')],
+    ['src/pages/comment.html', '<!-- c -->Save</p>\n', '<!-- c -->Store</p>\n', inexact('src/pages/comment.html')],
     ['src/pages/odd.html', '</1>Save</p>\n', '</1>Store</p>\n', inexact('src/pages/odd.html')],
     ['src/pages/open.html', '<p>Save\n', '<p>Store\n', inexact('src/pages/open.html')],
     ['src/pages/tail.html', '<p>Save<\n', '<p>Store<\n', inexact('src/pages/tail.html')],
@@ -1716,7 +1717,11 @@ test('round 2, finding 9: a pass names each judged file with its staged id, whic
 
 // The fourth round (2026-10-09): the security attack and the code review, each through
 // the first call. [path, base content, new content, the clause, or null for `checking`]
-test('round 4: components, code elements, conditional templates, variables, literal blocks, directives, lists and generics', async () => {
+// Renamed at review (2026-10-09): since the owner's decision of that day the check reads plain
+// HTML, plain CSS, catalogues, Markdown and plain text only, so the rows on conditional
+// templates, Sass variables, reStructuredText literal blocks and directives, and TypeScript
+// generics now assert that each such file is a kind the check does not recognise.
+test('round 4: components and code elements in HTML, Markdown lists and definitions, catalogue values, custom properties; Vue, JSX, Sass, Less and reStructuredText files are not recognised', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
@@ -1750,9 +1755,10 @@ test('round 4: components, code elements, conditional templates, variables, lite
     ['docs/ordered-two.md', 'Text.\n2. foo\n\n      pip install requests\n', 'Text.\n2. foo\n\n      pip install reqests\n', un('docs/ordered-two.md')],
     ['docs/item-fence.md', '- ```\n  pip install requests\n  ```\n', '- ```\n  pip install reqests\n  ```\n', un('docs/item-fence.md')],
     ['docs/item-doctest.md', '- >>> print("old")\n  old\n', '- >>> print("old")\n  new\n', un('docs/item-doctest.md')],
-    ['docs/two-defs.md', 'See [it][b].\n\n[a]:\n[b]: /one\n', 'See [it][b].\n\n[a]:\n[b]: /two\n', un('docs/two-defs.md')],
+    // Since the review of 2026-10-09 a definition in any but its plain one-line form cannot be read exactly.
+    ['docs/two-defs.md', 'See [it][b].\n\n[a]:\n[b]: /one\n', 'See [it][b].\n\n[a]:\n[b]: /two\n', inexact('docs/two-defs.md')],
     // A reference definition with an inline title.
-    ['docs/inline-title.md', 'See [it][a].\n\n[a]: /u\n"Old title"\n', 'See [it][a].\n\n[a]: /u\n"New title"\n', un('docs/inline-title.md')],
+    ['docs/inline-title.md', 'See [it][a].\n\n[a]: /u\n"Old title"\n', 'See [it][a].\n\n[a]: /u\n"New title"\n', inexact('docs/inline-title.md')],
     ['docs/after-def.md', 'See [it][a].\n\n[a]: /u\nOld words.\n', 'See [it][a].\n\n[a]: /u\nNew words.\n', null],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
@@ -1886,7 +1892,9 @@ test('round 4: CTOC\'s enforcement list applies only in CTOC\'s own repository',
   assertChecking(await check(react, 'src/hooks/README.md'), ['src/hooks/README.md']);
 });
 
-test('round 3: the whole-file scanners read strings, templates, escapes, comments, Sass and code spans', async () => {
+// Renamed at review (2026-10-09): the rows on template literals, Vue and JSX templates and
+// Sass now assert that each such file is a kind the check does not recognise.
+test('round 3: the whole-file scanners read script escape states, titles, comments, stylesheet strings and Markdown code spans; JSX, Vue, Sass and reStructuredText files are not recognised', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
   // Every scanner fails closed (2026-10-09): a file that ends inside an unclosed string,
@@ -1924,7 +1932,9 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     ['docs/span.md', 'Run `pip install requests` first.\n', 'Run `pip install reqests` first.\n', un('docs/span.md')],
     ['docs/beside.md', 'Run `npm test` first, ``x`` and ` alone.\n', 'Run `npm test` now, ``x`` and ` alone.\n', null],
     ['docs/open-json.md', '{\n  "title": "Old"\n\nBody old.\n', '{\n  "title": "Old"\n\nBody new.\n', open('docs/open-json.md')],
-    ['docs/angle.md', 'See [the guide](<a b.md>) now.\n', 'See [the guide](<a c.md>) now.\n', un('docs/angle.md')],
+    // Since the review of 2026-10-09 a destination in angle brackets cannot be read exactly
+    // (without its link text it would be a tag).
+    ['docs/angle.md', 'See [the guide](<a b.md>) now.\n', 'See [the guide](<a c.md>) now.\n', inexact('docs/angle.md')],
     ['docs/full.md', 'See [the guide][a] now.\n\n[a]: /a\n[b]: /b\n', 'See [the guide][b] now.\n\n[a]: /a\n[b]: /b\n', un('docs/full.md')],
     ['docs/escaped.md', 'See [x](a\\)b) old.\n', 'See [x](a\\)b) new.\n', null],
     ['docs/after-code.md', 'Text.\n\n    code here\n\nOld words.\n', 'Text.\n\n    code here\n\nNew words.\n', null],
@@ -1993,8 +2003,10 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
   /** One row from a template holding `@`, replaced by the old and the new text. */
   const row = (fix, p, template, [o, n], expected) => [fix, p, template.replace('@', o), template.replace('@', n), expected];
   const shapes = [
-    // 1. Host elements are a fixed list (HTML, SVG, MathML), matched in any letter case; an
-    // element with an `is` attribute, a custom element and an unknown name hold their text.
+    // 1. Host elements are a fixed list (the 111 HTML element names; since the sixth round
+    // `<svg>` and `<math>` are opaque pieces and their names are no host elements), matched in
+    // any letter case; an element with an `is` attribute, a custom element and an unknown name
+    // hold their text.
     row(1, 'src/pages/is.html', '<button is="run-sql">@</button>\n', sql, inexact('src/pages/is.html')),
     row(1, 'src/pages/is-upper.html', '<P IS="x">@</P>\n', ['Save', 'Store'], inexact('src/pages/is-upper.html')),
     row(1, 'src/pages/runsql.html', '<runsql>@</runsql>\n', sql, inexact('src/pages/runsql.html')),
@@ -2008,7 +2020,9 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(2, 'src/pages/stack.html', '<run-sql><div></run-sql>@</div></run-sql>\n', sql, inexact('src/pages/stack.html')),
     row(2, 'docs/stack.md', 'Text.\n\n<run-sql><div></run-sql>@</div></run-sql>\n', sql, inexact('docs/stack.md')),
     row(2, 'src/pages/implied.html', '<ul><li>One<li>@</ul>\n<p>a<br>b</p>\n', ['Save', 'Store'], null),
-    row(2, 'src/pages/stray.html', '<p>@</p></b></p>\n', ['Save', 'Store'], null),
+    // A pass until the review of 2026-10-09: an end tag that closes nothing is outside the
+    // strict subset (the reviewer's general rule; a browser makes an empty element for `</p>`).
+    row(2, 'src/pages/stray.html', '<p>@</p></b></p>\n', ['Save', 'Store'], inexact('src/pages/stray.html')),
     row(2, 'src/pages/held-implied.html', '<my-card><p>one<p>two</my-card>\n<p>@</p>\n', ['Save', 'Store'], inexact('src/pages/held-implied.html')),
     row(2, 'src/pages/self-closed.html', '<my-widget/>\n<p>@</p>\n', ['Save', 'Store'], inexact('src/pages/self-closed.html')),
     // A pass until the sixth round: a brace inside a tag is outside the strict HTML subset
@@ -2034,13 +2048,21 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(4, 'docs/tick-setext.md', 'A lone ` here\n===\nRun `@` now.\n', rm, un('docs/tick-setext.md')),
     row(4, 'docs/tick-break.md', 'A lone ` here\n* * *\nRun `@` now.\n', rm, un('docs/tick-break.md')),
     row(4, 'docs/tick-quote.md', 'A lone ` here\n> Run `@` now.\n', rm, un('docs/tick-quote.md')),
-    row(4, 'docs/tick-cell.md', '| ` | `@` |\n', rm, un('docs/tick-cell.md')),
+    // Refused until the review of 2026-10-09 because a table cell might end at the `|`. The
+    // line is no table row (no delimiter row follows), and markdown-it reads the first two
+    // backticks as the span and the changed words as plain text, as the check now does.
+    row(4, 'docs/tick-cell.md', '| ` | `@` |\n', rm, null),
+    row(4, 'docs/tick-row.md', '| a | b |\n| - | - |\n| ` | `@` |\n', rm, un('docs/tick-row.md')),
     row(4, 'docs/tick-escape.md', 'A \\` then `@` now.\n', rm, un('docs/tick-escape.md')),
-    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, inexact('docs/tick-tag.md')),
+    // Since the review of 2026-10-09 the tag is read first, as a Markdown reader does, and the
+    // changed words stand in a code span: code, no longer "cannot read exactly".
+    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, un('docs/tick-tag.md')),
     row(4, 'docs/tick-lazy.md', '> a `@\nc` d\n', ['b', 'x'], un('docs/tick-lazy.md')),
     // An ordered item not numbered 1 after a bullet item starts no item: the span runs on.
     // After another ordered item it does, and each item's lone backtick pairs with nothing.
-    row(4, 'docs/tick-second.md', '- a `@\n2. b` c\n', ['b', 'x'], un('docs/tick-second.md')),
+    // Since the review of 2026-10-09: readers disagree whether `2.` right under a bullet item
+    // starts a list or runs the paragraph on, so the file cannot be read exactly.
+    row(4, 'docs/tick-second.md', '- a `@\n2. b` c\n', ['b', 'x'], inexact('docs/tick-second.md')),
     row(4, 'docs/tick-third.md', '2. a `@\n3. b` c\n', ['b', 'x'], null),
     row(4, 'docs/tick-wrapped.md', 'Run `rm -rf\n@` now.\n', ['build', 'dist'], un('docs/tick-wrapped.md')),
     row(4, 'docs/tick-indent.md', '> a `@\n    c` d\n', ['b', 'x'], un('docs/tick-indent.md')),
@@ -2196,7 +2218,9 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
     row(6, 'docs/autolink-own.md', 'See <https://example.org/@> first.\n', ['guide', 'other'], un('docs/autolink-own.md')),
     // No autolink (a space inside), and no tag a Markdown reader passes on: read as a
     // placeholder, which its paragraph's end closes.
-    row(6, 'docs/autolink-space.md', 'See <https://example.org/a b> first.\n\n@ words.\n', words, null),
+    // A pass until the review of 2026-10-09: what is neither an autolink nor a tag for a
+    // Markdown reader is outside the strict subset.
+    row(6, 'docs/autolink-space.md', 'See <https://example.org/a b> first.\n\n@ words.\n', words, exact('docs/autolink-space.md')),
     row(6, 'docs/autolink-space-same.md', 'See <https://example.org/a b> @.\n', ['first', 'now'], exact('docs/autolink-space-same.md')),
     row(6, 'docs/placeholder.md', 'Edit <file> and <your-name> then save.\n\n@ words.\n', words, null),
     row(6, 'docs/placeholder-closed.md', 'Edit <file>x</file> and <name> then save.\n\n@ words.\n', words, null),
@@ -2207,7 +2231,10 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
     row(6, 'docs/placeholder-div.md', 'Use <div> and <runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-div.md')),
     row(6, 'docs/placeholder-end.md', 'Use </p> and <runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-end.md')),
     row(6, 'docs/placeholder-center.md', 'Use <center> and <runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-center.md')),
-    row(6, 'docs/placeholder-code-line.md', 'Use <runsql> here\n```\ncode\n```\n@ words.\n', words, exact('docs/placeholder-code-line.md')),
+    // Refused until the review of 2026-10-09. The fence ends the paragraph, the paragraph's end
+    // closes the placeholder as a browser does, and markdown-it and parse5 read the changed
+    // words as plain text of a paragraph of their own, as the check now does.
+    row(6, 'docs/placeholder-code-line.md', 'Use <runsql> here\n```\ncode\n```\n@ words.\n', words, null),
     // 7. A changed heading qualifies only when its generated anchor stays the same.
     row(7, 'docs/heading.md', '# @\n\nWords.\n', ['Install', 'Setup'], exact('docs/heading.md')),
     row(7, 'docs/heading-typo.md', '## Getting @\n\nWords.\n', ['started', 'going'], exact('docs/heading-typo.md')),
@@ -2270,4 +2297,123 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
   fs.writeFileSync(path.join(root, 'src/styles/two-tokens.css'), ':root { --brand-color: red url(x); }\n');
   await check(root, 'src/styles/two-tokens.css');
   assert.deepEqual(logLines(root).slice(-3).map((l) => l.cause), ['unrecognised', 'unreadable', 'setting']);
+});
+
+// The seventh round (2026-10-09, the decision at review): the reader is held to real parsers
+// by the differential test (tests/hotfix-check-differential.test.js); these rows pin the
+// classes it found and the three false refusals it let go. Each row marked `red` answered
+// otherwise on `e43ea9ae`; the others are guards.
+// [item, path, base content, new content, the clause, or null for `checking`]
+test('round 7: names, frames, options, noscript, end tags, text over lines and beside comments; Markdown read as its reader renders it', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
+  const save = ['Save', 'Store'];
+  const words = ['Old', 'New'];
+  const pip = ['pip install requests', 'pip install reqests'];
+  const row = (item, p, template, [o, n], expected) => [item, p, template.replace('@', o), template.replace('@', n), expected];
+  const shapes = [
+    // 1. Names are lower-cased in ASCII only: `lin` with the Kelvin sign is no `link` (red).
+    row(1, 'src/pages/kelvin.html', '<linK>@</linK>\n', save, exact('src/pages/kelvin.html')),
+    row(1, 'src/pages/upper-link.html', '<LINK rel="x"><p>@</p>\n', save, null),
+    // 2. `<frameset>` and `<frame>` refuse the file: a browser may drop the body for them (red).
+    row(2, 'src/pages/frames.html', '<div></div><frameset></frameset>\n<p>@</p>\n', save, exact('src/pages/frames.html')),
+    // 3. Inside a `<select>` text is wording only in an `<option>` with a `value` (red); an
+    // `<option>` on top of the stack is closed by the next one and by the end of its list.
+    row(3, 'src/pages/select-text.html', '<select>@</select>\n', ['Choose', 'Pick'], un('src/pages/select-text.html')),
+    row(3, 'src/pages/option-text.html', '<select><option>@</select>\n', ['Small', 'Little'], un('src/pages/option-text.html')),
+    row(3, 'src/pages/option-valued.html', '<select><option value="a">@<option value="b">Two<hr><optgroup label="x"><option value="c">Three</select>\n', ['One', 'First'], null),
+    row(3, 'src/pages/datalist.html', '<datalist><option value="a">@<option value="b">Two</datalist>\n', ['One', 'First'], null),
+    // 4. The content of `<noscript>` must itself be markup of the subset, every element
+    // closed: a browser without scripting reads it as markup (red).
+    row(4, 'src/pages/noscript-open.html', '<noscript><code></noscript><p>@</p></code>\n', pip, exact('src/pages/noscript-open.html')),
+    row(4, 'src/pages/noscript-comment.html', '<noscript><!-- </noscript> --></noscript><p>@</p>\n', save, exact('src/pages/noscript-comment.html')),
+    row(4, 'src/pages/noscript-ok.html', '<noscript><img src="/pixel.png" alt=""></noscript>\n<p>@</p>\n', save, null),
+    // 5. An end tag closes the element on top of the stack, or the elements that may leave
+    // their end tag out before it; every other end tag refuses the file (red), and so does a
+    // start tag for which a browser would close an element that is not on top (red).
+    row(5, 'src/pages/misnested.html', '<b><p>One</b>@</p>\n', save, exact('src/pages/misnested.html')),
+    row(5, 'src/pages/stray-end.html', '<p>@</p></div>\n', save, exact('src/pages/stray-end.html')),
+    row(5, 'src/pages/through.html', '<p><span>One<div>@</div></span></p>\n', save, exact('src/pages/through.html')),
+    row(5, 'src/pages/second-link.html', '<a href="/a"><span>One<a href="/b">@</a></span></a>\n', save, exact('src/pages/second-link.html')),
+    row(5, 'src/pages/list-through.html', '<ul><li><span>One<li>@</span></ul>\n', save, exact('src/pages/list-through.html')),
+    row(5, 'src/pages/form-in-form.html', '<form><div><form>One</form>@</div></form>\n', save, exact('src/pages/form-in-form.html')),
+    row(5, 'src/pages/cell-alone.html', '<div><td>@</td></div>\n', save, exact('src/pages/cell-alone.html')),
+    row(5, 'src/pages/table-in-table.html', '<table><tr><td>One</td></tr><table><tr><td>@</td></tr></table></table>\n', save, exact('src/pages/table-in-table.html')),
+    row(5, 'src/pages/column-text.html', '<table><colgroup>x</colgroup><tr><td>@</td></tr></table>\n', save, exact('src/pages/column-text.html')),
+    row(5, 'src/pages/ruby-through.html', '<ruby>a<p>b<rt>@</ruby>\n', save, exact('src/pages/ruby-through.html')),
+    row(5, 'src/pages/after-body.html', '<html><body><p>One</p></body>@</html>\n', save, exact('src/pages/after-body.html')),
+    row(5, 'src/pages/body-is.html', '<p>@</p>\n<body is="x"></body>\n', save, exact('src/pages/body-is.html')),
+    // The end tags that may be left out, each as the HTML parser reads it (guards).
+    row(5, 'src/pages/ends-list.html', '<ul><li><p>One<li>@</ul>\n<ol><li>a</li><li>b</ol>\n', save, null),
+    row(5, 'src/pages/ends-paragraph.html', '<div><p>One<p>@</div>\n<blockquote><p>q</blockquote>\n', save, null),
+    row(5, 'src/pages/ends-definitions.html', '<dl><dt>One<dd>@<dt>a<dd>b</dl>\n', save, null),
+    row(5, 'src/pages/ends-ruby.html', '<ruby>a<rp>(<rt>@<rp>)</ruby>\n', save, null),
+    row(5, 'src/pages/ends-table.html', '<table><caption>c<colgroup><col><thead><tr><th>@<tbody><tr><td>a<td>b<tr><td>c<tfoot><tr><td>d</table>\n', save, null),
+    row(5, 'src/pages/ends-document.html', '<!DOCTYPE html>\n<html><head><title>T</title><body><h1>One<h2>@</h2><p>last</html>\n', save, null),
+    row(5, 'src/pages/closes-own.html', '<p><a href="/a">One<a href="/b">@</a></p>\n<button>x<button>y</button>\n', save, null),
+    // A table in a paragraph: under `<!DOCTYPE html>` it closes the paragraph, without one a
+    // browser nests it (quirks mode), so the paragraph's `is` attribute holds its text.
+    row(5, 'src/pages/standards-table.html', '<!DOCTYPE html>\n<p is="x">One<table><tr><td>@</td></tr></table>\n', save, null),
+    row(5, 'src/pages/quirks-table.html', '<p is="x">One<table><tr><td>@</td></tr></table></p>\n', save, exact('src/pages/quirks-table.html')),
+    // 6. The three false refusals let go: text over several lines (red), a plain character
+    // reference in the changed sentence (red), text beside a comment (red).
+    row(6, 'src/pages/two-lines.html', '<p>\n  @ your work\n  now\n</p>\n', save, null),
+    row(6, 'src/pages/reference.html', '<p>Terms &amp; @ &mdash; read them&hellip;</p>\n', ['rules', 'conditions'], null),
+    row(6, 'src/pages/beside-comment.html', '<p>Save<!-- note --> @</p>\n', ['now', 'today'], null),
+    // A reference that may spell a digit, a currency sign or an `@`, or lacks its semicolon, still refuses.
+    row(6, 'src/pages/reference-at.html', '<p>Mail us &commat; @</p>\n', ['home', 'work'], un('src/pages/reference-at.html')),
+    row(6, 'src/pages/reference-open.html', '<p>Terms &amp @</p>\n', ['rules', 'conditions'], un('src/pages/reference-open.html')),
+    // Text that comes or goes whole is no reworded text.
+    row(6, 'src/pages/emptied.html', '<table>@<tr><td>a</td></tr></table>\n', ['x', ' '], un('src/pages/emptied.html')),
+    // 7. Markdown, script text: an `export` line is a paragraph for a Markdown reader, and the
+    // `<script>` under it starts an HTML block that a blank line does not end (red).
+    row(7, 'docs/export-script.md', 'export const x = y\n<script>\n\n@\n</script>\n', ['alpha', 'zulu'], un('docs/export-script.md')),
+    row(7, 'docs/doctest-script.md', '>>> x\n<script>\n\n@\n</script>\n', ['alpha', 'zulu'], un('docs/doctest-script.md')),
+    // An HTML block is raw: a fence or a code span inside it is no code, and its tags count (red).
+    row(7, 'docs/block-fence.md', '<div>\n```\n<code>\n```\n</div>\n\n@ words.\n', words, exact('docs/block-fence.md')),
+    row(7, 'docs/block-span.md', '<div>\n`<code>`\n</div>\n\n@ words.\n', words, exact('docs/block-span.md')),
+    row(7, 'docs/block-autolink.md', '<div>\n<https://example.org/x>\n</div>\n\n@ words.\n', words, exact('docs/block-autolink.md')),
+    // 8. A definition or a label over several lines (red).
+    row(8, 'docs/def-lines.md', '[\nguide]: /@\n\nWords.\n', ['one', 'two'], exact('docs/def-lines.md')),
+    row(8, 'docs/label-lines.md', 'See [@\nguide] now.\n\n[the guide]: /u\n', ['the', 'a'], un('docs/label-lines.md')),
+    row(8, 'docs/label-target.md', 'See [the guide](/@) now.\n\n[the guide]: /u\n', ['one', 'two'], un('docs/label-target.md')),
+    // 9. A tag split across block quote lines: the markers are no part of it (red).
+    row(9, 'docs/quote-tag.md', '> <a\n> href="/@">link</a>\n', ['one', 'two'], un('docs/quote-tag.md')),
+    // 10. Continuation and code: a quoted line under a lazy line continues the paragraph and
+    // may underline it into a heading (red); an indented line under a definition, a finished
+    // HTML block or a table is code (red); a lazy line is prose.
+    row(10, 'docs/lazy-underline.md', '> @\nmore\n> ---\n', ['Install', 'Upgrade'], exact('docs/lazy-underline.md')),
+    row(10, 'docs/def-code.md', '[guide]: /u\n    @\n', pip, un('docs/def-code.md')),
+    row(10, 'docs/comment-code.md', '<!-- note -->\n    @\n', pip, un('docs/comment-code.md')),
+    row(10, 'docs/table-code.md', '| a | b |\n| - | - |\n| c | d |\n    @\n', pip, un('docs/table-code.md')),
+    row(10, 'docs/lazy-quote.md', '> A quote that\nruns @ lazily.\n\nAfter.\n', ['on', 'along'], null),
+    row(10, 'docs/lazy-item.md', '- an item that\nruns @ lazily\n- the next item\n', ['on', 'along'], null),
+    row(10, 'docs/lazy-none.md', '> ```\n> code\n> ```\n@ words.\n', words, null),
+    // 11. What a Markdown reader does not pass on as a tag is none: an end tag behind a
+    // backslash leaves the code element open (red); an image's text is an attribute (red).
+    row(11, 'docs/escaped-end.md', 'Run <code>x\\</code> and @ it.</code>\n', ['save', 'store'], un('docs/escaped-end.md')),
+    row(11, 'docs/image-text.md', '![The @ logo](/logo.png)\n', ['old', 'new'], un('docs/image-text.md')),
+    row(11, 'docs/image-beside.md', '![The logo](/logo.png) <br> The @ words.\n', ['old', 'new'], null),
+    // 12. The tags a Markdown reader makes count: an end tag inside a paragraph closes nothing
+    // outside it (red); a list item's paragraph may or may not get a `<p>`, so a placeholder
+    // left open in it cannot be read exactly.
+    row(12, 'docs/end-in-paragraph.md', '<x-box>\n\nText </x-box> and @ words.\n', ['old', 'new'], exact('docs/end-in-paragraph.md')),
+    row(12, 'docs/item-placeholder.md', '- Use <file> here\n  <div>@</div>\n', words, exact('docs/item-placeholder.md')),
+    row(12, 'docs/details.md', '<details>\n<summary>More</summary>\n\nThe @ words.\n\n</details>\n', ['old', 'new'], null),
+    row(12, 'docs/table.md', '| Name | Use |\n| --- | --- |\n| Save | @ your work |\n', ['Keep', 'Store'], null),
+    row(12, 'docs/table-extra.md', '| Name |\n| --- |\n| Save | @ |\n', ['dropped', 'gone'], un('docs/table-extra.md'))
+  ];
+  const base = {};
+  for (const [, p, b] of shapes) base[p] = b;
+  const root = makeRepo(base);
+  const wrong = [];
+  for (const [item, p, b, n, expected] of shapes) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    const want = expected === null ? STATUS_LINE : refusal(expected);
+    if (res.text !== want) wrong.push(`item ${item} ${p}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
+    else if (expected === null) assertChecking(res, [p]);
+  }
+  assert.deepEqual(wrong, []);
 });
