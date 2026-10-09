@@ -1289,7 +1289,9 @@ test('edge shapes of every kind give the exact verdict', async () => {
     // a `value` inside another attribute's value is no `value` attribute.
     ['src/components/Click.jsx', '  <button onClick={() => go(a > b)}>Save</button>\n', '  <button onClick={() => go(a > b)}>Store</button>\n', NO_TEST],
     ['src/pages/stray.html', '<p data-x=}>Save</p>\n', '<p data-x=}>Store</p>\n', NO_TEST],
-    ['docs/rule.md', '---\nOld text.\n', '---\nNew text.\n', null],
+    // An unclosed first-line `---` was no front matter; since every scanner fails closed
+    // (2026-10-09) it is a front matter left open, and the change is unreadable.
+    ['docs/rule.md', '---\nOld text.\n', '---\nNew text.\n', 'I could not read the change (docs/rule.md leaves a tag, quote, comment, block, fence or span open)'],
     ['docs/bom.md', '\uFEFF---\ntitle: a\n---\nBody.\n', '\uFEFF---\ntitle: b\n---\nBody.\n', 'it changes a setting in docs/bom.md, and settings changes are a common cause of outages'],
     ['locales/esc.json', '{\n  "help": "Help"\n}\n', '{\n  "help": "\\u006aavascript:alert()"\n}\n', un('locales/esc.json')],
     ['src/pages/opt.html', '<option title="no value here">Red</option>\n', '<option title="no value here">Blue</option>\n', un('src/pages/opt.html')]
@@ -1696,6 +1698,7 @@ test('round 2, finding 9: a pass names each judged file with its staged id, whic
 test('round 4: components, code elements, conditional templates, variables, literal blocks, directives, lists and generics', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
   const shapes = [
     // Only HTML host elements carry wording: a lowercase name with no hyphen, in every
     // markup kind, and nothing anywhere inside a component.
@@ -1740,7 +1743,7 @@ test('round 4: components, code elements, conditional templates, variables, lite
     ['docs/break.md', '* * *\n\n    pip install requests\n', '* * *\n\n    pip install reqests\n', un('docs/break.md')],
     ['docs/ended.md', '- Item.\n\nText.\n\n    pip install requests\n', '- Item.\n\nText.\n\n    pip install reqests\n', un('docs/ended.md')],
     ['docs/wide.md', '-     pip install requests\n', '-     pip install reqests\n', un('docs/wide.md')],
-    ['docs/fence-out.md', '- a\n  ```\n  x\n- b\n```\npip install requests\n```\n', '- a\n  ```\n  x\n- b\n```\npip install reqests\n```\n', un('docs/fence-out.md')],
+    ['docs/fence-out.md', '- a\n  ```\n  x\n- b\n```\npip install requests\n```\n', '- a\n  ```\n  x\n- b\n```\npip install reqests\n```\n', open('docs/fence-out.md')],
     ['docs/ordered.md', '1. Step one.\n\n   Old words.\n', '1. Step one.\n\n   New words.\n', null],
     ['docs/ordered-two.md', 'Text.\n2. foo\n\n      pip install requests\n', 'Text.\n2. foo\n\n      pip install reqests\n', un('docs/ordered-two.md')],
     ['docs/item-fence.md', '- ```\n  pip install requests\n  ```\n', '- ```\n  pip install reqests\n  ```\n', un('docs/item-fence.md')],
@@ -1754,6 +1757,85 @@ test('round 4: components, code elements, conditional templates, variables, lite
     ['src/components/Arrow.tsx', 'export const f = <T extends () => void,>(x: T) => x;\nexport const P = () => <p>Save</p>;\n', 'export const f = <T extends () => void,>(x: T) => x;\nexport const P = () => <p>Store</p>;\n', null],
     ['docs/inline-title.md', 'See [it][a].\n\n[a]: /u\n"Old title"\n', 'See [it][a].\n\n[a]: /u\n"New title"\n', un('docs/inline-title.md')],
     ['docs/after-def.md', 'See [it][a].\n\n[a]: /u\nOld words.\n', 'See [it][a].\n\n[a]: /u\nNew words.\n', null]
+  ];
+  const base = {};
+  for (const [p, b] of shapes) base[p] = b;
+  const root = makeRepo(base);
+  for (const [p, b, n, expected] of shapes) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    if (expected === null) assertChecking(res, [p]);
+    else assert.equal(res.text, refusal(expected), `${p}: ${JSON.stringify(res)}`);
+  }
+});
+
+// Every scanner fails closed (the automated commit security review, 2026-10-09): a side
+// that ends inside an unfinished construct, or holds one the scanner cannot follow, makes
+// the change unreadable. [path, base content, new content, the clause, or null for `checking`]
+test('round 4: every scanner fails closed on an unfinished or unreadable construct', async () => {
+  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
+  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const shapes = [
+    // An attribute name where none can start: an unclosed `<div` swallowing the next tag.
+    ['src/pages/div.html', '<div class="a"\n<p>Save</p>\n', '<div class="a"\n<p>Store</p>\n', lost('src/pages/div.html')],
+    // An unclosed quote, comment, raw-text element, tag and template brace after the change.
+    ['src/pages/quote.html', '<p>Save</p>\n<a title="x>Go</a>\n', '<p>Store</p>\n<a title="x>Go</a>\n', open('src/pages/quote.html')],
+    ['src/pages/note.html', '<p>Save</p>\n<!-- note\n', '<p>Store</p>\n<!-- note\n', open('src/pages/note.html')],
+    ['src/pages/script.html', '<p>Save</p>\n<script>\nrun();\n', '<p>Store</p>\n<script>\nrun();\n', open('src/pages/script.html')],
+    ['src/pages/tag.html', '<p>Save</p>\n<a href="/x"\n', '<p>Store</p>\n<a href="/x"\n', open('src/pages/tag.html')],
+    ['src/components/Mustache.vue', '<template>\n  <p>Save</p>\n  <p>{{ msg </p>\n</template>\n', '<template>\n  <p>Store</p>\n  <p>{{ msg </p>\n</template>\n', open('src/components/Mustache.vue')],
+    ['src/components/Root.vue', '<template>\n  <p>Save</p>\n', '<template>\n  <p>Store</p>\n', open('src/components/Root.vue')],
+    ['src/pages/cdata-open.html', '<p>Save</p>\n<svg><![CDATA[ x\n', '<p>Store</p>\n<svg><![CDATA[ x\n', open('src/pages/cdata-open.html')],
+    // JSX and JavaScript: an unclosed brace, comment, element, string, template and
+    // regular expression; a closing brace with nothing open.
+    ['src/components/Brace.jsx', 'export const P = () => <p>Save</p>;\nconst x = {\n', 'export const P = () => <p>Store</p>;\nconst x = {\n', open('src/components/Brace.jsx')],
+    ['src/components/Shut.jsx', 'export const P = () => <p>Save</p>;\n}\n', 'export const P = () => <p>Store</p>;\n}\n', lost('src/components/Shut.jsx')],
+    ['src/components/Comment.jsx', 'export const P = () => <p>Save</p>;\n/* note\n', 'export const P = () => <p>Store</p>;\n/* note\n', open('src/components/Comment.jsx')],
+    ['src/components/Unshut.jsx', 'export const P = () => <div><p>Save</p>;\n', 'export const P = () => <div><p>Store</p>;\n', open('src/components/Unshut.jsx')],
+    ['src/components/Line.jsx', 'const s = "abc\nexport const P = () => <p>Save</p>;\n', 'const s = "abc\nexport const P = () => <p>Store</p>;\n', lost('src/components/Line.jsx')],
+    ['src/components/Str.jsx', "export const P = () => <p>Save</p>;\nconst s = 'abc", "export const P = () => <p>Store</p>;\nconst s = 'abc", open('src/components/Str.jsx')],
+    ['src/components/Tick.jsx', 'export const P = () => <p>Save</p>;\nconst t = `abc', 'export const P = () => <p>Store</p>;\nconst t = `abc', open('src/components/Tick.jsx')],
+    ['src/components/Re.jsx', 'export const P = () => <p>Save</p>;\nconst q = /abc', 'export const P = () => <p>Store</p>;\nconst q = /abc', open('src/components/Re.jsx')],
+    // The `.tsx` generic arrow function (item B9), a regression guard.
+    ['src/components/GenGuard.tsx', 'export const f = <T,>(x: T) => x;\nexport const s = "<b>Save</b>";\n', 'export const f = <T,>(x: T) => x;\nexport const s = "<b>Store</b>";\n', un('src/components/GenGuard.tsx')],
+    // Stylesheets: an unclosed comment, block and string; a closing brace with nothing open.
+    ['src/styles/note.css', 'a { color: red; }\n/* note\n', 'a { color: blue; }\n/* note\n', open('src/styles/note.css')],
+    ['src/styles/block.css', 'a { color: red; }\nb {\n', 'a { color: blue; }\nb {\n', open('src/styles/block.css')],
+    ['src/styles/string.css', 'a { color: red; }\nb { content: "x }\n', 'a { color: blue; }\nb { content: "x }\n', lost('src/styles/string.css')],
+    ['src/styles/extra.css', 'a { color: red; }\n}\n', 'a { color: blue; }\n}\n', lost('src/styles/extra.css')],
+    // Markdown: a change above an unclosed fence, under one (a guard), an unclosed front
+    // matter, an unclosed template brace and HTML comment in the prose.
+    ['docs/fence-below.md', 'Old words.\n\n```\ncode\n', 'New words.\n\n```\ncode\n', open('docs/fence-below.md')],
+    ['docs/fence-above.md', '```\ncode\nOld words.\n', '```\ncode\nNew words.\n', open('docs/fence-above.md')],
+    ['docs/front-open.md', '---\nOld text.\n', '---\nNew text.\n', open('docs/front-open.md')],
+    ['docs/brace-open.md', 'Old words {{ x\n', 'New words {{ x\n', open('docs/brace-open.md')],
+    ['docs/comment-open.md', 'Old words.\n\n<!-- note\n', 'New words.\n\n<!-- note\n', open('docs/comment-open.md')],
+    // reStructuredText: a role span or inline literal left open.
+    ['docs/span-open.rst', 'Old words.\n\nPress :kbd:`Ctrl now.\n', 'New words.\n\nPress :kbd:`Ctrl now.\n', open('docs/span-open.rst')],
+    ['docs/literal-open.rst', 'Old words.\n\nRun ``pip now.\n', 'New words.\n\nRun ``pip now.\n', open('docs/literal-open.rst')],
+    // One side well-formed and the other not.
+    ['src/pages/one-side.html', '<p>Save</p>\n<!-- c -->\n', '<p>Store</p>\n<!-- c --\n', open('src/pages/one-side.html')],
+    ['docs/one-side.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n``\n', open('docs/one-side.md')],
+    // Well-formed files still qualify.
+    ['src/pages/closed.html', '<p>Save</p>\n<!-- note -->\n<script>run();</script>\n', '<p>Store</p>\n<!-- note -->\n<script>run();</script>\n', null],
+    ['docs/closed.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n```\n', null],
+    ['docs/closed.rst', 'Old words.\n\nPress :kbd:`Ctrl` now.\n', 'New words.\n\nPress :kbd:`Ctrl` now.\n', null],
+    // A catalogue line whose state at its start is not a fresh entry: inside a YAML block
+    // scalar, a quoted value or a flow collection begun above, or a properties value
+    // continued from the line above.
+    ['i18n/block.yaml', 'desc: |\n  save: Save\n', 'desc: |\n  save: Store\n', lost('i18n/block.yaml')],
+    ['i18n/folded.yaml', 'desc: >-\n  save: Save\nnext: Hi\n', 'desc: >-\n  save: Store\nnext: Hi\n', lost('i18n/folded.yaml')],
+    ['i18n/quoted.yaml', 'a: "one\n  b: two"\n', 'a: "one\n  b: three"\n', lost('i18n/quoted.yaml')],
+    ['i18n/flow.yaml', 'a: [one,\n  b: two]\n', 'a: [one,\n  b: three]\n', lost('i18n/flow.yaml')],
+    ['lang/cont.properties', 'a=Save \\\nb=Cancel\n', 'a=Save \\\nb=Close\n', lost('lang/cont.properties')],
+    ['i18n/after-block.yaml', 'desc: |\n  Long text.\nsave: Save\n', 'desc: |\n  Long text.\nsave: Store\n', null],
+    ['lang/after-cont.properties', 'a=Save \\\n  more\nb=Cancel\n', 'a=Save \\\n  more\nb=Close\n', null],
+    // A file emptied is the content of a removal, never wording (found by the cut-short property case).
+    ['docs/emptied.rst', 'Old words.\n', '', un('docs/emptied.rst')],
+    ['notes/emptied.txt', 'Old words.\n', '', un('notes/emptied.txt')],
+    ['notes/filled.txt', '', 'New words.\n', un('notes/filled.txt')]
   ];
   const base = {};
   for (const [p, b] of shapes) base[p] = b;
@@ -1782,19 +1864,22 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  // Every scanner fails closed (2026-10-09): a file that ends inside an unclosed string,
+  // template literal, regular expression, script, front matter or fence is unreadable.
+  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
   const shapes = [
     // JavaScript around JSX: a template literal with a substitution, a regular expression
     // with a class and flags, a self-closing element, an unclosed string and regular
     // expression at the end of the file.
     ['src/components/Tpl.jsx', 'export const T = () => <p className={`a ${b}`}>Save</p>;\n', 'export const T = () => <p className={`a ${b}`}>Store</p>;\n', null],
-    ['src/components/Re.jsx', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Save</p>;\nconst q = /abc', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Store</p>;\nconst q = /abc', null],
-    ['src/components/Str.jsx', "export const P = () => <p>Save</p>;\nconst s = 'abc", "export const P = () => <p>Store</p>;\nconst s = 'abc", null],
-    ['src/components/Tick.jsx', 'export const P = () => <p>Save</p>;\nconst t = `abc', 'export const P = () => <p>Store</p>;\nconst t = `abc', null],
+    ['src/components/Re.jsx', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Save</p>;\nconst q = /abc', 'const r = /[/]x/g;\nexport const B = () => <br/>;\nexport const P = () => <p>Store</p>;\nconst q = /abc', open('src/components/Re.jsx')],
+    ['src/components/Str.jsx', "export const P = () => <p>Save</p>;\nconst s = 'abc", "export const P = () => <p>Store</p>;\nconst s = 'abc", open('src/components/Str.jsx')],
+    ['src/components/Tick.jsx', 'export const P = () => <p>Save</p>;\nconst t = `abc', 'export const P = () => <p>Store</p>;\nconst t = `abc', open('src/components/Tick.jsx')],
     ['src/components/Gen.tsx', 'const f = <T,>(x: T) => x;\nexport const P = () => <p>Save</p>;\n', 'const f = <T,>(x: T) => x;\nexport const P = () => <p>Store</p>;\n', null],
     // A script block's escape states: `</script>` inside `<!--<script>` does not end it.
     ['src/pages/escaped.html', '<script><!--<script></script><b>Save</b></script>\n<p>Hi</p>\n', '<script><!--<script></script><b>Store</b></script>\n<p>Hi</p>\n', un('src/pages/escaped.html')],
     ['src/pages/escaped-after.html', '<script><!--<script></script>--></script>\n<p>Save</p>\n', '<script><!--<script></script>--></script>\n<p>Store</p>\n', null],
-    ['src/pages/unclosed.html', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Save</b>\n', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Store</b>\n', un('src/pages/unclosed.html')],
+    ['src/pages/unclosed.html', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Save</b>\n', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Store</b>\n', open('src/pages/unclosed.html')],
     // A title is wording (the code review, 2026-10-09: it was wrongly refused).
     ['src/pages/title.html', '<title>Save</title>\n', '<title>Store</title>\n', null],
     ['src/pages/tpl.html', '<template><p>Save</p></template>\n', '<template><p>Store</p></template>\n', un('src/pages/tpl.html')],
@@ -1833,12 +1918,12 @@ test('round 3: the whole-file scanners read strings, templates, escapes, comment
     // target in angle brackets, a full reference, a heading after an indented block.
     ['docs/span.md', 'Run `pip install requests` first.\n', 'Run `pip install reqests` first.\n', un('docs/span.md')],
     ['docs/beside.md', 'Run `npm test` first, ``x`` and ` alone.\n', 'Run `npm test` now, ``x`` and ` alone.\n', null],
-    ['docs/open-json.md', '{\n  "title": "Old"\n\nBody old.\n', '{\n  "title": "Old"\n\nBody new.\n', setting('docs/open-json.md')],
+    ['docs/open-json.md', '{\n  "title": "Old"\n\nBody old.\n', '{\n  "title": "Old"\n\nBody new.\n', open('docs/open-json.md')],
     ['docs/angle.md', 'See [the guide](<a b.md>) now.\n', 'See [the guide](<a c.md>) now.\n', un('docs/angle.md')],
     ['docs/full.md', 'See [the guide][a] now.\n\n[a]: /a\n[b]: /b\n', 'See [the guide][b] now.\n\n[a]: /a\n[b]: /b\n', un('docs/full.md')],
     ['docs/escaped.md', 'See [x](a\\)b) old.\n', 'See [x](a\\)b) new.\n', null],
     ['docs/after-code.md', 'Text.\n\n    code here\n\nOld words.\n', 'Text.\n\n    code here\n\nNew words.\n', null],
-    ['docs/unfence.md', '```\ncode\n```\nOld words.\n', '```\ncode\n\nOld words.\n', un('docs/unfence.md')],
+    ['docs/unfence.md', '```\ncode\n```\nOld words.\n', '```\ncode\n\nOld words.\n', open('docs/unfence.md')],
     ['docs/sub.rst', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>one</b>\n\nOld words.\n', 'Title\n=====\n\n.. |logo| raw:: html\n\n   <b>two</b>\n\nOld words.\n', un('docs/sub.rst')],
     ['docs/note.rst', 'Title\n=====\n\n.. note::\n\n   Old words.\n', 'Title\n=====\n\n.. note::\n\n   New words.\n', null],
     ['docs/jinja.rst', 'Title\n=====\n\nOld words.\n', 'Title\n=====\n\nNew {{ words }}.\n', un('docs/jinja.rst')],

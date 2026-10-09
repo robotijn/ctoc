@@ -632,7 +632,7 @@ const ALLOWED = {
   },
   text: plain('<>"\'{}()=:/\\#;*[]&`|_', 'any punctuation in a plain-text paragraph is shown as typed'),
   rst: {
-    ...plain('<>"\'{}()=:/\\#;*[]&`|', 'punctuation in a reStructuredText paragraph is shown as typed (spans and references are compared exactly)'),
+    ...plain('<>"\'{}()=:/\\#;*[]&|', 'punctuation in a reStructuredText paragraph is shown as typed (spans and references are compared exactly)'),
     '_': (v, at) => (/[A-Za-z0-9]$/.test(v.slice(0, at)) && /^_?(?:$|[\s)>}'".,;:!?])/.test(v.slice(at + 1)) ? null
       : 'an underscore that ends no reference name is shown as typed')
   },
@@ -724,6 +724,74 @@ test('property: one inserted character in the changed text of every qualifying s
   for (const [key, n] of reasons) t.diagnostic(`${n} x ${key}`);
 });
 
+// Every scanner fails closed (the automated commit security review, 2026-10-09): the new
+// side of every qualifying shape, cut short at every point, refuses, unless the cut lands in
+// plain visible text at the very end with every construct before it closed. The changed
+// lines are read as git reads them: a last line without its line break differs from the
+// same line with one.
+function gitHunks(oldText, newText) {
+  const keyed = (t) => {
+    const l = t.split('\n');
+    const last = l.pop();
+    const keys = l.map((x) => `${x}\n`);
+    if (last !== '') keys.push(last);
+    return keys;
+  };
+  const a = keyed(oldText);
+  const b = keyed(newText);
+  let p = 0;
+  while (p < a.length && p < b.length && a[p] === b[p]) p++;
+  let q = 0;
+  while (q < a.length - p && q < b.length - p && a[a.length - 1 - q] === b[b.length - 1 - q]) q++;
+  const strip = (x) => x.replace(/\n$/, '').replace(/\r$/, '');
+  const removed = a.slice(p, a.length - q).map(strip);
+  const added = b.slice(p, b.length - q).map(strip);
+  return removed.length + added.length === 0 ? [] : [{ oldStart: p + 1, newStart: p + 1, removed, added }];
+}
+
+/** Whether a cut text ends in plain visible text with every construct before it closed. */
+function closedAtEnd(kind, cut) {
+  const lines = cut.split('\n');
+  const tail = lines[lines.length - 1] === '' ? (lines[lines.length - 2] || '') : lines[lines.length - 1];
+  const even = (t, c) => t.split(c).length % 2 === 1;
+  const balanced = (t, o, c) => t.split(o).length === t.split(c).length;
+  if (cut.trim() === '') return false; // an emptied file is no wording edit
+  if (kind === 'text') return true;
+  if (kind === 'catalogue') return even(tail, '"') && !/^\s*[{}[\]]?\s*$/.test(tail) && /[:=]|^msgstr/.test(tail);
+  if (kind === 'markdown' || kind === 'rst') {
+    const fences = lines.filter((l) => /^\s*(```|~~~)/.test(l)).length;
+    const front = lines[0] === '---' && !lines.slice(1).some((l) => l === '---');
+    return fences % 2 === 0 && !front && even(tail, '`') && !tail.includes('<') && !tail.includes('{{')
+      && balanced(tail, '[', ']') && balanced(tail, '(', ')') && !/^\s*\.\. /.test(tail);
+  }
+  return false; // markup, JSX and stylesheets: a cut always leaves a tag, element or block open
+}
+
+test('property: a qualifying file cut short at any point refuses, unless the cut lands in closed plain text at the very end', (t) => {
+  let cuts = 0;
+  let passes = 0;
+  for (const [shape, content] of QUALIFY) {
+    const writes = typeof shape === 'string' ? { [shape]: content } : shape;
+    for (const [rel, neu] of Object.entries(writes)) {
+      const old = BASE[rel];
+      for (let at = 0; at < neu.length; at++) {
+        const cut = neu.slice(0, at);
+        if (cut === old) continue;
+        cuts++;
+        const hunks = gitHunks(old, cut);
+        const change = {
+          files: [{ display: rel, topRel: rel, status: 'M', oldMode: '100644', newMode: '100644', oldSha: null, oldText: old, newText: cut, hunks }],
+          lineCount: hunks.reduce((n, h) => n + h.removed.length + h.added.length, 0)
+        };
+        if (ruleRefusal(change)) continue;
+        passes++;
+        assert.ok(closedAtEnd(kindOf(rel), cut), `${rel} cut at ${at} passed: ${JSON.stringify(cut.slice(-40))}`);
+      }
+    }
+  }
+  t.diagnostic(`${cuts} cuts, ${passes} pass, each in closed plain text at the very end`);
+});
+
 // Each scanner moves forward only. Inputs built to make a backtracking or rescanning
 // scanner quadratic are judged in well under a quarter of a second (a quadratic scan of
 // these 100,000 to 400,000 characters takes seconds).
@@ -750,7 +818,9 @@ test('the whole-file scanners stay linear on input built against them', () => {
     'docs/options.rst': `Old words.\n.. note::\n${'   :class: x\n'.repeat(30000)}`,
     'src/components/Params.tsx': `export const P = () => <p>Old</p>;\n${'x = <T extends A<'.repeat(20000)}\n`,
     'src/components/Holds.vue': `<template>\n<p>Old</p>\n${'<MyThing>'.repeat(30000)}\n</template>\n`,
-    'src/styles/vars.scss': `a { color: red; }\n${'$a: b;'.repeat(50000)}\n`
+    'src/styles/vars.scss': `a { color: red; }\n${'$a: b;'.repeat(50000)}\n`,
+    // Every scanner fails closed: catalogue line states over many open quotes and blocks.
+    'i18n/states.yaml': `title: Old\n${'a: "x\n  b: |\n'.repeat(30000)}`
   };
   for (const [rel, old] of Object.entries(cases)) {
     const changed = rel.endsWith('.css') ? old.replace('red', 'blue') : old.replace('Old', 'New');

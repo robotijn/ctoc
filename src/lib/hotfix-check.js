@@ -81,7 +81,10 @@
  *                                          references are compared exactly; doctests in plain
  *                                          text are code; a catalogue value is decoded as its
  *                                          format reads it and read as a browser reads an
- *                                          address
+ *                                          address, each line only where it starts an entry.
+ *                                          EVERY SCANNER FAILS CLOSED: a side that ends inside
+ *                                          an unfinished construct, or holds one its scanner
+ *                                          cannot follow, makes the change unreadable
  *   5  not in a sensitive area           — 33 whole words, also in the plural, in the path from
  *                                          the repository top (auth, login, ...; a stylesheet's
  *                                          own file name aside), CTOC's own secret-file guard,
@@ -753,6 +756,21 @@ function commonEnds(o, n) {
 
 /** @typedef {{k: string, v: string, name?: string, end?: boolean, self?: boolean, attrs?: string[], quiet?: boolean}} Tok */
 
+/*
+ * EVERY SCANNER FAILS CLOSED. A scanner that ends inside an unfinished construct (a tag, an
+ * attribute quote, a comment, a raw-text element, a brace, a string, a template literal, a
+ * regular expression, a stylesheet block, a fence, a front matter, a reStructuredText span)
+ * reports `open`; one that meets a construct it cannot follow where it expects structure (an
+ * attribute name starting with `<`, `"`, `'` or `=`; a string or regular expression running
+ * into a line break; a `}` with nothing open) reports `lost`. Rule 4 resets the report
+ * before it judges a file and refuses the change as unreadable when either side reported
+ * one: a scanner that lost its place never falls through to text.
+ */
+/** @type {('open'|'lost'|null)} the first fault the scanners met since rule 4 last reset it */
+let scanFault = null;
+/** @param {'open'|'lost'} kind */
+const fault = (kind) => { if (scanFault === null) scanFault = kind; };
+
 /** Elements whose content a browser reads as raw text, never as markup (`plaintext` runs to the end). */
 const RAW_TEXT = new Set(['script', 'style', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'plaintext']);
 /**
@@ -802,9 +820,10 @@ function skipString(s, i) {
     const c = s[j];
     if (c === '\\') j += 2;
     else if (c === q) return j + 1;
-    else if (c === '\n') return j;
+    else if (c === '\n') { fault('lost'); return j; }
     else j++;
   }
+  fault('open');
   return s.length;
 }
 
@@ -821,6 +840,7 @@ function skipTemplate(s, i) {
     else if (c === '$' && s[j + 1] === '{') j = scanJs(s, j + 1, true, null);
     else j++;
   }
+  fault('open');
   return s.length;
 }
 
@@ -835,7 +855,7 @@ function skipRegex(s, i) {
   while (j < s.length) {
     const c = s[j];
     if (c === '\\') { j += 2; continue; }
-    if (c === '\n') return j;
+    if (c === '\n') { fault('lost'); return j; }
     if (inClass) { if (c === ']') inClass = false; }
     else if (c === '[') inClass = true;
     else if (c === '/') {
@@ -845,6 +865,7 @@ function skipRegex(s, i) {
     }
     j++;
   }
+  fault('open');
   return s.length;
 }
 
@@ -864,6 +885,7 @@ function skipBraces(s, i) {
     else if (c === '}' && --depth === 0) return j + 1;
     j++;
   }
+  fault('open');
   return s.length;
 }
 
@@ -896,7 +918,12 @@ function scanJs(s, i, brace, out) {
       continue;
     }
     if (c === '/' && s[j + 1] === '/') { const e = s.indexOf('\n', j); j = e < 0 ? n : e; continue; }
-    if (c === '/' && s[j + 1] === '*') { const e = s.indexOf('*/', j + 2); j = e < 0 ? n : e + 2; continue; }
+    if (c === '/' && s[j + 1] === '*') {
+      const e = s.indexOf('*/', j + 2);
+      if (e < 0) fault('open');
+      j = e < 0 ? n : e + 2;
+      continue;
+    }
     if (isSpace(c)) { j++; continue; }
     if (isWordChar(c)) {
       const start = j;
@@ -919,9 +946,11 @@ function scanJs(s, i, brace, out) {
     }
     if (c === '{') depth++;
     else if (c === '}' && --depth === 0 && brace) return j + 1;
+    else if (depth < 0) fault('lost'); // a `}` with nothing open
     prev = c;
     j++;
   }
+  if (brace || depth > 0) fault('open');
   flush(n);
   return n;
 }
@@ -959,6 +988,7 @@ function typeParameters(s, i) {
     else if (c === '>' && s[j - 1] !== '=' && --depth === 0) return j + 1;
     j++;
   }
+  fault('open');
   return n;
 }
 
@@ -992,6 +1022,7 @@ function scanTag(s, i, isEnd, braces) {
       continue;
     }
     if (c === '{') { j = braces(s, j); continue; }
+    if (c === '<' || c === '"' || c === "'" || c === '=') fault('lost'); // no attribute name starts so
     const attrStart = j++;
     while (j < n && !isSpace(s[j]) && s[j] !== '/' && s[j] !== '>' && s[j] !== '=') j++;
     attrs.push(s.slice(attrStart, j).toLowerCase());
@@ -1002,6 +1033,7 @@ function scanTag(s, i, isEnd, braces) {
     const q = s[j];
     if (q === '"' || q === "'") {
       const e = s.indexOf(q, j + 1);
+      if (e < 0) fault('open');
       j = e < 0 ? n : e + 1;
     } else if (q === '{') {
       j = braces(s, j);
@@ -1009,6 +1041,7 @@ function scanTag(s, i, isEnd, braces) {
       while (j < n && !isSpace(s[j]) && s[j] !== '>') j++;
     }
   }
+  if (j >= n && s[n - 1] !== '>') fault('open'); // the tag never ended
   return { k: 'tag', v: s.slice(i, j), name, end: isEnd, self, attrs };
 }
 
@@ -1037,6 +1070,7 @@ function rawEnd(s, from, name) {
     const re = RAW_CLOSE[/** @type {keyof RAW_CLOSE} */ (name)];
     re.lastIndex = from;
     const m = re.exec(s);
+    if (!m) fault('open');
     return m ? m.index : s.length;
   }
   let state = 0; // 0 script data, 1 escaped, 2 double escaped
@@ -1048,6 +1082,7 @@ function rawEnd(s, from, name) {
     else if (m[1]) { if (state === 2) state = 1; else return m.index; }
     else if (state === 1) state = 2;
   }
+  fault('open');
   return s.length;
 }
 
@@ -1102,6 +1137,7 @@ function scanJsx(s, i, out) {
     }
     if (j > start) push({ k: 'text', v: s.slice(start, j), quiet: quiet > 0 || option });
   }
+  fault('open'); // an element still open at the end
   return n;
 }
 
@@ -1185,22 +1221,25 @@ function scanMarkup(s, mode) {
         continue;
       }
       if (d === '!' || d === '?' || d === '/') {
-        let end;
-        if (s.startsWith('<!--', i)) { const e = s.indexOf('-->', i + 4); end = e < 0 ? n : e + 3; }
-        else if (s.startsWith('<![CDATA[', i)) { const e = s.indexOf(']]>', i + 9); end = e < 0 ? n : e + 3; }
-        else { const e = s.indexOf('>', i + 2); end = e < 0 ? n : e + 1; }
-        take('comment', end);
+        const [close, from] = s.startsWith('<!--', i) ? ['-->', i + 4] : s.startsWith('<![CDATA[', i) ? [']]>', i + 9] : ['>', i + 2];
+        const e = s.indexOf(close, from);
+        if (e < 0) fault('open');
+        take('comment', e < 0 ? n : e + close.length);
         continue;
       }
     } else if (c === '{' && (mode !== 'md' || s[i + 1] === '{' || s[i + 1] === '%')) {
       let end;
-      if (mode === 'md') { const e = s.indexOf(s[i + 1] === '{' ? '}}' : '%}', i + 2); end = e < 0 ? n : e + 2; }
-      else end = skipBraces(s, i);
+      if (mode === 'md') {
+        const e = s.indexOf(s[i + 1] === '{' ? '}}' : '%}', i + 2);
+        if (e < 0) fault('open');
+        end = e < 0 ? n : e + 2;
+      } else end = skipBraces(s, i);
       take('expr', end);
       continue;
     }
     i++;
   }
+  if (templates.length > 0) fault('open'); // a `<template>` never closed
   text(n);
   return out;
 }
@@ -1245,6 +1284,66 @@ function markupWording(toks, k, jsx) {
   if (!prev || !next || prev.k !== 'tag' || next.k !== 'tag') return false;
   if (!jsx) return true;
   return !prev.end && !prev.self && isLetter((prev.name || '')[0] || '') && Boolean(next.end) && next.name === prev.name;
+}
+
+/**
+ * Rule 4 (message catalogue) — whether each line of a catalogue starts a fresh entry, which
+ * is the one state where a line is read alone: never a line inside a YAML block scalar
+ * (`|`, `>` and the lines indented beneath its key), a YAML quoted value or flow collection
+ * begun on an earlier line, or a properties value continued by a `\` at the end of the line
+ * above. One pass.
+ * @param {string} text line feeds only @param {string} ext @returns {boolean[]}
+ */
+function entryLines(text, ext) {
+  const lines = text.split('\n');
+  const fresh = new Array(lines.length).fill(true);
+  const indent = (l) => l.length - l.trimStart().length;
+  if (ext === '.properties') {
+    for (let i = 1; i < lines.length; i++) {
+      const m = /\\+$/.exec(lines[i - 1]);
+      fresh[i] = !(m && m[0].length % 2 === 1);
+    }
+    return fresh;
+  }
+  if (ext !== '.yaml' && ext !== '.yml') return fresh;
+  let block = -1; // inside a block scalar while a line is blank or indented deeper than this
+  let quote = ''; // a quoted value still open
+  let flow = 0; // open `[` and `{` of a flow collection
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let from = 0;
+    if (quote || flow > 0) {
+      fresh[i] = false;
+    } else if (block >= 0 && (line.trim() === '' || indent(line) > block)) {
+      fresh[i] = false;
+      continue;
+    } else {
+      block = -1;
+      const at = line.indexOf(': ');
+      const value = at < 0 ? '' : line.slice(at + 2).trimStart();
+      if (value[0] === '|' || value[0] === '>') { // a block scalar header: indicators, then at most a comment
+        let k = 1;
+        while (k < value.length && '-+0123456789'.includes(value[k])) k++;
+        const rest = value.slice(k).trimEnd();
+        if (rest === '' || /^[ \t]+#/.test(rest)) block = indent(line);
+      }
+      if (!'"\'[{'.includes(value[0] || 'x')) continue; // a plain value: its quotes are text
+      from = line.length - value.length;
+    }
+    // Follow a quoted value or a flow collection through the line (escapes and doubled quotes skipped).
+    for (let j = from; j < line.length; j++) {
+      const c = line[j];
+      if (quote) {
+        if (quote === '"' && c === '\\') j++;
+        else if (c === "'" && quote === "'" && line[j + 1] === "'") j++;
+        else if (c === quote) quote = '';
+      } else if (c === '"' || c === "'") quote = c;
+      else if (c === '[' || c === '{') flow++;
+      else if ((c === ']' || c === '}') && flow > 0) flow--;
+      if (!quote && flow === 0 && j >= from && fresh[i]) break; // the value closed on its own line
+    }
+  }
+  return fresh;
 }
 
 /** @param {Hunk[]} hunks @returns {boolean} every group replaces line for line */
@@ -1412,6 +1511,7 @@ function blankCss(s, lineComments) {
     let end = -1;
     if (c === '/' && s[i + 1] === '*') {
       const e = s.indexOf('*/', i + 2);
+      if (e < 0) fault('open');
       end = e < 0 ? n : e + 2;
     } else if (c === '/' && s[i + 1] === '/' && lineComments) {
       const e = s.indexOf('\n', i);
@@ -1423,6 +1523,7 @@ function blankCss(s, lineComments) {
       while (j < n && isSpace(s[j])) j++;
       if (s[j] !== '"' && s[j] !== "'") {
         const e = s.indexOf(')', j);
+        if (e < 0) fault('open');
         end = e < 0 ? n : e + 1;
       }
     }
@@ -1469,8 +1570,10 @@ function cssStatements(blank, sass) {
     out.push({ start, end: i, term: c, depth });
     if (c === '{') depth++;
     else if (c === '}' && depth > 0) depth--;
+    else if (c === '}') fault('lost'); // a `}` with nothing open
     start = i + 1;
   }
+  if (depth > 0) fault('open');
   out.push({ start, end: blank.length, term: '', depth });
   return out;
 }
@@ -1659,10 +1762,12 @@ function frontMatterLines(lines) {
   const close = first === '---' ? /^(?:---|\.\.\.)[ \t]*$/ : first === '+++' ? /^\+\+\+[ \t]*$/ : null;
   if (close) {
     for (let i = 1; i < lines.length; i++) if (close.test(lines[i])) return i + 1;
+    fault('open');
     return 0;
   }
   if (first !== '{' && !first.startsWith('{"')) return 0;
   for (let i = 0; i < lines.length; i++) if (lines[i].trimEnd() === '}') return i + 1;
+  fault('open');
   return lines.length;
 }
 
@@ -1784,6 +1889,7 @@ function markdownLines(text) {
       }
     }
   }
+  if (fence) fault('open');
   return cls;
 }
 
@@ -1936,11 +2042,12 @@ function codeSpans(s) {
 
 /**
  * Every pair of backtick runs in the text: a run closed by the next run of the same length.
- * Each run is visited once.
+ * Each run is visited once. With `strict` (reStructuredText, where a run left unpaired is an
+ * inline span left open), a run that pairs with none is an `open` fault.
  * @param {string} s @returns {Array<{open: number, from: number, to: number, len: number}>}
  * `open` is the opening run's start, `from` and `to` the content's ends, `len` the run length
  */
-function backtickPairs(s) {
+function backtickPairs(s, strict = false) {
   /** @type {Array<[number, number]>} */
   const runs = [];
   for (let i = 0; i < s.length;) {
@@ -1958,17 +2065,19 @@ function backtickPairs(s) {
   });
   const next = new Map();
   const pairs = [];
+  let unpaired = 0;
   for (let r = 0; r < runs.length;) {
     const [start, len] = runs[r];
     const list = /** @type {number[]} */ (byLength.get(len));
     let p = next.get(len) || 0;
     while (p < list.length && list[p] <= r) p++;
     next.set(len, p);
-    if (p === list.length) { r++; continue; }
+    if (p === list.length) { unpaired++; r++; continue; }
     const close = list[p];
     pairs.push({ open: start, from: start + len, to: runs[close][0], len });
     r = close + 1;
   }
+  if (strict && unpaired > 0) fault('open');
   return pairs;
 }
 
@@ -1998,7 +2107,7 @@ function rstReference(t) {
  */
 function rstSpans(s) {
   const out = [];
-  for (const { open, from, to, len } of backtickPairs(s)) {
+  for (const { open, from, to, len } of backtickPairs(s, true)) {
     const text = s.slice(from, to);
     if (len !== 1) {
       out.push(`\`\`${text}`);
@@ -2048,6 +2157,7 @@ function linkTargets(s) {
       }
     }
     j = Math.min(j, s.length);
+    if (j === s.length || s[j] === '\n') fault('open'); // a destination never closed on its line
     out.push(s.slice(i + 2, j));
     i = Math.max(i, j - 2);
   }
@@ -2149,11 +2259,27 @@ function textRefusal(f) {
 /**
  * Rule 4 — place the file in the first kind that fits and judge the whole old and new file
  * with that kind's scanner; a place that governs the work never qualifies, whatever the
- * kind; otherwise the clause of the first other kind it matches.
+ * kind; otherwise the clause of the first other kind it matches. When a scanner of either
+ * side ended inside an unfinished construct or lost its place, the change could not be read
+ * (every scanner fails closed).
  * @param {ChangedFile} f
  * @returns {{kind: string, runs: string[]}|{clause: string, cause: string}}
  */
 function ruleKind(f) {
+  scanFault = null;
+  const judged = kindOf(f);
+  if (!scanFault) return judged;
+  const why = scanFault === 'open' ? 'leaves a tag, quote, comment, block, fence or span open' : 'holds something I cannot follow';
+  return { clause: `I could not read the change (${f.display} ${why})`, cause: 'unreadable' };
+}
+
+/**
+ * Rule 4 — the kind of one file and its wording, or the clause that refuses it; the
+ * scanners' faults are read by {@link ruleKind}.
+ * @param {ChangedFile} f
+ * @returns {{kind: string, runs: string[]}|{clause: string, cause: string}}
+ */
+function kindOf(f) {
   const { base, ext, folders, topFolders } = nameParts(f);
   const d = f.display;
   const lowerBase = base.toLowerCase();
@@ -2180,6 +2306,8 @@ function ruleKind(f) {
   else if (CATALOGUE_EXT.has(ext) && folders.some((p) => CATALOGUE_FOLDERS.has(p))) kind = 'catalogue';
   else if (COLOUR_EXT.has(ext)) kind = 'colour';
   if (kind !== null && governing) return unrecognised;
+  // A side emptied, or filled from empty, holds the content of a removal or an addition.
+  if (kind !== null && (f.oldText === '') !== (f.newText === '')) return unrecognised;
   if (kind !== null && buildFolder) return build;
   if (kind === 'documentation' && dotFolder) return unrecognised;
 
@@ -2199,8 +2327,14 @@ function ruleKind(f) {
   }
   if (kind === 'catalogue') {
     if (!equalHunks(f.hunks)) return unrecognised;
+    const oldFresh = entryLines(lineFeeds(/** @type {string} */ (f.oldText)), ext);
+    const newFresh = entryLines(lineFeeds(/** @type {string} */ (f.newText)), ext);
     const runs = [];
     for (const pair of linePairs(f.hunks)) {
+      if (!oldFresh[pair.oldLine - 1] || !newFresh[pair.newLine - 1]) {
+        fault('lost'); // the line is read alone, but it does not start an entry
+        return unrecognised;
+      }
       const a = catalogueEntry(pair.o, ext);
       const b = catalogueEntry(pair.n, ext);
       if (!a || !b || a.key !== b.key || a.value === b.value || placeholders(a.value) !== placeholders(b.value)) return unrecognised;
