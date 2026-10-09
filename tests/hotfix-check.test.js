@@ -1281,6 +1281,7 @@ test('when the file-name selection names a test for every judged file, that sele
 
 test('edge shapes of every kind give the exact verdict', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   // [path, base content, new content, expected clause, or null for the pass of the test call]
   const shapes = [
     ['src/pages/lead.html', 'Welcome <b>home</b>\n', 'Hello <b>home</b>\n', un('src/pages/lead.html')],
@@ -1292,17 +1293,23 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['src/pages/tail.html', '<p>Save<\n', '<p>Store<\n', inexact('src/pages/tail.html')],
     ['src/pages/heart.html', '<p>Save <3</p>\n', '<p>Store <3</p>\n', un('src/pages/heart.html')],
     ['src/pages/grow.html', '<p>a</p>\n', '<p>a</p>\n<p>b</p>\n', un('src/pages/grow.html')],
+    // Since the ninth round (the decisions at review of 2026-10-09) a file is a catalogue only
+    // under a language tag or a wording bundle's name, so the catalogue rows whose names were
+    // neither moved into a language folder (`en/`); a catalogue is read whole, in a strict
+    // subset of its format, and a file outside that subset "holds something I cannot follow"
+    // where it was "not recognised" (a continued line, text after a quoted value, an anchor,
+    // a comment after a value); and a list line `- value` is wording now.
     ['locales/num.json', '{\n  "count": 1,\n  "x": "y"\n}\n', '{\n  "count": 2,\n  "x": "y"\n}\n', un('locales/num.json')],
-    ['locales/grow.json', '{\n  "a": "b"\n}\n', '{\n  "a": "b",\n  "c": "d"\n}\n', un('locales/grow.json')],
-    ['lang/cont.properties', 'a=Save \\\n  more\n', 'a=Store \\\n  more\n', un('lang/cont.properties')],
-    ['lang/comment.properties', '# Save\na=b\n', '# Store\na=b\n', un('lang/comment.properties')],
-    ['i18n/list.yaml', '- Save\n', '- Store\n', un('i18n/list.yaml')],
-    ['i18n/blank.yaml', 'title: Old\n', 'title:   \n', un('i18n/blank.yaml')],
-    ['i18n/dq.yaml', 'save: "Save" now\n', 'save: "Store" now\n', un('i18n/dq.yaml')],
+    ['locales/en/grow.json', '{\n  "a": "b"\n}\n', '{\n  "a": "b",\n  "c": "d"\n}\n', un('locales/en/grow.json')],
+    ['lang/en/cont.properties', 'a=Save \\\n  more\n', 'a=Store \\\n  more\n', lost('lang/en/cont.properties')],
+    ['lang/en/comment.properties', '# Save\na=b\n', '# Store\na=b\n', un('lang/en/comment.properties')],
+    ['i18n/en/list.yaml', '- Save\n', '- Store\n', NO_TEST],
+    ['i18n/en/blank.yaml', 'title: Old\n', 'title:   \n', un('i18n/en/blank.yaml')],
+    ['i18n/dq.yaml', 'save: "Save" now\n', 'save: "Store" now\n', lost('i18n/dq.yaml')],
     ['i18n/sq.yaml', "save: 'Save'\n", "save: 'Store'\n", NO_TEST],
-    ['i18n/sqbad.yaml', "save: 'Save' x\n", "save: 'Store' x\n", un('i18n/sqbad.yaml')],
-    ['i18n/anchor.yaml', 'save: &a Save\n', 'save: &a Store\n', un('i18n/anchor.yaml')],
-    ['i18n/hash.yaml', 'save: Save # c\n', 'save: Store # c\n', un('i18n/hash.yaml')],
+    ['i18n/en/sqbad.yaml', "save: 'Save' x\n", "save: 'Store' x\n", lost('i18n/en/sqbad.yaml')],
+    ['i18n/en/anchor.yaml', 'save: &a Save\n', 'save: &a Store\n', lost('i18n/en/anchor.yaml')],
+    ['i18n/en/hash.yaml', 'save: Save # c\n', 'save: Store # c\n', lost('i18n/en/hash.yaml')],
     ['src/styles/start.css', 'a {\n  color:\nred;\n}\n', 'a {\n  color:\nblue;\n}\n', un('src/styles/start.css')],
     ['src/styles/two.css', 'a { border: 1px solid red; color: blue; }\n', 'a { border: 1px solid red; color: green; }\n', NO_TEST],
     ['src/styles/grow.css', 'a { color: red; }\n', 'a { color: red; }\nb { color: red; }\n', un('src/styles/grow.css')],
@@ -1333,7 +1340,9 @@ test('edge shapes of every kind give the exact verdict', async () => {
     // (2026-10-09) it is a front matter left open, and the change is unreadable.
     ['docs/rule.md', '---\nOld text.\n', '---\nNew text.\n', inexact('docs/rule.md')],
     ['docs/bom.md', '\uFEFF---\ntitle: a\n---\nBody.\n', '\uFEFF---\ntitle: b\n---\nBody.\n', inexact('docs/bom.md')],
-    ['locales/esc.json', '{\n  "help": "Help"\n}\n', '{\n  "help": "\\u006aavascript:alert()"\n}\n', un('locales/esc.json')],
+    // (An escape JSON.stringify would not write is outside the form the JSON reader follows
+    // since the ninth round: the file is refused before the value is read as an address.)
+    ['locales/esc.json', '{\n  "help": "Help"\n}\n', '{\n  "help": "\\u006aavascript:alert()"\n}\n', lost('locales/esc.json')],
     ['src/pages/opt.html', '<option title="no value here">Red</option>\n', '<option title="no value here">Blue</option>\n', un('src/pages/opt.html')],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
@@ -1544,13 +1553,15 @@ test('finding 2a: the first failing test is read from blank lines in linear time
 });
 
 test('finding 2b: a catalogue line with trailing spaces is read in linear time', async (t) => {
+  // Since the ninth round the JSON reader is JSON.parse itself (no pattern reads a line any
+  // more), and a file that does not parse "holds something I cannot follow".
   const base = '{\n  "save": "Save"\n}\n';
   const root = makeRepo({ 'locales/en.json': base });
   fs.writeFileSync(path.join(root, 'locales', 'en.json'), `{\n  "save": "Store"${' '.repeat(1000)}x\n}\n`);
-  assert.equal((await check(root, 'locales/en.json')).text, refusal('I do not recognise locales/en.json as wording or a colour'));
+  assert.equal((await check(root, 'locales/en.json')).text, refusal('I could not read the change (locales/en.json holds something I cannot follow)'));
   const at = (n) => {
     const change = changeOf('locales/en.json', base, `{\n  "save": "Store"${' '.repeat(1000 * n)}x\n}\n`);
-    return () => assert.equal(ruleRefusal(change).cause, 'unrecognised');
+    return () => assert.equal(ruleRefusal(change).cause, 'unreadable');
   };
   const { n, small, big, ratio } = await growth(at, 16, 1600);
   t.diagnostic(`${n} thousand trailing spaces: ${small.toFixed(1)} ms, ${4 * n} thousand: ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
@@ -1942,13 +1953,17 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
     // A catalogue line whose state at its start is not a fresh entry: inside a YAML block
     // scalar, a quoted value or a flow collection begun above, or a properties value
     // continued from the line above.
-    ['i18n/block.yaml', 'desc: |\n  save: Save\n', 'desc: |\n  save: Store\n', lost('i18n/block.yaml')],
-    ['i18n/folded.yaml', 'desc: >-\n  save: Save\nnext: Hi\n', 'desc: >-\n  save: Store\nnext: Hi\n', lost('i18n/folded.yaml')],
-    ['i18n/quoted.yaml', 'a: "one\n  b: two"\n', 'a: "one\n  b: three"\n', lost('i18n/quoted.yaml')],
-    ['i18n/flow.yaml', 'a: [one,\n  b: two]\n', 'a: [one,\n  b: three]\n', lost('i18n/flow.yaml')],
-    ['lang/cont.properties', 'a=Save \\\nb=Cancel\n', 'a=Save \\\nb=Close\n', lost('lang/cont.properties')],
-    ['i18n/after-block.yaml', 'desc: |\n  Long text.\nsave: Save\n', 'desc: |\n  Long text.\nsave: Store\n', null],
-    ['lang/after-cont.properties', 'a=Save \\\n  more\nb=Cancel\n', 'a=Save \\\n  more\nb=Close\n', null],
+    // Since the ninth round (the decisions at review of 2026-10-09) a catalogue is read whole in
+    // a strict subset, so a block scalar or a continued line anywhere refuses the file, also
+    // above the changed line (the last two rows passed); the files moved into `en/` because a
+    // catalogue's name or folder now holds a language tag.
+    ['i18n/en/block.yaml', 'desc: |\n  save: Save\n', 'desc: |\n  save: Store\n', lost('i18n/en/block.yaml')],
+    ['i18n/en/folded.yaml', 'desc: >-\n  save: Save\nnext: Hi\n', 'desc: >-\n  save: Store\nnext: Hi\n', lost('i18n/en/folded.yaml')],
+    ['i18n/en/quoted.yaml', 'a: "one\n  b: two"\n', 'a: "one\n  b: three"\n', lost('i18n/en/quoted.yaml')],
+    ['i18n/en/flow.yaml', 'a: [one,\n  b: two]\n', 'a: [one,\n  b: three]\n', lost('i18n/en/flow.yaml')],
+    ['lang/en/cont.properties', 'a=Save \\\nb=Cancel\n', 'a=Save \\\nb=Close\n', lost('lang/en/cont.properties')],
+    ['i18n/en/after-block.yaml', 'desc: |\n  Long text.\nsave: Save\n', 'desc: |\n  Long text.\nsave: Store\n', lost('i18n/en/after-block.yaml')],
+    ['lang/en/after-cont.properties', 'a=Save \\\n  more\nb=Cancel\n', 'a=Save \\\n  more\nb=Close\n', lost('lang/en/after-cont.properties')],
     // A file emptied is the content of a removal, never wording (found by the cut-short property case).
     ['notes/emptied.txt', 'Old words.\n', '', un('notes/emptied.txt')],
     ['notes/filled.txt', '', 'New words.\n', un('notes/filled.txt')],
@@ -1998,6 +2013,7 @@ test('round 4: CTOC\'s enforcement list applies only in CTOC\'s own repository',
 // Sass now assert that each such file is a kind the check does not recognise.
 test('round 3: the whole-file scanners read script escape states, titles, comments, stylesheet strings and Markdown code spans; JSX, Vue, Sass and reStructuredText files are not recognised', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
   const shapes = [
     // A script block's escape states: `</script>` inside `<!--<script>` does not end it.
@@ -2013,12 +2029,16 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
     // escape is not wording.
     ['i18n/esc.yaml', 'title: "Save"\n', 'title: "Sto\\x72e"\n', null],
     ['i18n/at.yaml', 'title: "Save"\n', 'title: "Mail \\u0040x"\n', risk('i18n/at.yaml')],
-    ['i18n/short.yaml', 'title: "Save"\n', 'title: "Sto\\x7"\n', un('i18n/short.yaml')],
-    ['i18n/plain.yaml', 'title: Save\n', 'title: Store: now\n', un('i18n/plain.yaml')],
-    ['i18n/hashstart.yaml', 'title: Save\n', 'title: #Store\n', un('i18n/hashstart.yaml')],
+    // Since the ninth round a YAML or JSON file outside the strict subset "holds something I
+    // cannot follow" (an escape YAML does not know, a second `: ` in a plain value, a comment
+    // in place of a value, a raw tab in a JSON string); the files whose names are no language
+    // tag moved into `en/`.
+    ['i18n/en/short.yaml', 'title: "Save"\n', 'title: "Sto\\x7"\n', lost('i18n/en/short.yaml')],
+    ['i18n/en/plain.yaml', 'title: Save\n', 'title: Store: now\n', lost('i18n/en/plain.yaml')],
+    ['i18n/en/hashstart.yaml', 'title: Save\n', 'title: #Store\n', lost('i18n/en/hashstart.yaml')],
     ['lang/uni.properties', 'title=Save\n', 'title=Sto\\u0072e\n', null],
-    ['lang/badu.properties', 'title=Save\n', 'title=Sto\\u00zz\n', un('lang/badu.properties')],
-    ['locales/ctl.json', '{\n  "title": "Save"\n}\n', '{\n  "title": "Sto\tre"\n}\n', un('locales/ctl.json')],
+    ['lang/en/badu.properties', 'title=Save\n', 'title=Sto\\u00zz\n', un('lang/en/badu.properties')],
+    ['locales/ctl.json', '{\n  "title": "Save"\n}\n', '{\n  "title": "Sto\tre"\n}\n', lost('locales/ctl.json')],
     // Stylesheets: a colour function in its space form, a string, a colour beside a `url(…)`.
     ['src/styles/space.css', 'a { color: rgb(1 2 3 / 50%); }\n', 'a { color: rgb(1 2 4 / 50%); }\n', null],
     ['src/styles/badfn.css', 'a { color: rgb(1 2 3); }\n', 'a { color: rgb(1 2 3 / 4 / 5); }\n', un('src/styles/badfn.css')],
@@ -2912,6 +2932,188 @@ test('round 9: Markdown — size before content, a raw start tag anywhere, colon
   const root = makeRepo(base);
   const wrong = [];
   for (const [item, p, b, n, expected] of shapes) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    const want = expected === null ? STATUS_LINE : refusal(expected);
+    if (res.text !== want) wrong.push(`${item} ${p} ${JSON.stringify(b)}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
+    else if (expected === null) assertChecking(res, [p]);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+// The ninth round, catalogue files (decisions at review of 2026-10-09). A file is a catalogue
+// only under a language tag or a wording bundle's name, and never under a dependency, build
+// or settings name; JSON is read with JSON.parse on both sides; YAML and properties files are
+// read whole in a strict subset; and the wording rule also refuses every number character, a
+// format character, a bare host, a scheme anywhere and a change in the sequence of
+// placeholders. Every row marked `red` answered otherwise on `4212d9ff`.
+// [item, path, base content, new content, the clause, or null for `checking`]
+test('round 9: catalogue files — recognition, JSON by JSON.parse, strict YAML and properties, the wording rule', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
+  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  const build = (f) => `it changes how the project is built or shipped in ${f}`;
+  const deps = (f) => `it changes the dependencies in ${f}`;
+  const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
+  const json = (o) => `${JSON.stringify(o, null, 2)}\n`;
+  let count = 0;
+  /** One row from a template holding `@`; without a name, a catalogue file named for the item. */
+  const row = (item, ext, template, [o, n], expected, name = null) => {
+    const p = name || `locales/r9/en/${String(item).replace(/[^a-z0-9]+/gi, '-')}-${++count}.${ext}`;
+    return [item, p, template.replace('@', o), template.replace('@', n), typeof expected === 'function' ? expected(p) : expected];
+  };
+  const shapes = [
+    // 1. Recognition (red): a dependency, build or settings name is decided before the
+    // catalogue kind, in any letter case, wherever the file lies.
+    ['name', 'packages/i18n/package.json', json({ name: 'i18n', description: 'Old texts' }), json({ name: 'i18n', description: 'New texts' }), deps('packages/i18n/package.json')],
+    ['name', 'locales/package.json', json({ name: 'x', scripts: { test: 'node run tests' } }), json({ name: 'x', scripts: { test: 'echo skipped' } }), deps('locales/package.json')],
+    ['name', 'messages/docker-compose.yml', 'services:\n  web:\n    image: app\n', 'services:\n  web:\n    image: other\n', build('messages/docker-compose.yml')],
+    ['name', 'messages/docker-compose.override.yml', 'services:\n  web:\n    image: app\n', 'services:\n  web:\n    image: other\n', build('messages/docker-compose.override.yml')],
+    ['name', 'translations/pnpm-lock.yaml', 'lockfileVersion: old\n', 'lockfileVersion: new\n', deps('translations/pnpm-lock.yaml')],
+    ['name', 'i18n/tsconfig.json', json({ compilerOptions: { module: 'commonjs' } }), json({ compilerOptions: { module: 'esnext' } }), setting('i18n/tsconfig.json')],
+    ['name', 'i18n/tsconfig.build.json', json({ extends: 'base' }), json({ extends: 'other' }), setting('i18n/tsconfig.build.json')],
+    ['name', 'i18n/jsconfig.json', json({ extends: 'base' }), json({ extends: 'other' }), setting('i18n/jsconfig.json')],
+    ['name', 'messages/application.properties', 'spring.profiles.active=dev\n', 'spring.profiles.active=prod\n', setting('messages/application.properties')],
+    ['name', 'messages/application-prod.yml', 'mode: dev\n', 'mode: prod\n', setting('messages/application-prod.yml')],
+    ['name', 'locales/app.config.json', json({ mode: 'dev' }), json({ mode: 'prod' }), setting('locales/app.config.json')],
+    ['name', 'lang/Composer.JSON', json({ name: 'old' }), json({ name: 'new' }), deps('lang/Composer.JSON')],
+    ['name', 'locales/PACKAGE-LOCK.json', json({ name: 'old' }), json({ name: 'new' }), deps('locales/PACKAGE-LOCK.json')],
+    // A catalogue folder alone is no catalogue (red): the name or a folder below it is a
+    // language tag, or the name is a wording bundle's.
+    ['tag', 'i18n/routes.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('i18n/routes.json')],
+    ['tag', 'locales/settings.yml', 'mode: dark\n', 'mode: light\n', setting('locales/settings.yml')],
+    ['tag', 'messages/config.properties', 'mode=dark\n', 'mode=light\n', setting('messages/config.properties')],
+    ['tag', 'src/locales/index.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('src/locales/index.json')],
+    ['tag', 'locales/english.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('locales/english.json')],
+    ['tag', 'locales/messages_english.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('locales/messages_english.json')],
+    // The shapes that qualify (guards): a tag as the name, a tag as a folder, a bundle with a
+    // tag behind `_`, a bundle alone, a tag with a region or a script.
+    ['tag', 'locales/en.json', json({ home: 'Start' }), json({ home: 'Begin' }), null],
+    ['tag', 'locales/de/common.json', json({ home: 'Start' }), json({ home: 'Begin' }), null],
+    ['tag', 'i18n/messages_fr.properties', 'home=Start\n', 'home=Begin\n', null],
+    ['tag', 'config/locales/en.yml', 'en:\n  home: Start\n', 'en:\n  home: Begin\n', null],
+    ['tag', 'lang/pt_BR/app.yaml', 'home: Start\n', 'home: Begin\n', null],
+    ['tag', 'locales/zh-Hans.json', json({ home: 'Start' }), json({ home: 'Begin' }), null],
+    ['tag', 'translations/Strings.json', json({ home: 'Start' }), json({ home: 'Begin' }), null],
+    ['tag', 'messages/labels_en-US.yml', 'home: Start\n', 'home: Begin\n', null],
+    // 2. JSON is read with JSON.parse on both sides: the same keys in the same order, the same
+    // types, and only string leaves differ. A string in a list is wording too (red: the line
+    // reader knew only `"key": "value"`).
+    row('json', 'json', json({ days: ['one day', '@'], menu: { save: 'Save' } }), ['many days', 'several days'], null),
+    row('json', 'json', json({ menu: { save: '@', more: [{ label: 'Help' }] } }), ['Save', 'Store'], null),
+    row('json, not wording', 'json', json({ save: 'Save', count: 0 }).replace('0', '@'), ['1', '2'], un),
+    row('json', 'json', json({ save: 'Save', flag: '@' }), ['yes', 'no'], null),
+    ['json, not wording', 'locales/r9/en/typed.json', json({ flag: 'yes' }), json({ flag: true }), un('locales/r9/en/typed.json')],
+    ['json, not wording', 'locales/r9/en/key.json', json({ save: 'Save', cancel: 'Cancel' }), json({ store: 'Save', cancel: 'Cancel' }), un('locales/r9/en/key.json')],
+    ['json, not wording', 'locales/r9/en/order.json', json({ a: 'One', b: 'Two' }), json({ b: 'Two', a: 'One' }), un('locales/r9/en/order.json')],
+    ['json, not wording', 'locales/r9/en/indent.json', '{\n  "a": "Old"\n}\n', '{\n    "a": "New"\n}\n', un('locales/r9/en/indent.json')],
+    // A duplicate key, a comment, a trailing comma, another formatting than JSON.stringify
+    // writes: the parse or the comparison with the parsed value fails (red: each passed).
+    row('json, duplicate key', 'json', '{\n  "save": "@",\n  "save": "Keep"\n}\n', ['Save', 'Store'], lost),
+    row('json, duplicate key', 'json', '{\n  "save": "Keep",\n  "save": "@"\n}\n', ['Save', 'Store'], lost),
+    row('json, comment', 'json', '{\n  // a note\n  "save": "@"\n}\n', ['Save', 'Store'], lost),
+    row('json, trailing comma', 'json', '{\n  "save": "@",\n}\n', ['Save', 'Store'], lost),
+    row('json, other form', 'json', '{\n  "save" : "@"\n}\n', ['Save', 'Store'], lost),
+    row('json, other form', 'json', '{\n  "save": "caf\\u00e9 @"\n}\n', ['old', 'new'], lost),
+    row('json, other form', 'json', '{ "save": "@" }\n', ['Save', 'Store'], lost),
+    row('json, other form', 'json', '\ufeff{\n  "save": "@"\n}\n', ['Save', 'Store'], lost),
+    row('json, other form', 'json', '{\n  "2": "b",\n  "1": "@"\n}\n', ['Save', 'Store'], lost),
+    // The forms that are JSON.stringify's own qualify: two or four spaces, a tab, one line,
+    // with or without a last line break, Windows line endings.
+    row('json, form', 'json', '{\n    "save": "@"\n}\n', ['Save', 'Store'], null),
+    row('json, form', 'json', '{\n\t"save": "@"\n}', ['Save', 'Store'], null),
+    // One line holds every string of the catalogue, so a change to all of them would count as
+    // two changed lines: a file with no indentation is refused, as the line reader refused it.
+    row('json, other form', 'json', '{"save":"@"}\n', ['Save', 'Store'], lost),
+    row('json, form', 'json', '{\r\n  "save": "@"\r\n}\r\n', ['Save', 'Store'], null),
+    // 3. YAML: a strict subset, and the whole file is refused for anything outside it (red:
+    // each line was read alone, so what stood on other lines was never seen).
+    row('yaml', 'yml', '---\n# The catalogue\nmenu:\n  save: @\n  days:\n    - Monday\n  list:\n  - "one"\n  - \'two\'\n\nnext: Hi\n', ['Save', 'Store'], null),
+    row('yaml', 'yml', 'days:\n  - @\n  - Tuesday\n', ['Monday', 'Mondays'], null),
+    row('yaml', 'yml', 'save: "@ it\\x21"\n', ['Save', 'Store'], null),
+    row('yaml, a tag', 'yml', 'desc: !!str |\n  save: @\n', ['Save', 'Store'], lost),
+    row('yaml, an anchor', 'yml', 'desc: &a |\n  save: @\n', ['Save', 'Store'], lost),
+    row('yaml, a tab', 'yml', 'desc:\t|\n  save: @\n', ['Save', 'Store'], lost),
+    row('yaml, a quoted key', 'yml', '"a: b": |\n  save: @\n', ['Save', 'Store'], lost),
+    row('yaml, a quoted scalar over lines', 'yml', '- "one\n  save: @"\n', ['Save', 'Store'], lost),
+    row('yaml, a flow collection over lines', 'yml', '- { a: one,\n    b: two@ }\n', ['', ', c'], lost),
+    row('yaml, an alias', 'yml', 'a: &x Save\nb: *x\nc: @\n', ['Old', 'New'], lost),
+    row('yaml, a document marker', 'yml', 'a: @\n---\nb: x\n', ['Old', 'New'], lost),
+    row('yaml, a document marker', 'yml', 'a: @\n...\n', ['Old', 'New'], lost),
+    row('yaml, a scalar over lines', 'yml', 'a: @ words\n  and more\n', ['Old', 'New'], lost),
+    row('yaml, a complex key', 'yml', '? a\n: @\n', ['Old', 'New'], lost),
+    row('yaml, a duplicate key', 'yml', 'save: @\nsave: Keep\n', ['Save', 'Store'], lost),
+    row('yaml, a duplicate key', 'yml', 'menu:\n  save: @\nother:\n  save: Keep\nmenu:\n  x: y\n', ['Save', 'Store'], lost),
+    row('yaml, a key that is no word', 'yml', 'on: @\n', ['Old', 'New'], lost),
+    row('yaml, a key that is no word', 'yml', '404: @ found\n', ['Not', 'Never'], lost),
+    row('yaml, the indentation', 'yml', 'a: x\n  b: @\n', ['Old', 'New'], lost),
+    row('yaml, the indentation', 'yml', 'a:\n    b: @\n  c: x\n', ['Old', 'New'], lost),
+    row('yaml, a comment after a value', 'yml', 'a: @ # note\n', ['Old', 'New'], lost),
+    row('yaml, a carriage return on its own', 'yml', 'a: @\rb: x\n', ['Old', 'New'], lost),
+    // A changed value that is no string for a YAML reader, or no wording.
+    row('yaml, not wording', 'yml', 'limit: @\n', ['.inf', '.nan'], un),
+    row('yaml, not wording', 'yml', 'flag: @\n', ['True', 'False'], un),
+    row('yaml, not wording', 'yml', 'a: @\n', ['Old', '"Old"'], un),
+    row('yaml, not wording', 'yml', 'a: "@"\n', ['Old', 'O\\x6cd'], un),
+    ['yaml, not wording', 'locales/r9/en/comment.yml', '# Old note\na: x\n', '# New note\na: x\n', un('locales/r9/en/comment.yml')],
+    ['yaml, not wording', 'locales/r9/en/spaces.yml', 'a: Old\n', 'a: New \n', un('locales/r9/en/spaces.yml')],
+    // 4. Properties: the key ends at the first unescaped `=`, `:` or white space (red).
+    row('properties', 'properties', 'a\\=b=@\n', ['value', 'other'], un),
+    ['properties', 'locales/r9/en/escaped-key.properties', 'a\\=b=value\n', 'a\\=c=value\n', un('locales/r9/en/escaped-key.properties')],
+    row('properties', 'properties', 'a\\:b : @\n', ['Old', 'New'], un),
+    row('properties', 'properties', 'key\\ one = @\n', ['Old', 'New'], un),
+    // A changed line needs `=` or `:` right behind its key: where white space ends the key, a
+    // reader that splits at the first `=` takes another key than Java does.
+    row('properties', 'properties', 'greeting @ there\n', ['Hello', 'Welcome'], un),
+    ['properties', 'locales/r9/en/key-space.properties', 'a b=Old\n', 'a c=Old\n', un('locales/r9/en/key-space.properties')],
+    ['properties', 'locales/r9/en/key-space-value.properties', 'a b=Old\n', 'a b=New\n', un('locales/r9/en/key-space-value.properties')],
+    row('properties', 'properties', '  greeting = @ there\n! a note\n# another\n\nkey:value\nword alone\n', ['Hello', 'Welcome'], null),
+    // A continued line anywhere refuses the file.
+    row('properties, a continued line', 'properties', 'a=@\nb=one \\\n  two\n', ['Old', 'New'], lost),
+    row('properties, a continued line', 'properties', '# note \\\na=@\n', ['Old', 'New'], lost),
+    row('properties, a continued line', 'properties', 'a=@ \\\\\nb=x\n', ['Old', 'New'], lost),
+    // 5. The wording rule (red): every number character, a format character, a bare host, a
+    // scheme anywhere, and the placeholders in their order.
+    row('wording', 'json', json({ a: 'See account.example.@' }), ['com', 'net'], risk),
+    row('wording', 'json', json({ a: 'Read [the guide](@)' }), ['/guide', 'javascript:steal()'], un),
+    row('wording', 'json', json({ a: 'Write @' }), ['to us', 'mailto:x'], un),
+    ['wording', 'locales/r9/en/bell.json', json({ a: 'Ring' }), json({ a: 'Ring\u0007' }), risk('locales/r9/en/bell.json')],
+    row('wording', 'json', json({ a: 'Save@' }), ['', '\u202e'], risk),
+    row('wording', 'json', json({ a: 'Step @' }), ['two', '\u2461'], risk),
+    row('wording', 'json', json({ a: 'Part @' }), ['eight', '\u2167'], risk),
+    row('wording', 'yml', 'a: Hello @\n', [':name', ':email'], un),
+    row('wording', 'json', json({ a: '@' }), ['%s of %d', '%d of %s'], un),
+    row('wording', 'json', json({ a: 'Hi @' }), ['$name', '$user'], un),
+    row('wording', 'json', json({ a: 'Hi @' }), ['%{name}', '%{user}'], un),
+    row('wording', 'properties', 'a=Hi @\n', ['%1$s and %2$s', '%2$s and %1$s'], un),
+    // The placeholders stay as they are and the words around them change (guards).
+    row('wording', 'json', json({ a: '@ :name, %s, %1$s, {n}, {{m}}, %{k} and $x' }), ['Hello', 'Welcome'], null),
+    row('wording', 'json', json({ a: 'Note: the @ way, e.g. this one (short).' }), ['old', 'new'], null),
+    // The same rule in HTML text.
+    ['wording', 'src/pages/r9-host.html', '<p>See account.example.com now</p>\n', '<p>See account.example.net now</p>\n', risk('src/pages/r9-host.html')],
+    ['wording', 'src/pages/r9-scheme.html', '<p>Write to us</p>\n', '<p>Write mailto:us</p>\n', risk('src/pages/r9-scheme.html')],
+    ['wording', 'src/pages/r9-numeral.html', '<p>Step two</p>\n', '<p>Step \u2461</p>\n', risk('src/pages/r9-numeral.html')],
+    // 6. A byte-order mark on one side only, or another number of carriage returns (red for
+    // the YAML file and the stylesheet; an HTML page was let through with every line ending changed).
+    ['mark', 'locales/r9/en/mark.yml', 'a: Old\n', '\ufeffa: New\n', un('locales/r9/en/mark.yml')],
+    ['mark', 'locales/r9/en/mark-kept.yml', '\ufeffa: Old\n', '\ufeffa: New\n', null],
+    ['mark', 'locales/r9/en/returns.yml', 'a: Old\nb: x\n', 'a: New\nb: x\r\n', un('locales/r9/en/returns.yml')],
+    ['mark', 'locales/r9/en/returns-kept.yml', 'a: Old\r\nb: x\r\n', 'a: New\r\nb: x\r\n', null],
+    ['mark', 'src/styles/r9-mark.css', 'a { color: red; }\n', '\ufeffa { color: blue; }\n', un('src/styles/r9-mark.css')],
+    ['mark', 'src/styles/r9-returns.css', 'a { color: red; }\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n', un('src/styles/r9-returns.css')],
+    ['mark', 'src/pages/r9-returns.html', '<p>Save</p>\n<p>More</p>\n', '<p>Store</p>\n<p>More</p>\r\n', un('src/pages/r9-returns.html')],
+    ['mark', 'locales/r9/en/returns.properties', 'a=Old\nb=x\n', 'a=New\nb=x\r\n', un('locales/r9/en/returns.properties')]
+  ];
+  const base = {};
+  for (const [, p, b] of shapes) {
+    assert.equal(base[p], undefined, `${p} is used once`);
+    base[p] = b;
+  }
+  const root = makeRepo(base);
+  const wrong = [];
+  for (const [item, p, b, n, expected] of shapes) {
+    assert.notEqual(b, n, `${p} holds a change`);
     fs.writeFileSync(path.join(root, ...p.split('/')), n);
     const res = await check(root, p);
     fs.writeFileSync(path.join(root, ...p.split('/')), b);

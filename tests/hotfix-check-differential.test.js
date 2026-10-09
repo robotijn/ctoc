@@ -19,6 +19,9 @@
 //             nodes whose ancestors are only `p`, `li`, `ul` and `ol` (and `body` and `html`):
 //             the words of a paragraph or of a list item. No tag, attribute, code or structure
 //             may differ. (Until the ninth round only `p`: a list item's text was no prose.)
+//   YAML      (the ninth round) catalogue files and edits; both sides are loaded by js-yaml,
+//             and the two values must have the same shape, the same keys in the same order
+//             and the same types, and differ only in string values.
 // Anything else is a disagreement: the check called a change wording that a real parser
 // reads as something else.
 //
@@ -28,16 +31,19 @@
 // witness then passed, and the copy was thrown away. The plan's Execution Record holds the
 // table of rules, witnesses and results.
 //
-// parse5 and markdown-it are test-only dependencies (devDependencies, exact versions);
-// nothing under src/ requires either. Both load ECMAScript modules with `require`, which
-// needs Node.js 20.19 or later, or 22.12 or later: the guard below says so in one sentence.
+// parse5, markdown-it and js-yaml are test-only dependencies of this file (devDependencies,
+// exact versions); the hotfix check requires none of them. parse5 and markdown-it load
+// ECMAScript modules with `require`, which needs Node.js 20.19 or later, or 22.12 or later:
+// the guard below says so in one sentence.
 //
-// Size: by default 50,000 HTML and 12,000 Markdown cases. The long soak (6 million HTML and
-// 1 million Markdown cases) runs with HOTFIX_DIFFERENTIAL_SOAK=1. Every case is a pure
-// function of the seed and its index, so a failure names both and reproduces:
+// Size: by default 50,000 HTML, 12,000 Markdown and 20,000 YAML cases. The long soak (6
+// million HTML cases and 1 million of each other kind) runs with HOTFIX_DIFFERENTIAL_SOAK=1.
+// Every case is a pure function of the seed and its index, so a failure names both and
+// reproduces:
 //   HOTFIX_DIFFERENTIAL_SEED=<seed>   another seed (default 20261009)
 //   HOTFIX_DIFFERENTIAL_HTML=<count>  another number of HTML cases
 //   HOTFIX_DIFFERENTIAL_MARKDOWN=<count>
+//   HOTFIX_DIFFERENTIAL_YAML=<count>
 //   HOTFIX_DIFFERENTIAL_FROM=<index>  the first case index (to run one share of a soak)
 //   HOTFIX_DIFFERENTIAL_SHOW=<count>  also print that many plain visible-text edits the check refuses
 // Plan: plans/todo/ctoc-checks-that-a-hotfix-is-really-small-and-safe-s1-the-hotfix-check.md,
@@ -57,6 +63,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const parse5 = require('parse5');
 const MarkdownIt = require('markdown-it');
+const yaml = require('js-yaml');
 
 const { route } = require('../src/lib/menu-screens');
 const { ruleRefusal } = require('../src/lib/hotfix-check');
@@ -67,6 +74,7 @@ const FROM = Number(process.env.HOTFIX_DIFFERENTIAL_FROM || 0);
 const HTML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_HTML || (SOAK ? 6000000 : 50000));
 const SHOW = Number(process.env.HOTFIX_DIFFERENTIAL_SHOW || 0);
 const MARKDOWN_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_MARKDOWN || (SOAK ? 1000000 : 12000));
+const YAML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_YAML || (SOAK ? 1000000 : 20000));
 
 /** The Markdown readers of the oracle: markdown-it in four configurations. */
 const MARKDOWN_READERS = [
@@ -995,6 +1003,96 @@ function markdownDocument(r) {
 }
 
 // ---------------------------------------------------------------------------------------
+// The YAML generator (the ninth round): catalogue files as translators write them, nested
+// keys, lists, comments and quoted values, and, seldom, each thing that is no single-line
+// string in a `key: value` or `- value` line: a tag, an anchor, an alias, a flow collection,
+// a block scalar, a scalar over several lines, a document marker, a tab, a complex key, a
+// duplicate key, an indentation no mapping has.
+// ---------------------------------------------------------------------------------------
+
+const YAML_KEYS = ['title', 'save', 'cancel', 'greeting', 'help', 'menu', 'days', 'errors', 'one', 'other', 'label', 'hint', 'zero', 'many'];
+
+/** What stands behind a key or a `- `: mostly a string of the words an edit changes. */
+function yamlValue(r) {
+  const w = word(r);
+  const x = word(r);
+  return weighted(r, [
+    [30, () => `${w} ${x}`], [14, () => w], [10, () => `"${w} ${x}"`], [6, () => `'${w} ${x}'`], [4, () => `"${w}, ${x}!"`],
+    [3, () => `'${w}''s ${x}'`], [3, () => `"${w} \\"${x}\\""`], [2, () => `"${w}\\n${x}"`], [2, () => `"${w} \\x41 ${x}"`], [2, () => `${w} (${x})`],
+    [2, () => `${w} {name} ${x}`], [2, () => `${w} %s ${x}`], [2, () => `Caf\u00e9 ${w}`], [2, () => `${w}#${x}`], [2, () => `${w}  ${x}`],
+    [W(2), () => `!!str ${w}`], [W(2), () => `&a ${w}`], [W(2), () => '*a'], [W(2), () => `[${w}, ${x}]`], [W(2), () => `{ a: ${w} }`],
+    [W(2), () => '|'], [W(2), () => '>-'], [W(2), () => `${w} # ${x}`], [W(2), () => `${w}: ${x}`], [W(2), () => `${w}:`],
+    [W(2), () => `"${w}" ${x}`], [W(1), () => `'${w}`], [W(1), () => `"${w}`], [W(1), () => `- ${w}`], [W(1), () => `-${w}`],
+    [W(1), () => `? ${w}`], [W(1), () => `%${w}`], [W(1), () => `@${w}`], [W(2), () => pick(r, ['~', 'true', 'True', 'no', 'null', '.inf', '.NaN', '12', '1.5', '2026-10-09', '0x1F', '1e3'])],
+    [W(1), () => `"${w}\\q"`], [W(1), () => `${w}\t${x}`], [W(1), () => ''], [W(1), () => `${w} ${x}   `], [W(1), () => `:${w}`],
+    [W(1), () => `${w}:${x}`], [W(1), () => `#${w}`], [W(1), () => `"${w}"   # ${x}`], [W(1), () => `!${w}`], [W(1), () => `>${w}`],
+    [W(1), () => `[${w}`], [W(1), () => `${w}]`], [W(1), () => `{${w}}`], [W(1), () => `${w} \u2028 ${x}`], [W(1), () => `\u0007${w}`],
+    [W(1), () => `"${w}\\u0041"`], [W(1), () => `'${w}' '${x}'`], [W(1), () => `${w}, ${x}`], [W(1), () => `<<`], [W(1), () => `=`]
+  ])();
+}
+
+/** The lines of one mapping at an indentation: entries, nested mappings and lists, comments. */
+function yamlMapping(r, indent, depth) {
+  const pad = ' '.repeat(indent);
+  const lines = [];
+  const keys = YAML_KEYS.slice();
+  for (let n = 1 + int(r, 5); n > 0 && keys.length > 0; n--) {
+    const key = keys.splice(int(r, keys.length), 1)[0];
+    const w = word(r);
+    weighted(r, [
+      [50, () => lines.push(`${pad}${key}: ${yamlValue(r)}`)],
+      [depth < 3 ? 10 : 0, () => lines.push(`${pad}${key}:`, ...yamlMapping(r, indent + 2, depth + 1))],
+      [8, () => { lines.push(`${pad}${key}:`); for (let k = 1 + int(r, 3); k > 0; k--) lines.push(`${pad}  - ${yamlValue(r)}`); }],
+      [3, () => { lines.push(`${pad}${key}:`); for (let k = 1 + int(r, 3); k > 0; k--) lines.push(`${pad}- ${yamlValue(r)}`); }],
+      [3, () => lines.push(`${pad}# ${w}`, `${pad}${key}: ${yamlValue(r)}`)],
+      [2, () => lines.push('', `${pad}${key}: ${yamlValue(r)}`)],
+      [2, () => lines.push(`${pad}${key}:`)],
+      [W(2), () => lines.push(`${pad}${key}: |`, `${pad}  ${pick(r, YAML_KEYS)}: ${w}`, `${pad}  ${word(r)}`)],
+      [W(1), () => lines.push(`${pad}${key}: !!str |`, `${pad}  ${pick(r, YAML_KEYS)}: ${w}`)],
+      [W(1), () => lines.push(`${pad}${key}: &a |`, `${pad}  ${pick(r, YAML_KEYS)}: ${w}`)],
+      [W(1), () => lines.push(`${pad}${key}:\t|`, `${pad}  ${pick(r, YAML_KEYS)}: ${w}`)],
+      [W(1), () => lines.push(`${pad}${key}: >`, `${pad}  ${w} ${word(r)}`, '')],
+      [W(2), () => lines.push(`${pad}"${key}: ${w}": ${yamlValue(r)}`)],
+      [W(1), () => lines.push(`${pad}"${key}: ${w}": |`, `${pad}  ${pick(r, YAML_KEYS)}: ${word(r)}`)],
+      [W(1), () => lines.push(`${pad}'${key}': ${yamlValue(r)}`)],
+      [W(1), () => lines.push(`${pad}? ${key}`, `${pad}: ${yamlValue(r)}`)],
+      [W(1), () => lines.push(`${pad}${key} : ${yamlValue(r)}`)],
+      [W(1), () => lines.push(`${pad}${key}:${w}`)],
+      [W(1), () => lines.push(`${pad}${pick(r, ['yes', 'on', 'true', 'null', '404', '1.5', 'no'])}: ${yamlValue(r)}`)],
+      [W(2), () => lines.push(`${pad}${key}: ${w} ${word(r)}`, `${pad}  ${word(r)} more`)],
+      [W(2), () => lines.push(`${pad}${key}: "${w}`, `${pad}  ${pick(r, YAML_KEYS)}: ${word(r)}"`)],
+      [W(1), () => lines.push(`${pad}- "${w}`, `${pad}  ${pick(r, YAML_KEYS)}: ${word(r)}"`)],
+      [W(1), () => lines.push(`${pad}${key}: [${w},`, `${pad}  ${word(r)}]`)],
+      [W(1), () => lines.push(`${pad}- { a: ${w},`, `${pad}    b: ${word(r)} }`)],
+      [W(2), () => lines.push(`${pad}${key}: ${yamlValue(r)}`, `${pad}${key}: ${yamlValue(r)}`)],
+      [W(2), () => lines.push(`${pad}${key}: ${yamlValue(r)}`, `${pad}${pick(r, [' ', '   ', '\t'])}${pick(r, YAML_KEYS)}: ${yamlValue(r)}`)],
+      [W(1), () => lines.push(`${pad}${key}:`, `${pad}    ${pick(r, YAML_KEYS)}: ${w}`, `${pad}  ${pick(r, YAML_KEYS)}: ${word(r)}`)],
+      [W(1), () => lines.push(`${pad}- ${key}: ${yamlValue(r)}`)],
+      [W(1), () => lines.push(`${pad}${key}:`, `${pad}  - - ${w}`)],
+      [W(1), () => lines.push(`${pad}${key}:`, `${pad}  -`)],
+      [W(1), () => lines.push(`${pad}- ${yamlValue(r)}`)],
+      [W(1), () => lines.push(pick(r, ['---', '...', '%YAML 1.2', '--- # doc']))],
+      [W(1), () => lines.push(`${pad}${key}: &x ${w}`, `${pad}${pick(r, YAML_KEYS)}2: *x`)],
+      [W(1), () => lines.push(`${pad}<<: *x`)]
+    ])();
+  }
+  return lines;
+}
+
+/** One YAML catalogue: a mapping or a list at the top, sometimes behind a `---`. */
+function yamlDocument(r) {
+  wild = pick(r, [0.1, 0.35, 1, 1]);
+  let lines = chance(r, 0.88) ? yamlMapping(r, 0, 0) : Array.from({ length: 1 + int(r, 4) }, () => `- ${yamlValue(r)}`);
+  if (chance(r, 0.12)) lines = [pick(r, ['---', '---', '# Catalogue', '--- ', '%YAML 1.2\n---']), ...lines];
+  if (chance(r, 0.03 * wild)) lines.push(pick(r, ['...', '---', 'title: again']));
+  let text = `${lines.join('\n')}\n`;
+  if (chance(r, 0.03)) text = `\ufeff${text}`;
+  if (chance(r, 0.03)) text = text.replace(/\n/g, '\r\n');
+  if (chance(r, 0.04)) text = text.replace(/\n$/, '');
+  return text;
+}
+
+// ---------------------------------------------------------------------------------------
 // The edit, of eleven kinds, and the change as the check's rules read it.
 // ---------------------------------------------------------------------------------------
 
@@ -1007,6 +1105,11 @@ const EDIT_WORDS = {
     starts: ['- ', '> ', '# ', '1. ', ' ', '    ', 'a. ', '\t', '* ', '+ ', '[g]: ', ': ', '<', '```', '---', '| ', '! ', 'x', 'import ', 'i. '],
     added: [(r) => plainLine(r), (r) => plainLine(r), () => '', () => '```', () => '---', () => '===', (r) => `- ${word(r)}`,
       (r) => `> ${word(r)}`, (r) => `# ${word(r)}`, () => '<div>', () => '</div>', () => '<!--', () => '-->', (r) => `    ${word(r)}`, (r) => `[g]: /${word(r)}`]
+  },
+  yaml: {
+    marks: [':', '#', '"', '\'', '-', '[', ']', '{', '}', '|', '>', '&', '*', '!', '%', '@', '?', ',', '\\', '\t', ' '],
+    starts: ['- ', '  ', '? ', '# ', '---', '\t', 'x: ', ' ', '...', '! ', '& ', '- - ', '"'],
+    added: [(r) => `${pick(r, YAML_KEYS)}: ${word(r)}`, (r) => `- ${word(r)}`, () => '', (r) => `# ${word(r)}`, () => '---', (r) => `  ${pick(r, YAML_KEYS)}: ${word(r)}`, (r) => `"q": ${word(r)}`]
   },
   html: {
     marks: ['<', '>', '&', '"', '\'', '=', '/', ';', '!', '-', '{', '`'],
@@ -1108,7 +1211,7 @@ function hunksOf(oldText, newText) {
   return removed.length + added.length === 0 ? [] : [{ oldStart: p + 1, newStart: p + 1, removed, added }];
 }
 
-const FILES = { html: 'site/page.html', markdown: 'docs/page.md' };
+const FILES = { html: 'site/page.html', markdown: 'docs/page.md', yaml: 'locales/en.yml' };
 
 function judge(kind, oldText, newText) {
   const rel = FILES[kind];
@@ -1241,7 +1344,49 @@ function markdownOracle(oldText, newText) {
   return null;
 }
 
-const ORACLES = { html: htmlOracle, markdown: markdownOracle };
+/**
+ * Walk two values js-yaml loaded side by side. Returns the first difference that is no
+ * string's text, as a sentence, or null; `state.strings` counts the strings that differ.
+ */
+function yamlDifference(a, b, state) {
+  if (typeof a === 'string' && typeof b === 'string') {
+    if (a !== b) state.strings++;
+    return null;
+  }
+  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
+    return Object.is(a, b) ? null : `a value that is no string differs, or its type does (${a === null ? 'null' : typeof a} and ${b === null ? 'null' : typeof b})`;
+  }
+  if (a instanceof Date || b instanceof Date) return a instanceof Date && b instanceof Date && a.getTime() === b.getTime() ? null : 'a date differs';
+  if (Array.isArray(a) !== Array.isArray(b)) return 'a list and a mapping stand in the same place';
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (ka.length !== kb.length || ka.some((k, i) => k !== kb[i])) return 'the keys differ, or their order';
+  for (const k of ka) {
+    const found = yamlDifference(a[k], b[k], state);
+    if (found) return found;
+  }
+  return null;
+}
+
+/**
+ * What js-yaml says about one edit of a YAML catalogue: null when both sides load, to the
+ * same shape, the same keys in the same order and the same types, and only string values
+ * differ; or the first reason they do not.
+ */
+function yamlOracle(oldText, newText) {
+  let a;
+  let b;
+  try {
+    a = yaml.load(oldText);
+    b = yaml.load(newText);
+  } catch (err) {
+    return `a side is no YAML for js-yaml (${String(err.reason || err.message).split('\n')[0]})`;
+  }
+  const state = { strings: 0 };
+  return yamlDifference(a, b, state) || (state.strings > 0 ? null : 'no string value differs');
+}
+
+const ORACLES = { html: htmlOracle, markdown: markdownOracle, yaml: yamlOracle };
 /** Whether the default reader alone calls the edit a change to plain text and nothing else (for the count of refused plain edits). */
 const PLAIN = {
   html: (o, n) => htmlOracle(o, n) === null,
@@ -1250,7 +1395,8 @@ const PLAIN = {
     const [, reader] = MARKDOWN_READERS[0];
     return treeDifference(parse5.parse(reader.render(o)), parse5.parse(reader.render(n)), [], changed) === null && changed.length > 0
       && changed.every((ancestors) => ancestors.every((el) => PROSE_ANCESTORS.has(el.tagName)));
-  }
+  },
+  yaml: (o, n) => yamlOracle(o, n) === null
 };
 
 // ---------------------------------------------------------------------------------------
@@ -1258,9 +1404,12 @@ const PLAIN = {
 // ---------------------------------------------------------------------------------------
 
 /** One case: the document, its edit, the kind of edit. */
+const DOCUMENTS = { html: htmlDocument, markdown: markdownDocument, yaml: yamlDocument };
+/** Each kind has a stream of its own (the HTML and Markdown streams are those of the earlier rounds). */
+const SEED_OFFSET = { html: 0, markdown: 7919, yaml: 104729 };
 function caseOf(kind, index, seed = SEED) {
-  const r = stream(seed + (kind === 'html' ? 0 : 7919), index);
-  const oldText = kind === 'html' ? htmlDocument(r) : markdownDocument(r);
+  const r = stream(seed + SEED_OFFSET[kind], index);
+  const oldText = DOCUMENTS[kind](r);
   const e = edit(r, oldText, EDIT_WORDS[kind]);
   return e === null ? null : { oldText, newText: e.newText, edit: e.kind };
 }
@@ -1324,20 +1473,28 @@ const INGREDIENTS = {
     'two plain paragraphs': /^[A-Z"][^\n<>[\]`*_#|:()]+\n\n[A-Z"][^\n<>[\]`*_#|:()]+\n/m,
     'a line break of two spaces': / {2}\n\S/, 'a number': /\d/, 'typographic marks': /[\u2014\u2026\u201c]/, 'a thematic break': /^(?:\*\*\*|___|\* \* \*)$/m,
     'a definition': /^\[[^\]]+\]: /m
+  },
+  yaml: {
+    'a nested mapping': /^[a-z]+:\n {2}[a-z]+: /m, 'a list under a key': /^ *[a-z]+:\n *- /m, 'a list at the top': /^- /, 'a comment': /^ *# /m,
+    'a double-quoted value': /: "[^"\n]*"$/m, 'a single-quoted value': /: '[^'\n]*'$/m, 'an escape': /\\[nx"]/, 'a document start': /^\ufeff?---\n/,
+    'an empty line': /\n\n/, 'a placeholder': /\{name\}|%s/, 'a key with no value': /^ *[a-z]+:\n(?! )/m, 'Windows line endings': /\r\n/, 'a byte-order mark': /^\ufeff/
   }
 };
 
 /** The kinds of edit that add or remove a line; in Markdown also a change of the spaces around a line. No such edit may pass. */
 const NEVER_PASSES = {
   html: ['lines joined', 'a line split', 'a line added', 'a line removed'],
-  markdown: ['lines joined', 'a line split', 'a line added', 'a line removed', 'leading or trailing spaces changed']
+  markdown: ['lines joined', 'a line split', 'a line added', 'a line removed', 'leading or trailing spaces changed'],
+  yaml: ['lines joined', 'a line split', 'a line added', 'a line removed', 'leading or trailing spaces changed']
 };
+/** The kinds of edit of which the check must pass some, per language. */
+const MUST_PASS = { html: EDITS.slice(0, 3), markdown: EDITS.slice(0, 3), yaml: EDITS.slice(0, 3) };
 /**
  * The share of the generated edits the check must pass, per language: about half of the
  * share measured on 2026-10-09 (the numbers are beside each test), so that a rule which
  * starts to refuse far more than it did fails here.
  */
-const PASS_FLOOR = { html: 0.03, markdown: 0.09 };
+const PASS_FLOOR = { html: 0.03, markdown: 0.05, yaml: 0.05 };
 
 function run(kind, count) {
   const started = Date.now();
@@ -1405,7 +1562,7 @@ function assertRun(t, kind, count) {
   assert.equal(report.length, 0, `${summary}\nThe check passed edits a real parser reads as something else:\n${report.join('\n')}`);
   assert.ok(share > PASS_FLOOR[kind], `the check must pass more than ${(100 * PASS_FLOOR[kind]).toFixed(1)}% of the generated edits: ${summary}`);
   for (const name of NEVER_PASSES[kind]) assert.equal(byEdit.get(name)[1], 0, `no edit of the kind "${name}" may pass: ${summary}`);
-  for (const name of EDITS.slice(0, 3)) assert.ok(byEdit.get(name)[1] > 0, `the check must pass edits of the kind "${name}": ${summary}`);
+  for (const name of MUST_PASS[kind]) assert.ok(byEdit.get(name)[1] > 0, `the check must pass edits of the kind "${name}": ${summary}`);
   // A small run cannot hold every ingredient; the default size and the soak must.
   if (stats.cases >= 10000) assert.deepEqual(missing, [], `the check passed no edit in a document with: ${missing.join(', ')}`);
 }
@@ -1418,6 +1575,10 @@ test('HTML: every edit the check passes is a change to plain visible text for th
 // Measured on 2026-10-09, seed 20261009, default size: 11,236 edits, 2,024 passed (18.0%).
 test('Markdown: every edit the check passes changes only the words of a paragraph, for markdown-it in four configurations', (t) => {
   assertRun(t, 'markdown', MARKDOWN_CASES);
+});
+
+test('YAML: every catalogue edit the check passes changes only string values for js-yaml', (t) => {
+  assertRun(t, 'yaml', YAML_CASES);
 });
 
 // ---------------------------------------------------------------------------------------

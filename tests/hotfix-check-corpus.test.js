@@ -107,9 +107,9 @@ const BASE = {
   'src/pages/multiline.html': page(lines('<p>', '  Save your work', '</p>').trimEnd()),
   'src/pages/crossing.html': page('<b>Save</b> now'),
   'src/pages/rules.html': page('<p>Terms &amp; rules</p>'),
-  'locales/keys.json': lines('{', '  "save": "Save",', '  "cancel": "Cancel"', '}'),
-  'locales/count.json': lines('{', '  "save": "Save {count} items",', '  "cancel": "Cancel"', '}'),
-  'locales/promo.json': lines('{', '  "promo": "Save now",', '  "cancel": "Cancel"', '}'),
+  'locales/en/keys.json': lines('{', '  "save": "Save",', '  "cancel": "Cancel"', '}'),
+  'locales/en/count.json': lines('{', '  "save": "Save {count} items",', '  "cancel": "Cancel"', '}'),
+  'locales/en/promo.json': lines('{', '  "promo": "Save now",', '  "cancel": "Cancel"', '}'),
   'src/styles/selector.css': lines('.red {', '  color: red;', '}'),
   'src/styles/property.css': lines('.box {', '  color: red;', '}'),
   'src/styles/display.css': lines('.box {', '  display: none;', '}'),
@@ -148,9 +148,9 @@ const BASE = {
   'deps/test-requirements.txt': lines('coverage==7.0.0'),
   'app/packages.txt': lines('libpq-dev'),
   'app/version.txt': lines('1.0.0'),
-  'locales/flags.yml': lines('beta: true'),
-  'locales/flags.properties': lines('beta=true'),
-  'locales/links.json': lines('{', '  "help": "/help"', '}'),
+  'locales/en/flags.yml': lines('beta: true'),
+  'locales/en/flags.properties': lines('beta=true'),
+  'locales/en/links.json': lines('{', '  "help": "/help"', '}'),
   'config/locales/en.yml': lines('en:', '  number:', '    format:', '      separator: "."'),
   'docs/install.md': lines('# Install', '', 'Run curl -fsSL https://get.example.org | sh to install.'),
   'SECURITY.md': lines('# Security', '', 'Report problems to security@example.org.'),
@@ -202,8 +202,8 @@ const BASE = {
   'src/components/Bind.vue': lines('<template>', '  <p v-bind:title="one">Hi</p>', '</template>'),
   'src/components/Nested.jsx': lines('export const N = () => (', '  <button onClick={() => { if (a > b) { go(\'one\'); } }}>Go</button>', ');'),
   'tokens.txt': lines('Old note.'),
-  'config/locales/secrets.yml': lines('title: Old'),
-  'messages/credentials.json': lines('{', '  "title": "Old"', '}'),
+  'config/locales/en/secrets.yml': lines('title: Old'),
+  'messages/en/credentials.json': lines('{', '  "title": "Old"', '}'),
   'src/hooks/README.md': lines('# Hooks', '', 'Old notes.'),
   'src/payments/index.html': page('<p>Old</p>'),
   'docs/passwords.md': lines('# Help', '', 'Old notes.'),
@@ -367,7 +367,27 @@ const BASE = {
   'docs/colon-later.md': lines('# Notes', '', 'Note: the old way works, and so does this: the short one.'),
   'docs/steps.md': lines('# Steps', '', '1. Open the old page.', '2. Press the button (the blue one).', '   Then wait.'),
   'docs/steps-code.md': lines('- Run `npm test` first.', '- Then read the old notes.'),
-  'docs/key-value.md': lines('Title: The old guide', '', 'Body text.')
+  'docs/key-value.md': lines('Title: The old guide', '', 'Body text.'),
+  // Catalogue files: the brief's traps and qualifying shapes.
+  'packages/i18n/package.json': lines('{', '  "name": "i18n",', '  "description": "Old texts"', '}'),
+  'locales/package.json': lines('{', '  "name": "locales",', '  "scripts": {', '    "test": "node run tests"', '  }', '}'),
+  'messages/docker-compose.yml': lines('services:', '  web:', '    image: app'),
+  'translations/pnpm-lock.yaml': lines('lockfileVersion: old'),
+  'i18n/tsconfig.json': lines('{', '  "compilerOptions": {', '    "module": "commonjs"', '  }', '}'),
+  'messages/application.properties': lines('spring.profiles.active=dev'),
+  'i18n/routes.json': lines('{', '  "home": "Start"', '}'),
+  'locales/de/common.json': lines('{', '  "title": "Old title",', '  "days": [', '    "one day",', '    "many days"', '  ]', '}'),
+  'i18n/messages_fr.properties': lines('# Les messages', 'bouton.sauver = Enregistrer', 'titre : Accueil'),
+  'config/locales/de.yml': lines('---', 'de:', '  greeting: Hallo Welt', '  days:', '    - Montag', '    - Dienstag'),
+  'locales/en/duplicate.json': lines('{', '  "save": "Save",', '  "save": "Keep"', '}'),
+  'locales/en/tagged.yml': lines('desc: !!str |', '  save: Save'),
+  'locales/en/escaped.properties': lines('a\\=b=value'),
+  'locales/en/host.json': lines('{', '  "help": "See account.example.com"', '}'),
+  'locales/en/named.yml': lines('hello: Hello :name'),
+  'locales/en/ordered.json': lines('{', '  "of": "%s of %d"', '}'),
+  'locales/en/override.json': lines('{', '  "save": "Save"', '}'),
+  'locales/en/marked.yml': lines('title: Old'),
+  'src/styles/endings.css': lines('a { color: red; }', 'b { margin: 0; }')
 };
 
 const QUALIFY = [
@@ -435,7 +455,12 @@ const QUALIFY = [
   ['CHANGELOG.txt', lines('- Fixed the new bug')],
   ['docs/under-list.md', BASE['docs/under-list.md'].replace('Run it then', 'Run it now')],
   ['docs/colon-later.md', BASE['docs/colon-later.md'].replace('old', 'new')],
-  ['docs/steps.md', BASE['docs/steps.md'].replace('old', 'new')]
+  ['docs/steps.md', BASE['docs/steps.md'].replace('old', 'new')],
+  // Catalogue files (the ninth round): a language tag as a folder, with a string in a list; a
+  // wording bundle with its tag; a YAML file with nested keys and a list.
+  ['locales/de/common.json', BASE['locales/de/common.json'].replace('many days', 'several days')],
+  ['i18n/messages_fr.properties', BASE['i18n/messages_fr.properties'].replace('Accueil', 'Bienvenue')],
+  ['config/locales/de.yml', BASE['config/locales/de.yml'].replace('Montag', 'Mondtag')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -479,9 +504,9 @@ const TRAPS = [
   [{ 'src/pages/crossing.html': page('<b>Save now</b>') }, null, unrecognised('src/pages/crossing.html')],
   // A character reference that is none of the plain ones may spell a digit, a price or an address.
   [{ 'src/pages/rules.html': page('<p>Terms &commat; rules</p>') }, null, unrecognised('src/pages/rules.html')],
-  [{ 'locales/keys.json': BASE['locales/keys.json'].replace('"save":', '"store":') }, null, unrecognised('locales/keys.json')],
-  [{ 'locales/count.json': BASE['locales/count.json'].replace('{count}', '{total}') }, null, unrecognised('locales/count.json')],
-  [{ 'locales/promo.json': BASE['locales/promo.json'].replace('"Save now"', '"Save 5 euro now"') }, null, riskMarker('locales/promo.json')],
+  [{ 'locales/en/keys.json': BASE['locales/en/keys.json'].replace('"save":', '"store":') }, null, unrecognised('locales/en/keys.json')],
+  [{ 'locales/en/count.json': BASE['locales/en/count.json'].replace('{count}', '{total}') }, null, unrecognised('locales/en/count.json')],
+  [{ 'locales/en/promo.json': BASE['locales/en/promo.json'].replace('"Save now"', '"Save 5 euro now"') }, null, riskMarker('locales/en/promo.json')],
   [{ 'src/styles/selector.css': BASE['src/styles/selector.css'].replace('.red {', '.blue {') }, null, unrecognised('src/styles/selector.css')],
   [{ 'src/styles/property.css': BASE['src/styles/property.css'].replace('color: red;', 'background: red;') }, null, unrecognised('src/styles/property.css')],
   [{ 'src/styles/display.css': BASE['src/styles/display.css'].replace('none', 'block') }, null, unrecognised('src/styles/display.css')],
@@ -522,10 +547,12 @@ const TRAPS = [
   [{ 'deps/test-requirements.txt': lines('coverage==7.0.1') }, null, 'it changes the dependencies in deps/test-requirements.txt'],
   [{ 'app/packages.txt': lines('libxml-dev') }, null, 'it changes how the project is built or shipped in app/packages.txt'],
   [{ 'app/version.txt': lines('1.0.1') }, null, 'it changes how the project is built or shipped in app/version.txt'],
-  // Catalogue values that are not wording.
-  [{ 'locales/flags.yml': lines('beta: false') }, null, unrecognised('locales/flags.yml')],
-  [{ 'locales/flags.properties': lines('beta=false') }, null, unrecognised('locales/flags.properties')],
-  [{ 'locales/links.json': lines('{', '  "help": "javascript:fetch(document.cookie)"', '}') }, null, unrecognised('locales/links.json')],
+  // Catalogue values that are not wording. (Since the ninth round a file is a catalogue only
+  // under a language tag or a wording bundle's name, so the catalogue files of this corpus
+  // whose names were neither moved into a language folder, `en/`.)
+  [{ 'locales/en/flags.yml': lines('beta: false') }, null, unrecognised('locales/en/flags.yml')],
+  [{ 'locales/en/flags.properties': lines('beta=false') }, null, unrecognised('locales/en/flags.properties')],
+  [{ 'locales/en/links.json': lines('{', '  "help": "javascript:fetch(document.cookie)"', '}') }, null, unrecognised('locales/en/links.json')],
   [{ 'config/locales/en.yml': BASE['config/locales/en.yml'].replace('"."', '","') }, null, unrecognised('config/locales/en.yml')],
   // Documentation: a changed web address, e-mail address or number; a script; front matter;
   // the instruction files of other assistants; a release note that ships with the build.
@@ -554,7 +581,9 @@ const TRAPS = [
   // An option with no `value` sends its text, whatever tags sit inside it.
   [{ 'src/pages/status-pick.html': BASE['src/pages/status-pick.html'].replace('Pending', 'Approved') }, null, inexact('src/pages/status-pick.html')],
   // Catalogue values read as a browser reads an address: escapes decoded, tabs removed.
-  [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"\\/\\/other.example\\/go"') }, null, unrecognised('locales/far.json')],
+  // (An escaped slash is no form JSON.stringify writes: since the ninth round the file "holds
+  // something I cannot follow" before its value is read as an address.)
+  [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"\\/\\/other.example\\/go"') }, null, 'I could not read the change (locales/far.json holds something I cannot follow)'],
   [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"java\\tscript:go()"') }, null, unrecognised('locales/far.json')],
   [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"\\tjavascript:go()"') }, null, unrecognised('locales/far.json')],
   [{ 'locales/far.json': BASE['locales/far.json'].replace('"Help"', '"\\\\\\\\evil"') }, null, unrecognised('locales/far.json')],
@@ -590,8 +619,8 @@ const TRAPS = [
   // Since the eighth round `tokens.txt` carries no documentation name, so rule 4 refuses it
   // before rule 5 reads its name; `docs/tokens.md` below keeps the plural word pinned.
   [{ 'tokens.txt': lines('New note.') }, null, unrecognised('tokens.txt')],
-  [{ 'config/locales/secrets.yml': lines('title: New') }, null, 'config/locales/secrets.yml sits in an area named secret, and such areas are never a hotfix'],
-  [{ 'messages/credentials.json': BASE['messages/credentials.json'].replace('Old', 'New') }, null, 'messages/credentials.json sits in an area named credential, and such areas are never a hotfix'],
+  [{ 'config/locales/en/secrets.yml': lines('title: New') }, null, 'config/locales/en/secrets.yml sits in an area named secret, and such areas are never a hotfix'],
+  [{ 'messages/en/credentials.json': BASE['messages/en/credentials.json'].replace('Old', 'New') }, null, 'messages/en/credentials.json sits in an area named credential, and such areas are never a hotfix'],
   [{ 'src/payments/index.html': page('<p>New</p>') }, null, 'src/payments/index.html sits in an area named payment, and such areas are never a hotfix'],
   [{ 'docs/passwords.md': BASE['docs/passwords.md'].replace('Old', 'New') }, null, 'docs/passwords.md sits in an area named password, and such areas are never a hotfix'],
   [{ 'docs/id_rsa.md': BASE['docs/id_rsa.md'].replace('Old', 'New') }, null, 'docs/id_rsa.md sits in an area named secret, and such areas are never a hotfix'],
@@ -801,7 +830,31 @@ TRAPS.push(
   [{ 'docs/script-span.md': BASE['docs/script-span.md'].replace('Old', 'New') }, null, inexact('docs/script-span.md')],
   // A list whose other item holds a code span; `Key: value` in the file's first paragraph.
   [{ 'docs/steps-code.md': BASE['docs/steps-code.md'].replace('old', 'new') }, null, inexact('docs/steps-code.md')],
-  [{ 'docs/key-value.md': BASE['docs/key-value.md'].replace('old', 'new') }, null, inexact('docs/key-value.md')]
+  [{ 'docs/key-value.md': BASE['docs/key-value.md'].replace('old', 'new') }, null, inexact('docs/key-value.md')],
+  // Catalogue files (the ninth round), each an answer of `checking` on `4212d9ff`. A
+  // dependency, build or settings name is decided before the catalogue kind; a catalogue
+  // folder alone makes no catalogue.
+  [{ 'packages/i18n/package.json': BASE['packages/i18n/package.json'].replace('Old texts', 'New texts') }, null, 'it changes the dependencies in packages/i18n/package.json'],
+  [{ 'locales/package.json': BASE['locales/package.json'].replace('node run tests', 'echo skipped') }, null, 'it changes the dependencies in locales/package.json'],
+  [{ 'messages/docker-compose.yml': BASE['messages/docker-compose.yml'].replace('image: app', 'image: other') }, null, 'it changes how the project is built or shipped in messages/docker-compose.yml'],
+  [{ 'translations/pnpm-lock.yaml': lines('lockfileVersion: new') }, null, 'it changes the dependencies in translations/pnpm-lock.yaml'],
+  [{ 'i18n/tsconfig.json': BASE['i18n/tsconfig.json'].replace('commonjs', 'esnext') }, null, setting('i18n/tsconfig.json')],
+  [{ 'messages/application.properties': lines('spring.profiles.active=prod') }, null, setting('messages/application.properties')],
+  [{ 'i18n/routes.json': BASE['i18n/routes.json'].replace('Start', 'Begin') }, null, setting('i18n/routes.json')],
+  // A duplicate key in JSON; block text after a tag in YAML; an escaped `=` in a key of a
+  // properties file, which is a change to the key.
+  [{ 'locales/en/duplicate.json': BASE['locales/en/duplicate.json'].replace('"Save"', '"Store"') }, null, 'I could not read the change (locales/en/duplicate.json holds something I cannot follow)'],
+  [{ 'locales/en/tagged.yml': BASE['locales/en/tagged.yml'].replace('save: Save', 'save: Store') }, null, 'I could not read the change (locales/en/tagged.yml holds something I cannot follow)'],
+  [{ 'locales/en/escaped.properties': lines('a\\=c=value') }, null, unrecognised('locales/en/escaped.properties')],
+  // The wording rule: a bare host, a changed placeholder name, placeholders in another order,
+  // and a right-to-left override, which no reader sees.
+  [{ 'locales/en/host.json': BASE['locales/en/host.json'].replace('example.com', 'example.net') }, null, riskMarker('locales/en/host.json')],
+  [{ 'locales/en/named.yml': lines('hello: Hello :email') }, null, unrecognised('locales/en/named.yml')],
+  [{ 'locales/en/ordered.json': BASE['locales/en/ordered.json'].replace('%s of %d', '%d of %s') }, null, unrecognised('locales/en/ordered.json')],
+  [{ 'locales/en/override.json': BASE['locales/en/override.json'].replace('"Save"', '"Save\u202e"') }, null, riskMarker('locales/en/override.json')],
+  // A byte-order mark on one side only, and another number of carriage returns.
+  [{ 'locales/en/marked.yml': '\ufefftitle: New\n' }, null, unrecognised('locales/en/marked.yml')],
+  [{ 'src/styles/endings.css': 'a { color: blue; }\r\nb { margin: 0; }\n' }, null, unrecognised('src/styles/endings.css')]
 );
 
 // The owner's decision of 2026-10-09 (answer "a"): the hotfix check keeps only the formats
@@ -858,9 +911,9 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 38, 'the corpus holds 38 shapes that qualify');
+assert.equal(QUALIFY.length, 41, 'the corpus holds 41 shapes that qualify');
 assert.equal(REMOVED_FORMATS.length, 44, 'the corpus holds 44 cases of removed formats');
-assert.equal(TRAPS.length, 280, 'the corpus holds 280 traps, the removed formats among them');
+assert.equal(TRAPS.length, 296, 'the corpus holds 296 traps, the removed formats among them');
 
 let root;
 
@@ -1216,7 +1269,7 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     'src/components/Holds.vue': (n) => `<template>\n<p>Old</p>\n${'<MyThing>'.repeat(10 * n)}\n</template>\n`,
     'src/styles/vars.scss': (n) => `a { color: red; }\n${'$a: b;'.repeat(16 * n)}\n`,
     // Every scanner fails closed: catalogue line states over many open quotes and blocks.
-    'i18n/states.yaml': (n) => `title: Old\n${'a: "x\n  b: |\n'.repeat(8 * n)}`,
+    'i18n/en/states.yaml': (n) => `title: Old\n${'a: "x\n  b: |\n'.repeat(8 * n)}`,
     // The fifth round's scanners: a deep stack of open elements closed by end tags of other
     // names, with and without a holder open; deeply nested and very long block quotes; many
     // paragraphs of backticks; many custom properties.
@@ -1304,7 +1357,24 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     'docs/items-many.md': (n) => `${'- a plain item\n1. a numbered one (short): yes\n   and a second line\n\n'.repeat(3 * n)}Old words.\n`,
     'docs/items-run.md': (n) => `Text.\n\n${'- a plain item: yes (short)\n'.repeat(5 * n)}- Old words.\n`,
     'docs/colons-line.md': (n) => `Text.\n\n${'a: (b) '.repeat(20 * n)}Old words.\n`,
-    'docs/markers-line.md': (n) => `Text.\n\n${'1'.repeat(100 * n)}. Old words.\n`
+    'docs/markers-line.md': (n) => `Text.\n\n${'1'.repeat(100 * n)}. Old words.\n`,
+    // The ninth round's catalogue readers, each on a file it reads to the end: many keys in
+    // one mapping (the duplicate check), many small mappings, many list items, one long
+    // value, many placeholders, a long run of colons and full stops (the scheme and bare-host
+    // patterns), a JSON file of many keys and one of many small objects, and properties files
+    // of many lines and of one long line. (`i18n/en/states.yaml` above is kept from the
+    // fourth round; the reader it was built against is gone, and this one refuses it at its
+    // second line.)
+    'locales/en/wide.yml': (n) => `${Array.from({ length: 40 * n }, (_, i) => `key${i}: Plain words here`).join('\n')}\ntitle: Old\n`,
+    'locales/en/nested.yml': (n) => `${Array.from({ length: 12 * n }, (_, i) => `group${i}:\n  menu:\n    save: Plain words\n    days:\n      - Monday\n`).join('')}title: Old\n`,
+    'locales/en/lists.yml': (n) => `days:\n${'  - "Plain words"\n'.repeat(40 * n)}title: Old\n`,
+    'locales/en/long-value.yml': (n) => `title: Old ${'plain words '.repeat(80 * n)}end\n`,
+    'locales/en/placeholders.json': (n) => `${JSON.stringify({ title: `Old ${'{a} %s :n %1$s $x '.repeat(40 * n)}` }, null, 2)}\n`,
+    'locales/en/colons.json': (n) => `${JSON.stringify({ title: `Old ${'a: b. c, '.repeat(100 * n)}` }, null, 2)}\n`,
+    'locales/en/wide.json': (n) => `${JSON.stringify(Object.fromEntries([...Array.from({ length: 40 * n }, (_, i) => [`key${i}`, 'Plain words here']), ['title', 'Old']]), null, 2)}\n`,
+    'locales/en/objects.json': (n) => `${JSON.stringify({ items: Array.from({ length: 12 * n }, () => ({ label: 'Plain', hints: ['one', 'two'] })), title: 'Old' }, null, 2)}\n`,
+    'locales/en/many.properties': (n) => `${Array.from({ length: 40 * n }, (_, i) => `key${i} = Plain words here`).join('\n')}\ntitle = Old\n`,
+    'locales/en/long.properties': (n) => `title = Old ${'plain words '.repeat(80 * n)}end\n`
   };
   for (const [rel, build] of Object.entries(cases)) {
     const at = (n) => {
@@ -1316,7 +1386,7 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(at(1)().cause, 'unrecognised', rel);
     // The eighth round's inputs that end in a plain paragraph are read to the end and pass.
     // (`docs/comments-many.md` passed until the ninth round; a `<!--` anywhere now refuses the file.)
-    if (/^(?:docs\/(?:prose|fences-many|meta|spans|ticks-open|spaces|def-ends|fence-like|raw-near|items|colons)|NOTES)/.test(rel)) assert.equal(at(1)(), null, rel);
+    if (/^(?:docs\/(?:prose|fences-many|meta|spans|ticks-open|spaces|def-ends|fence-like|raw-near|items|colons)|NOTES|locales\/en\/)/.test(rel)) assert.equal(at(1)(), null, rel);
     // The largest input is about 1.6 million characters, four times the size a quadratic scan took seconds on.
     const { n, small, big, ratio } = growth(at, 16, Math.floor(1600000 / (build(64).length / 64)));
     assert.ok(ratio < 8, `${rel}: size ${n} took ${small.toFixed(1)} ms and size ${4 * n} took ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
