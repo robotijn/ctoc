@@ -2109,3 +2109,156 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
   }
   assert.deepEqual(wrong, []);
 });
+
+// The sixth round (2026-10-09): the strict HTML subset (the session's design decision: the
+// HTML reader accepts only what it reads as a browser's parser does, and refuses the whole
+// file for anything else), Markdown imports, autolinks, headings and paragraphs, folded and
+// camel-case paths, and the functional plan's sentence for a change the check cannot read
+// exactly. Each row marked `red` answered otherwise on `5326daae`; the others are guards.
+// [item, path, base content, new content, the clause, or null for `checking`]
+test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and paragraphs, folded paths, the cannot-read-exactly sentence', async () => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
+  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  const area = (f, word) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
+  const sql = ['SELECT name FROM users', 'SELECT pass FROM admins'];
+  const pip = ['pip install requests', 'pip install reqests'];
+  const save = ['Save', 'Store'];
+  const words = ['Old', 'New'];
+  const run = ['run()', 'drop()'];
+  /** One row from a template holding `@`, replaced by the old and the new text. */
+  const row = (item, p, template, [o, n], expected) => [item, p, template.replace('@', o), template.replace('@', n), expected];
+  const shapes = [
+    // 1. A brace inside a tag is outside the subset; in text it is a plain character.
+    row(1, 'src/pages/brace-tag.html', '<button { is="run-sql" }>@</button>\n', sql, exact('src/pages/brace-tag.html')),
+    row(1, 'src/pages/brace-el.html', '{<run-sql>}<span>@</span></run-sql>\n', sql, exact('src/pages/brace-el.html')),
+    row(1, 'src/pages/brace-script.html', '{<script>/*}<b></b>*/ @ /*<b></b>*/</script>\n', run, un('src/pages/brace-script.html')),
+    row(1, 'src/pages/brace-quoted.html', '<p title="{a}">@</p>\n', save, exact('src/pages/brace-quoted.html')),
+    row(1, 'src/pages/brace-text.html', '<p>{a}</p>\n<p>@</p>\n', save, null),
+    row(1, 'src/pages/brace-same.html', '<p>{a} @</p>\n', save, un('src/pages/brace-same.html')),
+    // 2. Anything starting `<!` but `<!DOCTYPE html>` and a standard comment; `<?`; `</` before
+    // no letter; the same inside a script block; a closing tag ends only before HTML white space.
+    row(2, 'src/pages/comment-abrupt.html', '<!--><run-sql>--><span>@</span></run-sql>\n', sql, exact('src/pages/comment-abrupt.html')),
+    row(2, 'src/pages/comment-abrupt-dash.html', '<!---><run-sql>--><span>@</span></run-sql>\n', sql, exact('src/pages/comment-abrupt-dash.html')),
+    row(2, 'src/pages/comment-bang.html', '<!-- a --!><run-sql> --><span>@</span></run-sql>\n', sql, exact('src/pages/comment-bang.html')),
+    row(2, 'src/pages/comment-nested.html', '<!-- a <!-- b --><p>@</p>\n', save, exact('src/pages/comment-nested.html')),
+    row(2, 'src/pages/cdata.html', '<![CDATA[><run-sql>]]><span>@</span></run-sql>\n', sql, exact('src/pages/cdata.html')),
+    row(2, 'src/pages/php.html', '<?php echo 1 ?><p>@</p>\n', save, exact('src/pages/php.html')),
+    row(2, 'src/pages/bogus.html', '<!x><p>@</p>\n', save, exact('src/pages/bogus.html')),
+    row(2, 'src/pages/bogus-end.html', '</ x><p>@</p>\n', save, exact('src/pages/bogus-end.html')),
+    row(2, 'src/pages/doctype-legacy.html', '<!DOCTYPE html PUBLIC "x">\n<p>@</p>\n', save, exact('src/pages/doctype-legacy.html')),
+    row(2, 'src/pages/script-abrupt.html', '<script><!--> x</script>\n<p>@</p>\n', save, exact('src/pages/script-abrupt.html')),
+    row(2, 'src/pages/script-nested.html', '<script><!-- a <!-- b --></script>\n<p>@</p>\n', save, exact('src/pages/script-nested.html')),
+    row(2, 'src/pages/script-bang.html', '<script><!-- a --!> b --></script>\n<p>@</p>\n', save, exact('src/pages/script-bang.html')),
+    row(2, 'src/pages/script-space.html', '<script>x</script ><b></b>@<b></b></script>\n', run, un('src/pages/script-space.html')),
+    row(2, 'src/pages/style-space.html', '<style>x</style ><b></b>@<b></b></style>\n', save, un('src/pages/style-space.html')),
+    row(2, 'src/pages/doctype.html', '<!DocType HTML>\n<!-- a - b -- c -->\n<!---->\n<p>@</p>\n', save, null),
+    row(2, 'src/pages/script-comment.html', '<script><!--\nx();\n//--></script>\n<p>@</p>\n', save, null),
+    row(2, 'docs/comment.md', 'Text.\n\n<!--><run-sql>--><span>@</span></run-sql>\n', sql, exact('docs/comment.md')),
+    // 3. `<svg>` and `<math>` are opaque from their start tag to their matching end tag; the
+    // host elements are HTML's only; inside foreign content nothing HTML is followed.
+    row(3, 'src/pages/svg-pre.html', '<svg><style><pre></style><span>@</span></pre></svg>\n', pip, exact('src/pages/svg-pre.html')),
+    row(3, 'src/pages/unknown.html', '<unknown>@</unknown>\n', save, exact('src/pages/unknown.html')),
+    row(3, 'src/pages/set.html', '<set>@</set>\n', save, exact('src/pages/set.html')),
+    row(3, 'src/pages/text.html', '<text>@</text>\n', save, exact('src/pages/text.html')),
+    row(3, 'src/pages/svg-open.html', '<svg><g>\n<p>@</p>\n', save, exact('src/pages/svg-open.html')),
+    row(3, 'src/pages/svg-title-tag.html', '<svg><title><b></title></svg>\n<p>@</p>\n', save, exact('src/pages/svg-title-tag.html')),
+    row(3, 'src/pages/svg-foreign-object.html', '<svg><foreignObject><p>x</p></foreignObject></svg>\n<p>@</p>\n', save, exact('src/pages/svg-foreign-object.html')),
+    row(3, 'src/pages/svg-unquoted.html', '<svg><g x=1/></svg>\n<p>@</p>\n', save, exact('src/pages/svg-unquoted.html')),
+    row(3, 'src/pages/svg-after.html', '<svg viewBox="0 0 1 1"><title>Close</title><g><path d="M0 0"/></g></svg>\n<math><mi>x</mi></math>\n<svg/>\n<p>@</p>\n', save, null),
+    row(3, 'src/pages/svg-label.html', '<p>Save</p>\n<svg><title>@</title></svg>\n', ['Close', 'Shut'], exact('src/pages/svg-label.html')),
+    // Inside `<select>` only options are followed: an older parser ignores every other tag there.
+    row(3, 'src/pages/select-style.html', '<select><style><script>/*</style>*/ @ /*<b></b>*/</script></select>\n', run, exact('src/pages/select-style.html')),
+    row(3, 'src/pages/select-end.html', '<div><select></div><style><script>/*</style>*/ @ /*<b></b>*/</script>\n', run, exact('src/pages/select-end.html')),
+    row(3, 'src/pages/select-ok.html', '<select><optgroup label="a"><option value="m">@</option></optgroup><hr></select>\n', ['Middle', 'Medium'], null),
+    // An element never closed is outside the subset (the functional plan's scenario); an end
+    // tag that closes several elements is everyday HTML.
+    row(4, 'src/pages/open-div.html', '<div>\n<p>@</p>\n', save, exact('src/pages/open-div.html')),
+    row(4, 'src/pages/implied-list.html', '<ul><li>One<li>@</ul>\n', save, null),
+    row(4, 'src/pages/card.html', '<my-card>@</my-card>\n', save, exact('src/pages/card.html')),
+    // 5. A changed line that starts `import ` or `export ` is code wherever it stands.
+    row(5, 'docs/import-heading.md', "# Title\nimport Chart from './@'\n", ['chart', 'other'], un('docs/import-heading.md')),
+    row(5, 'docs/import-wrapped.md', "# Title\nimport Chart\n  from './@'\n", ['chart', 'other'], un('docs/import-wrapped.md')),
+    row(5, 'docs/import-fence.md', "```\ncode\n```\nexport const meta = '@'\n", ['old', 'new'], un('docs/import-fence.md')),
+    row(5, 'docs/import-mid.md', 'We\nimport @ goods.\n', ['old', 'new'], un('docs/import-mid.md')),
+    row(5, 'docs/important-heading.md', '# Title\nimportant @ words.\n', ['old', 'new'], null),
+    // 6. An autolink is one opaque piece. A placeholder such as `<file>` inside a paragraph
+    // holds the rest of its own paragraph only; one that starts a line holds the rest of the file.
+    row(6, 'docs/autolink.md', 'See <https://example.org/guide> first.\n\n@ words.\n', words, null),
+    row(6, 'docs/autolink-same.md', 'See <http://example.org/guide> and the @ words.\n', ['old', 'new'], null),
+    row(6, 'docs/autolink-mail.md', 'Write to <mailto:team@example.org> or <team@example.org>.\n\n@ words.\n', words, null),
+    row(6, 'docs/autolink-own.md', 'See <https://example.org/@> first.\n', ['guide', 'other'], un('docs/autolink-own.md')),
+    row(6, 'docs/autolink-space.md', 'See <https://example.org/a b> first.\n\n@ words.\n', words, exact('docs/autolink-space.md')),
+    row(6, 'docs/placeholder.md', 'Edit <file> and <your-name> then save.\n\n@ words.\n', words, null),
+    row(6, 'docs/placeholder-closed.md', 'Edit <file>x</file> and <name> then save.\n\n@ words.\n', words, null),
+    row(6, 'docs/placeholder-same.md', 'Edit <file> then @.\n', ['save', 'store'], exact('docs/placeholder-same.md')),
+    row(6, 'docs/placeholder-block.md', '<file>\n\n@ words.\n', words, exact('docs/placeholder-block.md')),
+    row(6, 'docs/placeholder-item.md', '- <file>\n\n@ words.\n', words, exact('docs/placeholder-item.md')),
+    row(6, 'docs/placeholder-object.md', 'Use <object><runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-object.md')),
+    row(6, 'docs/placeholder-div.md', 'Use <div> and <runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-div.md')),
+    row(6, 'docs/placeholder-end.md', 'Use </p> and <runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-end.md')),
+    row(6, 'docs/placeholder-center.md', 'Use <center> and <runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-center.md')),
+    row(6, 'docs/placeholder-code-line.md', 'Use <runsql> here\n```\ncode\n```\n@ words.\n', words, exact('docs/placeholder-code-line.md')),
+    // 7. A changed heading qualifies only when its generated anchor stays the same.
+    row(7, 'docs/heading.md', '# @\n\nWords.\n', ['Install', 'Setup'], exact('docs/heading.md')),
+    row(7, 'docs/heading-typo.md', '## Getting @\n\nWords.\n', ['started', 'going'], exact('docs/heading-typo.md')),
+    row(7, 'docs/heading-setext.md', '@\n=======\n\nWords.\n', ['Install', 'Upgrade'], exact('docs/heading-setext.md')),
+    row(7, 'docs/heading-quote.md', '> # @\n\nWords.\n', ['Install', 'Upgrade'], exact('docs/heading-quote.md')),
+    row(7, 'docs/heading-item.md', '- ## @\n\nWords.\n', ['Install', 'Upgrade'], exact('docs/heading-item.md')),
+    row(7, 'docs/heading-reference.md', '# The @\n\nWords.\n', ['copy', '&copy;'], exact('docs/heading-reference.md')),
+    row(7, 'docs/heading-caps.md', '# @\n\nWords.\n', ['instal the App', 'Instal the app'], null),
+    row(7, 'docs/heading-setext-caps.md', '@\n---\n\nWords.\n', ['instal the App', 'Instal the app'], null),
+    row(7, 'docs/heading-marks.md', '# Install@\n\nWords.\n', ['.', '!'], null),
+    row(7, 'docs/heading-below.md', '# Install\n\n@ words.\n', words, null),
+    // 8. A brace reaches its own paragraph, and an expression left open reaches what follows it.
+    row(8, 'docs/brace-far.md', 'Hello {name} there.\n\n@ words.\n', words, null),
+    row(8, 'docs/brace-before.md', '@ words.\n\nHello {name} there.\n', words, null),
+    row(8, 'docs/brace-same.md', 'Hello {name}. @ words.\n', words, un('docs/brace-same.md')),
+    row(8, 'docs/brace-same-wrapped.md', 'Hello {name}.\n@ words.\n', words, un('docs/brace-same-wrapped.md')),
+    row(8, 'docs/brace-open.md', '{/*\n\n@ words.\n\n*/}\n', words, un('docs/brace-open.md')),
+    row(8, 'docs/brace-string.md', 'Hello {"}" +\n\n@\n\n} there.\n', ['run', 'drop'], un('docs/brace-string.md')),
+    row(8, 'docs/brace-liquid.md', '{% if a %}\n\n{{ name }}\n\n@ words.\n', words, null),
+    // 9 and 10. The path is folded (Unicode NFKC, lower case) and split at every character
+    // that is no letter; camel-case sub-words count as words too.
+    row(9, 'ＡＵＴＨ/index.html', '<p>@</p>\n', save, area('ＡＵＴＨ/index.html', 'auth')),
+    row(9, 'src/état/index.html', '<p>@</p>\n', save, null),
+    row(10, 'src/pages/AuthPanel.html', '<p>@</p>\n', save, area('src/pages/AuthPanel.html', 'auth')),
+    row(10, 'src/pages/paymentForm.html', '<p>@</p>\n', save, area('src/pages/paymentForm.html', 'payment')),
+    row(10, 'src/pages/userTokens.html', '<p>@</p>\n', save, area('src/pages/userTokens.html', 'token')),
+    row(10, 'src/pages/Author.html', '<p>@</p>\n', save, null),
+    row(10, 'src/styles/brandTokens.css', 'a { color: @; }\n', ['red', 'blue'], null),
+    // The functional plan's fifth case: a colour that is not the whole value of a colour
+    // property, and a colour-named custom property whose value is not exactly one colour.
+    row('colour', 'src/styles/border.css', '.save { border: 1px solid @; }\n', ['#0a58ca', '#0b5ed7'], exact('src/styles/border.css')),
+    row('colour', 'src/styles/shadow.css', 'a { box-shadow: 0 0 2px @; }\n', ['red', 'blue'], exact('src/styles/shadow.css')),
+    row('colour', 'src/styles/two-tokens.css', ':root { --brand-color: @; }\n', ['red', 'red url(x)'], exact('src/styles/two-tokens.css')),
+    row('colour', 'src/styles/color-mode.css', ':root { --color-mode: @; }\n', ['dark', 'light'], exact('src/styles/color-mode.css')),
+    row('colour', 'src/styles/enabled.css', ':root { --enabled: @; }\n', ['green', 'red'], setting('src/styles/enabled.css')),
+    row('colour', 'src/styles/whole.css', 'a { border: @; outline-color: @ }\n', ['red', 'blue'], null),
+    row('colour', 'src/styles/important.css', 'a { color: @ !important; }\n', ['red', 'blue'], null),
+    row('colour', 'src/styles/width.css', 'a { width: @; }\n', ['#fff', '#000'], un('src/styles/width.css'))
+  ];
+  const base = {};
+  for (const [, p, b] of shapes) base[p] = b;
+  const root = makeRepo(base);
+  const wrong = [];
+  for (const [item, p, b, n, expected] of shapes) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), n);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), b);
+    const want = expected === null ? STATUS_LINE : refusal(expected);
+    if (res.text !== want) wrong.push(`item ${item} ${p}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
+    else if (expected === null) assertChecking(res, [p]);
+  }
+  assert.deepEqual(wrong, []);
+  // The sentence a person reads is one plain sentence, and the log keeps today's cause words.
+  fs.writeFileSync(path.join(root, 'src/pages/card.html'), '<my-card>Store</my-card>\n');
+  assert.equal((await check(root, 'src/pages/card.html')).text,
+    'I did not treat this as a hotfix because it changes src/pages/card.html in a way the check cannot read exactly, '
+    + 'and only what it can read exactly qualifies; it goes through a normal plan, and your edits stay in place, not committed.');
+  fs.writeFileSync(path.join(root, 'src/pages/open-div.html'), '<div>\n<p>Store</p>\n');
+  await check(root, 'src/pages/open-div.html');
+  fs.writeFileSync(path.join(root, 'src/styles/two-tokens.css'), ':root { --brand-color: red url(x); }\n');
+  await check(root, 'src/styles/two-tokens.css');
+  assert.deepEqual(logLines(root).slice(-3).map((l) => l.cause), ['unrecognised', 'unreadable', 'setting']);
+});

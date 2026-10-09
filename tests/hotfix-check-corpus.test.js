@@ -1,6 +1,6 @@
 'use strict';
 
-// The classifier corpus: 30 edit shapes that qualify as a hotfix and 195 traps that must
+// The classifier corpus: 34 edit shapes that qualify as a hotfix and 211 traps that must
 // not (42 of them the kept cases of the formats the owner's decision of 2026-10-09 removed),
 // plus one mode change, each judged through the menu router's first call (rules 1
 // to 7; no test runs) against ONE committed temporary repository with no test command.
@@ -22,6 +22,9 @@ const refusal = (clause) => `I did not treat this as a hotfix because ${clause};
   + 'it goes through a normal plan, and your edits stay in place, not committed.';
 const unrecognised = (f) => `I do not recognise ${f} as wording or a colour`;
 const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+// The functional plan's clause (amended 2026-10-09) for a file whose format the check reads
+// but whose change it cannot vouch for.
+const inexact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
 const riskMarker = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
 
 const page = (inner) => `<!doctype html>\n<html>\n<body>\n${inner}\n</body>\n</html>\n`;
@@ -256,7 +259,29 @@ const BASE = {
   'src/styles/two-tokens.css': lines(':root {', '  --brand-color: red;', '}'),
   'src/styles/var.css': lines(':root {', '  --color-a: var(--b);', '}'),
   'src/styles/color-brand.css': lines(':root {', '  --color-brand: #0b5ed7;', '}'),
-  'src/styles/button-colour.css': lines(':root {', '  --button-colour: red;', '}')
+  'src/styles/button-colour.css': lines(':root {', '  --button-colour: red;', '}'),
+  // The sixth round (2026-10-09): the strict HTML subset, Markdown headings, autolinks and
+  // paragraphs, folded and camel-case paths, and the functional plan's sentence for a change
+  // the check cannot read exactly.
+  'src/pages/brace-tag.html': page('<button { is="run-sql" }>SELECT name FROM users</button>'),
+  'src/pages/brace-el.html': page('{<run-sql>}<span>SELECT name FROM users</span></run-sql>'),
+  'src/pages/brace-script.html': page('{<script>/*}<b></b>*/ run() /*<b></b>*/</script>'),
+  'src/pages/comment-abrupt.html': page('<!--><run-sql>--><span>SELECT name FROM users</span></run-sql>'),
+  'src/pages/svg-pre.html': page('<svg><style><pre></style><span>pip install requests</span></pre></svg>'),
+  'src/pages/unknown.html': page('<unknown>Save</unknown>'),
+  'src/pages/svg-text.html': page('<svg><text>Save</text></svg>'),
+  'src/pages/card.html': page('<my-card>Save</my-card>'),
+  'src/pages/open-div.html': '<!doctype html>\n<div>\n<p>Save</p>\n',
+  'src/styles/border.css': lines('.save { border: 1px solid #0a58ca; }'),
+  'docs/heading-import.md': lines('# Title', "import Chart from './chart'"),
+  'docs/autolink.md': lines('See <https://example.org/guide> first.', '', 'Old words here.'),
+  'docs/heading.md': lines('# Install', '', 'Words.'),
+  'docs/heading-caps.md': lines('# instal the App', '', 'Words.'),
+  'docs/mdx-far.md': lines('Hello {name} there.', '', 'Old words.'),
+  '\uff21\uff35\uff34\uff28/index.html': page('<p>Save</p>'),
+  'src/pages/AuthPanel.html': page('<p>Save</p>'),
+  'src/pages/paymentForm.html': page('<p>Save</p>'),
+  'src/pages/Author.html': page('<p>Save</p>')
 };
 
 const QUALIFY = [
@@ -306,7 +331,14 @@ const QUALIFY = [
   ['src/pages/mixed.html', page('<DIV>Store</div>')],
   ['docs/quote-prose.md', BASE['docs/quote-prose.md'].replace('Old', 'New')],
   ['src/styles/color-brand.css', BASE['src/styles/color-brand.css'].replace('#0b5ed7', '#1a73e8')],
-  ['src/styles/button-colour.css', BASE['src/styles/button-colour.css'].replace('red', 'blue')]
+  ['src/styles/button-colour.css', BASE['src/styles/button-colour.css'].replace('red', 'blue')],
+  // The sixth round (2026-10-09). An autolink is one opaque piece, so a typo in the next
+  // paragraph is wording; a heading whose generated anchor stays the same (capital letters
+  // only); a brace in one paragraph and a typo in a later one; `Author` is not `auth`.
+  ['docs/autolink.md', BASE['docs/autolink.md'].replace('Old', 'New')],
+  ['docs/heading-caps.md', BASE['docs/heading-caps.md'].replace('instal the App', 'Instal the app')],
+  ['docs/mdx-far.md', BASE['docs/mdx-far.md'].replace('Old', 'New')],
+  ['src/pages/Author.html', BASE['src/pages/Author.html'].replace('Save', 'Store')]
 ];
 
 // [files to write {path: content}, the files named, the expected clause]
@@ -515,7 +547,31 @@ const TRAPS = [
   // A custom property named for a colour that holds no colour, a second token, or a variable.
   [{ 'src/styles/color-mode.css': BASE['src/styles/color-mode.css'].replace('dark', 'light') }, null, setting('src/styles/color-mode.css')],
   [{ 'src/styles/two-tokens.css': BASE['src/styles/two-tokens.css'].replace('red', 'red url(x)') }, null, setting('src/styles/two-tokens.css')],
-  [{ 'src/styles/var.css': BASE['src/styles/var.css'].replace('--b', '--c') }, null, setting('src/styles/var.css')]
+  [{ 'src/styles/var.css': BASE['src/styles/var.css'].replace('--b', '--c') }, null, setting('src/styles/var.css')],
+  // The sixth round (2026-10-09), each trap but the last two an answer of `checking` on
+  // `5326daae`. The strict HTML subset: a brace inside a tag, a comment that a browser ends
+  // early, text inside `<svg>`, a name that is no HTML element, an element never closed.
+  [{ 'src/pages/brace-tag.html': BASE['src/pages/brace-tag.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/brace-tag.html')],
+  [{ 'src/pages/brace-el.html': BASE['src/pages/brace-el.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/brace-el.html')],
+  [{ 'src/pages/brace-script.html': BASE['src/pages/brace-script.html'].replace('run()', 'drop()') }, null, unrecognised('src/pages/brace-script.html')],
+  [{ 'src/pages/comment-abrupt.html': BASE['src/pages/comment-abrupt.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/comment-abrupt.html')],
+  [{ 'src/pages/svg-pre.html': BASE['src/pages/svg-pre.html'].replace('requests', 'reqests') }, null, inexact('src/pages/svg-pre.html')],
+  [{ 'src/pages/unknown.html': BASE['src/pages/unknown.html'].replace('Save', 'Store') }, null, inexact('src/pages/unknown.html')],
+  [{ 'src/pages/svg-text.html': BASE['src/pages/svg-text.html'].replace('Save', 'Store') }, null, inexact('src/pages/svg-text.html')],
+  [{ 'src/pages/open-div.html': BASE['src/pages/open-div.html'].replace('Save', 'Store') }, null, inexact('src/pages/open-div.html')],
+  // A colour that is not the whole value of its property (the functional plan's scenario).
+  [{ 'src/styles/border.css': BASE['src/styles/border.css'].replace('#0a58ca', '#0b5ed7') }, null, inexact('src/styles/border.css')],
+  // Markdown: an `import` line right after a heading; a heading whose generated anchor changes.
+  [{ 'docs/heading-import.md': BASE['docs/heading-import.md'].replace('./chart', './other') }, null, unrecognised('docs/heading-import.md')],
+  [{ 'docs/heading.md': BASE['docs/heading.md'].replace('Install', 'Setup') }, null, inexact('docs/heading.md')],
+  // A sensitive word in full-width letters, and as a camel-case sub-word.
+  [{ '\uff21\uff35\uff34\uff28/index.html': BASE['\uff21\uff35\uff34\uff28/index.html'].replace('Save', 'Store') }, null, '\uff21\uff35\uff34\uff28/index.html sits in an area named auth, and such areas are never a hotfix'],
+  [{ 'src/pages/AuthPanel.html': BASE['src/pages/AuthPanel.html'].replace('Save', 'Store') }, null, 'src/pages/AuthPanel.html sits in an area named auth, and such areas are never a hotfix'],
+  [{ 'src/pages/paymentForm.html': BASE['src/pages/paymentForm.html'].replace('Save', 'Store') }, null, 'src/pages/paymentForm.html sits in an area named payment, and such areas are never a hotfix'],
+  // Refused on `5326daae` too, with another sentence: text inside a custom element, and an
+  // autolink's own text (one opaque piece, compared exactly).
+  [{ 'src/pages/card.html': BASE['src/pages/card.html'].replace('Save', 'Store') }, null, inexact('src/pages/card.html')],
+  [{ 'docs/autolink.md': BASE['docs/autolink.md'].replace('guide', 'other') }, null, unrecognised('docs/autolink.md')]
 ];
 
 // The owner's decision of 2026-10-09 (answer "a"): the hotfix check keeps only the formats
@@ -570,9 +626,9 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 30, 'the corpus holds 30 shapes that qualify');
+assert.equal(QUALIFY.length, 34, 'the corpus holds 34 shapes that qualify');
 assert.equal(REMOVED_FORMATS.length, 42, 'the corpus holds 42 cases of removed formats');
-assert.equal(TRAPS.length, 195, 'the corpus holds 195 traps, the removed formats among them');
+assert.equal(TRAPS.length, 211, 'the corpus holds 211 traps, the removed formats among them');
 
 let root;
 
