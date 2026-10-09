@@ -304,16 +304,67 @@ const DOC_EXT = new Set(['.md', '.txt']);
 const MARKUP_EXT = new Set(['.html', '.htm']);
 const CATALOGUE_EXT = new Set(['.json', '.yaml', '.yml', '.properties']);
 const CATALOGUE_FOLDERS = new Set(['locales', 'locale', 'i18n', 'lang', 'translations', 'messages']);
+/**
+ * @param {string} s @returns {boolean} a language tag: two or three letters, optionally with
+ * one more part behind `-` or `_`, a region (two letters or three digits) or a script (four
+ * letters): `en`, `en-US`, `pt_BR`, `zh-Hans`
+ */
+function languageTag(s) {
+  const [language, part, more] = s.split(/[-_]/);
+  return more === undefined && /^[a-z]{2,3}$/i.test(language) && (part === undefined || /^[a-z]{2}$|^[a-z]{4}$|^\d{3}$/i.test(part));
+}
+/** The names of wording bundles, which may carry a language tag behind `_` (`messages_fr`). */
+const WORDING_BUNDLES = new Set(['messages', 'strings', 'translations', 'labels', 'texts']);
+/**
+ * Rule 4 — a catalogue file by its place and its name (the decision at review of 2026-10-09):
+ * it lies under a catalogue folder, and its name without the extension, or a folder between
+ * the catalogue folder and the file, is a language tag ({@link languageTag}), or its name is
+ * a wording bundle's ({@link WORDING_BUNDLES}), alone or with a tag behind `_`. A catalogue
+ * folder alone makes no catalogue: `i18n/routes.json` and `locales/settings.yml` are settings.
+ * @param {string} stem the base name without its extension @param {string[]} folders the folders above the file, lower case
+ * @returns {boolean}
+ */
+function catalogueFile(stem, folders) {
+  const at = folders.findIndex((p) => CATALOGUE_FOLDERS.has(p));
+  if (at < 0) return false;
+  if (languageTag(stem) || folders.slice(at + 1).some(languageTag)) return true;
+  const cut = stem.indexOf('_');
+  return WORDING_BUNDLES.has((cut < 0 ? stem : stem.slice(0, cut)).toLowerCase()) && (cut < 0 || languageTag(stem.slice(cut + 1)));
+}
 const TEST_FOLDERS = new Set(['test', 'tests', '__tests__', 'spec']);
+/** Dependency lists and lock files, by name in lower case; every `*.lock` is one too. */
 const DEPENDENCY_NAMES = new Set(['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock',
-  'pnpm-lock.yaml', 'bun.lockb', 'Pipfile', 'Pipfile.lock', 'pyproject.toml', 'poetry.lock', 'uv.lock',
-  'go.mod', 'go.sum', 'Cargo.toml', 'Cargo.lock', 'Gemfile', 'Gemfile.lock', 'composer.json',
+  'pnpm-lock.yaml', 'bun.lockb', 'pipfile', 'pipfile.lock', 'pyproject.toml', 'poetry.lock', 'uv.lock',
+  'go.mod', 'go.sum', 'cargo.toml', 'cargo.lock', 'gemfile', 'gemfile.lock', 'composer.json',
   'composer.lock', 'pom.xml']);
 const DATABASE_FOLDERS = new Set(['migrations', 'migration', 'migrate']);
 /** Build lists that end in `.txt` and so are never documentation (compared in lower case). */
 const BUILD_TEXT_NAMES = new Set(['cmakelists.txt', 'runtime.txt', 'packages.txt', 'apt.txt', 'version.txt']);
-const BUILD_NAMES = new Set(['Makefile', 'Jenkinsfile', 'Procfile', 'Vagrantfile', '.gitlab-ci.yml',
-  'docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml']);
+/** Build files by name, in lower case; `dockerfile`, `dockerfile.*` and `docker-compose*.yml` are named in {@link namedKind}. */
+const BUILD_NAMES = new Set(['makefile', 'jenkinsfile', 'procfile', 'vagrantfile', '.gitlab-ci.yml', 'compose.yml', 'compose.yaml']);
+/** The configuration files of the common build tools. */
+const BUILD_CONFIG = /^(webpack|vite|rollup|esbuild|babel|tsup|turbo)\.config\./;
+/**
+ * Rule 4 — what a file is BY ITS NAME ALONE, in lower case, wherever it lies: a dependency
+ * list or lock file, a build file, or a settings file. Decided before any qualifying kind
+ * (the decision at review of 2026-10-09: `locales/package.json`, `messages/docker-compose.yml`
+ * and `i18n/tsconfig.json` are no catalogues), and the one place that decides it: the table
+ * of the other kinds in {@link kindOf} asks this function too.
+ * @param {string} lowerBase the base name, lower case @param {string} ext its extension, lower case
+ * @param {string[]} topFolders the folders above the file from the repository's top, lower case
+ * @returns {('dependencies'|'build'|'setting'|null)}
+ */
+function namedKind(lowerBase, ext, topFolders) {
+  if (DEPENDENCY_NAMES.has(lowerBase) || lowerBase.endsWith('.lock')
+    || (ext === '.txt' && (lowerBase.includes('requirements') || lowerBase.includes('constraints') || topFolders.includes('requirements')))) return 'dependencies';
+  if (lowerBase === 'dockerfile' || lowerBase.startsWith('dockerfile.') || BUILD_NAMES.has(lowerBase) || BUILD_TEXT_NAMES.has(lowerBase)
+    || (lowerBase.startsWith('docker-compose') && (ext === '.yml' || ext === '.yaml')) || ext === '.gradle' || lowerBase.endsWith('.gradle.kts')
+    || BUILD_CONFIG.test(lowerBase)) return 'build';
+  if (SETTINGS_TEXT_NAMES.has(lowerBase) || lowerBase === '.env' || lowerBase.startsWith('.env.') || lowerBase === 'jsconfig.json'
+    || (lowerBase.startsWith('tsconfig') && ext === '.json') || lowerBase.endsWith('.config.json')
+    || (lowerBase.startsWith('application') && (ext === '.properties' || ext === '.yml' || ext === '.yaml'))) return 'setting';
+  return null;
+}
 /** Folders whose every file is about building or shipping; their documentation too (`.changeset/` notes ship with a release). */
 const BUILD_FOLDERS = new Set(['.github', '.gitlab', '.circleci', '.buildkite', '.changeset']);
 /** Text files that crawlers, advertisers, security researchers and language models read as settings. */
@@ -374,14 +425,31 @@ const NAMED_COLOURS = new Set(('aliceblue antiquewhite aqua aquamarine azure bei
   + 'slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white '
   + 'whitesmoke yellow yellowgreen transparent').split(' '));
 
-const PLACEHOLDER = /\{\{[^{}]*\}\}|\{[^{}]*\}|%(?:\d\$)?[sdif@]/g;
-const RISK_MARKER = /[\p{Nd}\p{Sc}%<>{}$`@]|:\/\/|www\./iu;
-/** Documentation's risk markers, read in the changed words only: a number, a price, a web address, an e-mail address (and {@link HEX_WORD}). */
-const DOC_RISK = /[\p{Nd}\p{Sc}@]|:\/\/|www\./iu;
-/** A catalogue value that starts like an address: a scheme (`javascript:x`, `mailto:x`), a path (`/`, `//`) or `\`. */
-const ADDRESS_START = /^(?:[A-Za-z][\w+.-]*:\S|[/\\])/;
-/** A bare YAML or properties value that a program reads as a switch or nothing, never as wording. */
-const BARE_SCALAR = /^(?:true|false|yes|no|on|off|null|~)$/i;
+/*
+ * THE WORDING RULE (rule 6; widened by the decisions at review of 2026-10-09). One pattern
+ * for every kind: a changed text run of a page, a changed catalogue value and, in
+ * documentation, the changed words hold none of
+ *   - a number character of any script and any kind (`\p{N}`: a decimal digit, a Roman
+ *     numeral character, a superscript, a circled digit, a fraction), a currency sign, `%`,
+ *     `@`, `<`, `>`, `{`, `}`, `$` or a backtick;
+ *   - a web address: `://`, `www.`, a bare host (`label.label` whose last label is two or
+ *     more letters: `account.example.com`, and so also `Node.js` and `file.txt`) or a scheme
+ *     anywhere ({@link SCHEME});
+ *   - a character no reader sees ({@link UNSEEN_CHARACTER}: a control or format character,
+ *     a right-to-left override among them).
+ * KNOWN LIMIT: a Roman numeral written in letters (`VIII`) is a word to every rule.
+ */
+const RISK_MARKER = /[\p{N}\p{Sc}%<>{}$`@]|:\/\/|www\.|(?<=[\p{L}\p{N}])\.\p{L}{2,}/iu;
+/** A scheme: a letter or a digit, a colon, then anything but white space (`mailto:x`, `javascript:go()`); one pattern for rule 6 and for the catalogue reader. */
+const SCHEME = /(?<=[\p{L}\p{N}]):\S/u;
+/** A catalogue value that starts like a path: `/`, `//` or `\`. */
+const PATH_START = /^[/\\]/;
+/**
+ * A bare YAML or properties value that a program reads as a switch, as nothing or as a
+ * number that holds no digit, never as wording; and, as a YAML key, a word a YAML reader may
+ * read as another type.
+ */
+const BARE_SCALAR = /^(?:true|false|yes|no|on|off|null|~|[-+]?\.inf|\.nan)$/i;
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
 /** A character a single-quoted path in the commit command cannot carry, or slice 2's reader refuses. */
 const UNCARRIABLE = /['"$\\`\u0000-\u001f\u007f-\u009f]/;
@@ -880,8 +948,8 @@ function commonEnds(o, n) {
  */
 /** @type {('open'|'lost'|'subset'|null)} the first fault the scanners met since rule 4 last reset it */
 let scanFault = null;
-/** @param {'open'|'lost'} kind */
-const fault = (kind) => { if (scanFault === null) scanFault = kind; };
+/** @param {'open'|'lost'} kind @returns {null} what a reader that met the fault answers */
+const fault = (kind) => { if (scanFault === null) scanFault = kind; return null; };
 /** The markup holds something outside the strict subset: the whole file is refused. */
 const outside = () => { if (scanFault === null) scanFault = 'subset'; };
 
@@ -1527,66 +1595,6 @@ function markupWording(toks, k) {
   return beside(toks[k - 1]) && beside(toks[k + 1]);
 }
 
-/**
- * Rule 4 (message catalogue) — whether each line of a catalogue starts a fresh entry, which
- * is the one state where a line is read alone: never a line inside a YAML block scalar
- * (`|`, `>` and the lines indented beneath its key), a YAML quoted value or flow collection
- * begun on an earlier line, or a properties value continued by a `\` at the end of the line
- * above. One pass.
- * @param {string} text line feeds only @param {string} ext @returns {boolean[]}
- */
-function entryLines(text, ext) {
-  const lines = text.split('\n');
-  const fresh = new Array(lines.length).fill(true);
-  const indent = (l) => l.length - l.trimStart().length;
-  if (ext === '.properties') {
-    for (let i = 1; i < lines.length; i++) {
-      const m = /\\+$/.exec(lines[i - 1]);
-      fresh[i] = !(m && m[0].length % 2 === 1);
-    }
-    return fresh;
-  }
-  if (ext !== '.yaml' && ext !== '.yml') return fresh;
-  let block = -1; // inside a block scalar while a line is blank or indented deeper than this
-  let quote = ''; // a quoted value still open
-  let flow = 0; // open `[` and `{` of a flow collection
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    let from = 0;
-    if (quote || flow > 0) {
-      fresh[i] = false;
-    } else if (block >= 0 && (line.trim() === '' || indent(line) > block)) {
-      fresh[i] = false;
-      continue;
-    } else {
-      block = -1;
-      const at = line.indexOf(': ');
-      const value = at < 0 ? '' : line.slice(at + 2).trimStart();
-      if (value[0] === '|' || value[0] === '>') { // a block scalar header: indicators, then at most a comment
-        let k = 1;
-        while (k < value.length && '-+0123456789'.includes(value[k])) k++;
-        const rest = value.slice(k).trimEnd();
-        if (rest === '' || /^[ \t]+#/.test(rest)) block = indent(line);
-      }
-      if (!'"\'[{'.includes(value[0] || 'x')) continue; // a plain value: its quotes are text
-      from = line.length - value.length;
-    }
-    // Follow a quoted value or a flow collection through the line (escapes and doubled quotes skipped).
-    for (let j = from; j < line.length; j++) {
-      const c = line[j];
-      if (quote) {
-        if (quote === '"' && c === '\\') j++;
-        else if (c === "'" && quote === "'" && line[j + 1] === "'") j++;
-        else if (c === quote) quote = '';
-      } else if (c === '"' || c === "'") quote = c;
-      else if (c === '[' || c === '{') flow++;
-      else if ((c === ']' || c === '}') && flow > 0) flow--;
-      if (!quote && flow === 0 && j >= from && fresh[i]) break; // the value closed on its own line
-    }
-  }
-  return fresh;
-}
-
 /** @param {Hunk[]} hunks @returns {boolean} every group replaces line for line */
 const equalHunks = (hunks) => hunks.length > 0 && hunks.every((h) => h.removed.length > 0 && h.removed.length === h.added.length);
 
@@ -1597,38 +1605,6 @@ function* linePairs(hunks) {
       yield { o: h.removed[i], n: h.added[i], oldLine: h.oldStart + i, newLine: h.newStart + i };
     }
   }
-}
-
-/**
- * Rule 4 (message catalogue) — split one line into its key part and its value; `bare` when
- * the value is an unquoted YAML or properties value.
- * @param {string} line
- * @param {string} ext
- * @returns {{key: string, value: string, bare?: boolean, quote?: string}|null}
- */
-function catalogueEntry(line, ext) {
-  let m;
-  if (ext === '.json') {
-    // The tail is one run of white space and commas, at most one comma, read in one pass
-    // (`\s*,?\s*` tried every split of the white space: 100,000 trailing spaces before a
-    // stray character took 3.7 s; `\s*(?:,\s*)?` is refused by the unsafe-pattern lint rule).
-    m = /^(\s*"(?:[^"\\]|\\.)*"\s*:\s*)"((?:[^"\\]|\\.)*)"([\s,]*)$/.exec(line);
-    return m && m[3].indexOf(',') === m[3].lastIndexOf(',') ? { key: `${m[1]}\u0000${m[3]}`, value: m[2] } : null;
-  }
-  if (ext === '.properties') {
-    m = /^(\s*[^\s=:#!][^=:]*[=:][ \t]*)(.*)$/.exec(line);
-    return m && !m[2].endsWith('\\') ? { key: m[1], value: m[2], bare: true } : null;
-  }
-  m = /^(\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[A-Za-z0-9_][\w.-]*)[ \t]*:[ \t]+)(.*)$/.exec(line);
-  if (!m) return null;
-  const value = m[2].trimEnd();
-  if (value === '') return null;
-  if (value[0] === '"') return /^"(?:[^"\\]|\\.)*"$/.test(value) ? { key: m[1], value: value.slice(1, -1), quote: '"' } : null;
-  if (value[0] === "'") return /^'(?:[^']|'')*'$/.test(value) ? { key: m[1], value: value.slice(1, -1), quote: "'" } : null;
-  // A plain value that YAML reads as structure, a comment or an alias, never as wording.
-  if ('[]{}&*!|>%@`#'.includes(value[0]) || /^[-?:](?:[ \t]|$)/.test(value) || value.includes(' #')
-    || value.includes(': ') || value.endsWith(':')) return null;
-  return { key: m[1], value, bare: true };
 }
 
 /** YAML's double-quoted escapes, by the character after the backslash. */
@@ -1668,26 +1644,6 @@ function unescapeValue(raw, simple, hex, keep) {
 }
 
 /**
- * Rule 4 (message catalogue) — the value as the program reads it: a JSON string through
- * `JSON.parse`, a YAML double-quoted value through YAML's escapes (single-quoted: `''` is
- * `'`), a properties value through its own (a backslash before any other character is that
- * character); null for an escape the format refuses.
- * @param {{value: string, quote?: string}} entry @param {string} ext @returns {string|null}
- */
-function decodeValue(entry, ext) {
-  if (ext === '.json') {
-    try {
-      return JSON.parse(`"${entry.value}"`);
-    } catch {
-      return null;
-    }
-  }
-  if (ext === '.properties') return unescapeValue(entry.value, PROPERTIES_ESCAPES, { u: 4 }, true);
-  if (entry.quote === '"') return unescapeValue(entry.value, YAML_ESCAPES, { x: 2, u: 4, U: 8 }, false);
-  return entry.quote === "'" ? entry.value.replace(/''/g, "'") : entry.value;
-}
-
-/**
  * @param {string} s @returns {string} the text without tabs and line breaks, and without
  * control characters and spaces at either end — what a browser keeps of an address
  */
@@ -1700,25 +1656,305 @@ function asAddress(s) {
   return t.slice(a, b);
 }
 
-/**
- * Rule 4 (message catalogue) — the value reads as wording. It is decoded first
- * ({@link decodeValue}), then read as a browser reads an address ({@link asAddress}); it
- * needs a letter outside its placeholders, no start like an address (a scheme such as
- * `javascript:`, `/`, `//` or `\`), and, unquoted in YAML or properties, it is no switch
- * (`true`, `off`, `null`, `~`). Returns the read value, which rule 6 then reads, or null.
- * @param {{value: string, bare?: boolean, quote?: string}} entry @param {string} ext
- * @returns {string|null}
+/*
+ * MESSAGE CATALOGUES (rule 4; the decisions at review of 2026-10-09). Each format has ONE
+ * reader, and it reads the whole file on both sides: a line is never read alone, because
+ * what a line means is decided by the lines around it (a block scalar, a quoted value that
+ * runs on, a duplicate key further down). Each reader accepts a STRICT SUBSET of its format,
+ * in which every reader of that format agrees, and a file with anything outside it "holds
+ * something I cannot follow" ({@link fault}). The two sides must then be the same file but
+ * for string values, and each changed value must read as wording ({@link catalogueRuns}).
+ *   JSON        `JSON.parse`, and nothing written by hand. The file must be exactly what
+ *               `JSON.stringify` writes of the parsed value with the file's own indentation,
+ *               so a duplicate key (the parse keeps one), a number written otherwise, an
+ *               escape nobody needs and keys JavaScript reorders all fail the comparison; a
+ *               comment or a trailing comma fails the parse.
+ *   YAML        blank lines, comments, `key: value`, `key:` and `- value` lines, with plain
+ *               keys and plain or quoted values that end on their line; held to js-yaml by the
+ *               differential test ({@link yamlEntries}).
+ *   properties  blank lines, comments and `key=value` lines; a continued line anywhere is
+ *               outside it ({@link propertiesEntries}).
  */
-function catalogueWording(entry, ext) {
-  const decoded = decodeValue(entry, ext);
-  if (decoded === null) return null;
-  const v = asAddress(decoded);
-  const wording = /\p{L}/u.test(v.replace(PLACEHOLDER, '')) && !ADDRESS_START.test(v) && !(entry.bare && BARE_SCALAR.test(v));
-  return wording ? v : null;
+
+/**
+ * The placeholders a message carries, in every form the catalogues of the common frameworks
+ * use: `{{name}}`, `%{name}`, `{name}`, `%1$s`, `%s` (also `d`, `i`, `f`, `@`), `$name` and
+ * `:name`. A colon counts only where no letter or digit stands before it (`Note:this` is no
+ * placeholder).
+ */
+const PLACEHOLDER = /\{\{[^{}]*\}\}|%\{[^{}]*\}|\{[^{}]*\}|%\d+\$[sdif@]|%[sdif@]|\$[A-Za-z_]\w*|(?<![\p{L}\p{N}]):[A-Za-z_]\w*/gu;
+/** @param {string} value @returns {string} its placeholders in the order they stand, as one comparable string */
+const placeholders = (value) => (value.match(PLACEHOLDER) || []).join('\u0000');
+
+/**
+ * Rule 4 (message catalogue) — the changed values of a catalogue read as wording, or null.
+ * Each pair holds the old and the new value as the program reads them (decoded) and whether
+ * they were written without quotes. Both carry the same placeholders in the same order; each
+ * is read as a browser reads an address ({@link asAddress}) and needs a letter outside its
+ * placeholders, no start like a path (`/`, `//`, `\`), no scheme anywhere ({@link SCHEME}),
+ * and, written without quotes in YAML or a properties file, it is no switch
+ * ({@link BARE_SCALAR}). A change that changes no value is none. Returns what rule 6 reads:
+ * the old and the new value of each pair, as written and as an address, without their
+ * placeholders.
+ * @param {Array<[string, string, boolean]>} changed @returns {(string[]|null)}
+ */
+function catalogueRuns(changed) {
+  const runs = [];
+  for (const [before, after, bare] of changed) {
+    if (before === after || placeholders(before) !== placeholders(after)) return null;
+    for (const value of [before, after]) {
+      const v = asAddress(value);
+      if (!/\p{L}/u.test(v.replace(PLACEHOLDER, '')) || PATH_START.test(v) || SCHEME.test(v) || (bare && BARE_SCALAR.test(v))) return null;
+      // Rule 6 reads the value as it is and as an address-reader keeps it: the first still
+      // holds a control character at its end, the second has no tab or line break left inside.
+      runs.push(value.replace(PLACEHOLDER, ''), v.replace(PLACEHOLDER, ''));
+    }
+  }
+  return changed.length > 0 ? runs : null;
 }
 
-/** @param {string} value @returns {string} the placeholders, sorted, as one comparable string */
-const placeholders = (value) => (value.match(PLACEHOLDER) || []).sort().join('\u0000');
+/**
+ * Rule 4 (message catalogue, JSON) — one side as `JSON.parse` reads it, when the file is
+ * exactly what `JSON.stringify` writes of that value with the file's own indentation (the
+ * white space that starts its second line), with or without one last line break; or null: a
+ * file `JSON.parse` refuses, one written in another form, or one with no indentation (its one
+ * line would hold every string of the catalogue, and a change to all of them would count as
+ * two changed lines). Only a syntax error of the parse is caught; any other fault stops the
+ * check.
+ * @param {string} text line feeds only
+ * @returns {({value: unknown, form: string}|null)} `form`: the indentation and whether a line break ends the file
+ */
+function jsonSide(text) {
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch (err) {
+    if (err instanceof SyntaxError) return null;
+    throw err;
+  }
+  const indent = /\n([ \t]+)/.exec(text);
+  if (indent === null) return null;
+  const written = JSON.stringify(value, null, indent[1]);
+  if (text !== written && text !== `${written}\n`) return null;
+  return { value, form: `${indent[1]}${text.length - written.length}` };
+}
+
+/**
+ * Rule 4 (message catalogue, JSON) — the string values that differ between two parsed
+ * catalogues, or null when anything else does: the two must hold the same keys in the same
+ * order, lists of the same length, and the same value everywhere but in strings. Walked with
+ * a stack of its own, so a deeply nested file cannot exhaust the call stack.
+ * @param {unknown} oldValue @param {unknown} newValue @returns {(Array<[string, string, boolean]>|null)}
+ */
+function jsonChanges(oldValue, newValue) {
+  /** @type {Array<[string, string, boolean]>} */
+  const changed = [];
+  /** @type {Array<[any, any]>} */
+  const pending = [[oldValue, newValue]];
+  while (pending.length > 0) {
+    const [a, b] = /** @type {[any, any]} */ (pending.pop());
+    if (typeof a === 'string' && typeof b === 'string') {
+      if (a !== b) changed.push([a, b, false]);
+    } else if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
+      if (a !== b) return null;
+    } else {
+      const keys = Object.keys(a);
+      const others = Object.keys(b);
+      if (Array.isArray(a) !== Array.isArray(b) || keys.length !== others.length) return null;
+      for (let k = 0; k < keys.length; k++) {
+        if (keys[k] !== others[k]) return null;
+        pending.push([a[keys[k]], b[keys[k]]]);
+      }
+    }
+  }
+  return changed;
+}
+
+/** A plain YAML key and its colon: a word that starts with a letter or `_`, then letters, digits, `_`, `.` and `-`. */
+const YAML_KEY = /^( *)([A-Za-z_][\w.-]*):(?: +|$)/;
+/** A YAML list item's marker. */
+const YAML_ITEM = /^( *)- +/;
+/** What no line of a YAML catalogue holds: a control character but the line feed (a tab and a carriage return on its own among them), a line or paragraph separator. */
+const YAML_UNSEEN = /(?!\n)[\p{Cc}\u2028\u2029\ufffe\uffff]/u;
+
+/**
+ * Rule 4 (message catalogue, YAML) — one scalar that ends on its line: double-quoted (YAML's
+ * escapes decoded), single-quoted (`''` is `'`), or plain. A plain scalar starts with none of
+ * YAML's indicators (a tag `!`, an anchor `&`, an alias `*`, a flow collection `[` or `{`, a
+ * block scalar `|` or `>`, a complex key `?`, and `-`, `:`, `,`, `#`, `@`, a backtick, `%`,
+ * `]`, `}`), holds no ` #` (a comment) and no `: ` (a mapping), and does not end in `:`.
+ * @param {string} raw the text behind the key or the item marker, with no white space at its end
+ * @returns {({text: string, quote: string}|null)} null: no such scalar
+ */
+function yamlScalar(raw) {
+  if (raw[0] === '"') {
+    const text = /^"(?:[^"\\]|\\.)*"$/.test(raw) ? unescapeValue(raw.slice(1, -1), YAML_ESCAPES, { x: 2, u: 4, U: 8 }, false) : null;
+    return text === null ? null : { text, quote: '"' };
+  }
+  if (raw[0] === "'") return /^'(?:[^']|'')*'$/.test(raw) ? { text: raw.slice(1, -1).replace(/''/g, "'"), quote: "'" } : null;
+  if ('!&*[]{}|>?-:,#@`%'.includes(raw[0]) || raw.includes(' #') || raw.includes(': ') || raw.endsWith(':')) return null;
+  return { text: raw, quote: '' };
+}
+
+/**
+ * @typedef {Object} CatalogueLine one line of a YAML or properties catalogue
+ * @property {string} line the line as written
+ * @property {string} [head] for a line that carries a value: everything before the value
+ * @property {string} [text] the value as the program reads it
+ * @property {string} [quote] how a YAML value is quoted: `"`, `'` or not at all
+ * @property {number} [tail] how much white space ends the line
+ */
+
+/**
+ * Rule 4 (message catalogue, YAML) — the lines of a YAML catalogue in the strict subset, or
+ * null when the file holds anything outside it (the decision at review of 2026-10-09). The
+ * subset: an optional `---` as the first line; blank lines; comment lines; `key: value`,
+ * `key:` and `- value` lines, the key a plain word ({@link YAML_KEY}) that is none of YAML's
+ * switches ({@link BARE_SCALAR}), the value one scalar that ends on its line
+ * ({@link yamlScalar}). So the file holds no tag, anchor, alias, flow collection, block
+ * scalar, scalar over several lines, document marker after the first line, tab, complex key
+ * or quoted key. The indentation must be a mapping's or a list's: a line stands as deep as
+ * the lines of the mapping or list it belongs to; only the line right under a `key:` may
+ * stand deeper (a list may also stand as deep as its key); and no key occurs twice in one
+ * mapping. js-yaml reads such a file as this reader does: the differential test holds it to
+ * that.
+ * @param {string} text line feeds only, without a leading byte-order mark
+ * @returns {(CatalogueLine[]|null)}
+ */
+function yamlEntries(text) {
+  if (YAML_UNSEEN.test(text)) return null;
+  /** @type {CatalogueLine[]} */
+  const out = [];
+  /** @type {Array<{indent: number, list: boolean, keys: Set<string>}>} the open mappings and lists, the innermost last */
+  const open = [];
+  let parent = -1; // the indentation of a `key:` line right above, or -1
+  let started = false; // the document's first mapping or list is open
+  const lines = text.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^ *$/.test(line) || /^ *#/.test(line) || (i === 0 && line === '---')) {
+      out.push({ line });
+      continue;
+    }
+    const written = line.trimEnd();
+    const key = YAML_KEY.exec(written);
+    const item = key ? null : YAML_ITEM.exec(written);
+    const mark = key || item;
+    if (mark === null || (key && BARE_SCALAR.test(key[2]))) return null;
+    const indent = mark[1].length;
+    const raw = written.slice(mark[0].length);
+    const value = raw === '' ? null : yamlScalar(raw);
+    if (raw === '' ? item !== null : value === null) return null; // an item with nothing behind it, or no scalar that ends on its line
+    if (parent >= 0 && (indent > parent || (indent === parent && item !== null))) {
+      open.push({ indent, list: item !== null, keys: new Set() }); // the mapping or list of the `key:` right above
+    } else {
+      while (open.length > 0 && open[open.length - 1].indent > indent) open.pop();
+      // A list that stands as deep as its key ends where the next key of that mapping stands.
+      if (key && open.length > 1 && open[open.length - 1].list && open[open.length - 1].indent === indent && !open[open.length - 2].list
+        && open[open.length - 2].indent === indent) open.pop();
+      if (!started) open.push({ indent, list: item !== null, keys: new Set() }); // the first line of the document
+    }
+    started = true;
+    const top = open[open.length - 1];
+    if (top === undefined || top.indent !== indent || top.list !== (item !== null)) return null;
+    if (key) {
+      if (top.keys.has(key[2])) return null;
+      top.keys.add(key[2]);
+    }
+    parent = key && value === null ? indent : -1;
+    out.push(value === null ? { line, head: written } : { line, head: mark[0], text: value.text, quote: value.quote, tail: line.length - written.length });
+  }
+  return out;
+}
+
+/**
+ * Rule 4 (message catalogue, properties) — the lines of a Java properties file in the strict
+ * subset, or null when a line ends in a backslash (a line continued on the next, or an
+ * escaped backslash that another reader takes for one) or the file holds a carriage return
+ * on its own (a line break to Java). A line is blank, a comment (`#` or `!`), or an entry.
+ * The key ends at the first unescaped `=`, `:` or white space, as Java reads it. A line
+ * CARRIES A VALUE only when its key holds no backslash and `=` or `:` follows it, behind
+ * white space at most: where white space alone ends the key, or the key holds an escaped
+ * separator, a reader that splits at the first `=` takes another key than Java does, so such
+ * a line may stand in the file but may not change.
+ * @param {string} text line feeds only, without a leading byte-order mark
+ * @returns {(CatalogueLine[]|null)}
+ */
+function propertiesEntries(text) {
+  if (text.includes('\r')) return null;
+  /** @type {CatalogueLine[]} */
+  const out = [];
+  const space = (c) => c === ' ' || c === '\t' || c === '\f';
+  for (const line of text.split('\n')) {
+    if (line.endsWith('\\')) return null;
+    let at = 0;
+    while (space(line[at])) at++;
+    const start = at;
+    if (at === line.length || line[at] === '#' || line[at] === '!') {
+      out.push({ line });
+      continue;
+    }
+    while (at < line.length && !space(line[at]) && line[at] !== '=' && line[at] !== ':') at += line[at] === '\\' ? 2 : 1;
+    const key = line.slice(start, at);
+    while (space(line[at])) at++;
+    if (key.includes('\\') || (line[at] !== '=' && line[at] !== ':')) {
+      out.push({ line });
+      continue;
+    }
+    at++;
+    while (space(line[at])) at++;
+    const value = unescapeValue(line.slice(at), PROPERTIES_ESCAPES, { u: 4 }, true);
+    out.push(value === null ? { line } : { line, head: line.slice(0, at), text: value, quote: '', tail: 0 });
+  }
+  return out;
+}
+
+/**
+ * Rule 4 (message catalogue, YAML and properties) — the values that differ between the two
+ * sides, or null when anything else does: the same number of lines, and every line that
+ * differs carries a value on both sides, behind the same key and marker, in the same quotes
+ * and before the same white space.
+ * @param {CatalogueLine[]} a @param {CatalogueLine[]} b @returns {(Array<[string, string, boolean]>|null)}
+ */
+function lineChanges(a, b) {
+  if (a.length !== b.length) return null;
+  /** @type {Array<[string, string, boolean]>} */
+  const changed = [];
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (x.line === y.line) continue;
+    if (x.text === undefined || y.text === undefined || x.head !== y.head || x.quote !== y.quote || x.tail !== y.tail) return null;
+    changed.push([x.text, y.text, x.quote === '']);
+  }
+  return changed;
+}
+
+/**
+ * Rule 4 (message catalogue) — the wording a catalogue change alters, read by the one reader
+ * of the file's format on both whole sides; null when the change is anything but a change to
+ * string values that read as wording. A side its reader cannot follow is a fault
+ * ({@link fault}): the answer is then never a pass.
+ * @param {string} oldText @param {string} newText line feeds only; YAML and properties without a leading byte-order mark
+ * @param {string} ext `.json`, `.yaml`, `.yml` or `.properties`
+ * @returns {(string[]|null)}
+ */
+function catalogueChange(oldText, newText, ext) {
+  let changed;
+  if (ext === '.json') {
+    const a = jsonSide(oldText);
+    const b = jsonSide(newText);
+    if (a === null || b === null) return fault('lost');
+    changed = a.form === b.form ? jsonChanges(a.value, b.value) : null;
+  } else {
+    const read = ext === '.properties' ? propertiesEntries : yamlEntries;
+    const a = read(oldText);
+    const b = read(newText);
+    if (a === null || b === null) return fault('lost');
+    changed = lineChanges(a, b);
+  }
+  return changed === null ? null : catalogueRuns(changed);
+}
 
 /**
  * Rule 4 (colour) — the stylesheet with every string, every `/* … *\/` comment and every
@@ -2365,16 +2601,13 @@ function kindOf(f) {
   const unrecognised = { clause: `I do not recognise ${d} as wording or a colour`, cause: 'unrecognised' };
   const setting = { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
   const build = { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
-  const isDependency = DEPENDENCY_NAMES.has(base)
-    || (ext === '.txt' && (/requirements|constraints/i.test(base) || topFolders.includes('requirements')));
+  const named = namedKind(lowerBase, ext, topFolders);
   const governing = governingName(lowerBase)
     || topFolders.some((p, i) => GOVERNING_FOLDERS.has(p) || (p === '.github' && GITHUB_GOVERNING.has(topFolders[i + 1])));
   // Markdown under `.github/` outside `.github/workflows/` is the one documentation a
   // dot-folder may hold; every other dot-folder may be some tool's instructions.
   const githubDoc = (p, i) => p === '.github' && ext === '.md' && topFolders[i + 1] !== 'workflows';
   const dotFolder = topFolders.some((p, i) => p.startsWith('.') && p !== '.' && p !== '..' && !githubDoc(p, i));
-  const settingsText = SETTINGS_TEXT_NAMES.has(lowerBase);
-  const buildText = BUILD_TEXT_NAMES.has(lowerBase);
   const legal = DOC_EXT.has(ext) ? LEGAL_NAMES.find(([start]) => lowerBase.startsWith(start)) : undefined;
   // Markdown under `.github/` is documentation (a contributing guide, an issue template),
   // except under `.github/workflows/`; everything else under a build folder is the build.
@@ -2383,11 +2616,15 @@ function kindOf(f) {
   // A legal text never qualifies, whatever its change: the functional plan's clause for a sensitive area.
   if (legal) return { clause: `${d} sits in an area named ${legal[1]}, and such areas are never a hotfix`, cause: 'sensitive-area' };
   let kind = null;
-  // Plain text is documentation only under a documentation name; every other `.txt` falls to the clauses below.
-  if ((ext === '.md' || documentationText(lowerBase)) && !isDependency && !buildText && !settingsText) kind = 'documentation';
-  else if (MARKUP_EXT.has(ext)) kind = 'markup';
-  else if (CATALOGUE_EXT.has(ext) && folders.some((p) => CATALOGUE_FOLDERS.has(p))) kind = 'catalogue';
-  else if (ext === '.css') kind = 'colour';
+  // A dependency, build or settings name is none of the four kinds, whatever its extension
+  // and its folder. Plain text is documentation only under a documentation name; a catalogue
+  // is one only under a language tag or a wording bundle's name ({@link catalogueFile}).
+  if (named === null) {
+    if (ext === '.md' || documentationText(lowerBase)) kind = 'documentation';
+    else if (MARKUP_EXT.has(ext)) kind = 'markup';
+    else if (CATALOGUE_EXT.has(ext) && catalogueFile(base.slice(0, base.length - ext.length), folders)) kind = 'catalogue';
+    else if (ext === '.css') kind = 'colour';
+  }
   if (kind !== null && governing) return unrecognised;
   // A side emptied, or filled from empty, holds the content of a removal or an addition.
   if (kind !== null && (f.oldText === '') !== (f.newText === '')) return unrecognised;
@@ -2395,14 +2632,10 @@ function kindOf(f) {
   if (kind === 'documentation' && dotFolder) return unrecognised;
   if (kind !== null) return { kind };
 
-  if (isDependency) return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
+  if (named === 'dependencies') return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
   if (ext === '.sql' || topFolders.some((p) => DATABASE_FOLDERS.has(p))) return { clause: `it changes stored data in ${d}`, cause: 'stored-data' };
-  if (base === 'Dockerfile' || base.startsWith('Dockerfile.') || BUILD_NAMES.has(base) || buildText || ext === '.gradle'
-    || base.endsWith('.gradle.kts') || /^(webpack|vite|rollup|esbuild|babel|tsup|turbo)\.config\./.test(base)
-    || buildFolder) {
-    return build;
-  }
-  if (SETTINGS_EXT.has(ext) || settingsText || base === '.env' || base.startsWith('.env.')) return setting;
+  if (named === 'build' || buildFolder) return build;
+  if (named === 'setting' || SETTINGS_EXT.has(ext)) return setting;
   if (CODE_EXT.has(ext)) {
     const onlyText = equalHunks(f.hunks) && [...linePairs(f.hunks)].every((p) => emptyLiterals(p.o) === emptyLiterals(p.n));
     return onlyText
@@ -2431,38 +2664,32 @@ function readKind(f) {
     const runs = proseChange(/** @type {string} */ (f.oldText), /** @type {string} */ (f.newText));
     return runs ? { runs } : inexact;
   }
+  // A byte-order mark stands on both sides or on neither, and the number of carriage returns
+  // stays (the decision at review of 2026-10-09): the diff the size is counted from ignores a
+  // carriage return at a line's end, so neither may come or go unseen. A reader takes one
+  // leading mark off, as a browser and a parser do, and reads line feeds only.
+  const oldText = /** @type {string} */ (f.oldText);
+  const newText = /** @type {string} */ (f.newText);
+  const marked = (text) => text[0] === '\uFEFF';
+  const returns = (text) => text.split('\r').length;
+  if (marked(oldText) !== marked(newText) || returns(oldText) !== returns(newText)) return unrecognised;
+  const body = (text) => lineFeeds(text).slice(marked(text) ? 1 : 0);
   if (kind === 'markup') {
     if (!equalHunks(f.hunks)) return unrecognised;
-    // A browser takes one leading byte-order mark off the page before it reads it; the mark neither comes nor goes.
-    const marked = (text) => /** @type {string} */ (text)[0] === '\uFEFF';
-    if (marked(f.oldText) !== marked(f.newText)) return unrecognised;
-    const tokens = (text) => scanMarkup(lineFeeds(/** @type {string} */ (text)).slice(marked(text) ? 1 : 0));
-    const texts = changedTexts(tokens(f.oldText), tokens(f.newText), markupWording);
+    const texts = changedTexts(scanMarkup(body(oldText)), scanMarkup(body(newText)), markupWording);
     return texts.runs ? { runs: texts.runs } : texts.inexact ? inexact : unrecognised;
   }
   if (kind === 'catalogue') {
     if (!equalHunks(f.hunks)) return unrecognised;
-    const oldFresh = entryLines(lineFeeds(/** @type {string} */ (f.oldText)), ext);
-    const newFresh = entryLines(lineFeeds(/** @type {string} */ (f.newText)), ext);
-    const runs = [];
-    for (const pair of linePairs(f.hunks)) {
-      if (!oldFresh[pair.oldLine - 1] || !newFresh[pair.newLine - 1]) {
-        fault('lost'); // the line is read alone, but it does not start an entry
-        return unrecognised;
-      }
-      const a = catalogueEntry(pair.o, ext);
-      const b = catalogueEntry(pair.n, ext);
-      if (!a || !b || a.key !== b.key || a.value === b.value || placeholders(a.value) !== placeholders(b.value)) return unrecognised;
-      const oldValue = catalogueWording(a, ext);
-      const newValue = catalogueWording(b, ext);
-      if (oldValue === null || newValue === null) return unrecognised;
-      runs.push(oldValue.replace(PLACEHOLDER, ''), newValue.replace(PLACEHOLDER, ''));
-    }
-    return { runs };
+    // JSON.parse takes no byte-order mark, so a JSON file is handed to it as it is; js-yaml
+    // and a properties reader read past one.
+    const whole = ext === '.json' ? lineFeeds : body;
+    const runs = catalogueChange(whole(oldText), whole(newText), ext);
+    return runs ? { runs } : unrecognised;
   }
-  // The fourth kind: a colour in a stylesheet.
-  const o = lineFeeds(/** @type {string} */ (f.oldText));
-  const n = lineFeeds(/** @type {string} */ (f.newText));
+  if (kind !== 'colour') throw new Error(`no reader for the kind ${kind}`); // never a fall-back to another reader
+  const o = body(oldText);
+  const n = body(newText);
   // A custom property's change is a setting, unless the property is named for a colour and
   // holds exactly one colour before and after (any other value of such a property cannot be
   // read exactly); those values are then levelled, and what is left must be identical or a
@@ -2520,11 +2747,12 @@ function ruleSensitiveArea(f, ctoc) {
 
 /**
  * Rule 6 — the old and new wording of markup, catalogue and documentation files carries no
- * risk marker; in documentation the changed words ({@link proseChange}) also hold no word of
- * 7 to 40 hexadecimal digits ({@link HEX_WORD}).
+ * risk marker ({@link RISK_MARKER}), no scheme ({@link SCHEME}) and no character a reader
+ * does not see ({@link UNSEEN_CHARACTER}); in documentation the changed words
+ * ({@link proseChange}) also hold no word of 7 to 40 hexadecimal digits ({@link HEX_WORD}).
  */
 function ruleRiskMarker(f) {
-  const marked = f.kind === 'documentation' ? (r) => DOC_RISK.test(r) || HEX_WORD.test(r) : (r) => RISK_MARKER.test(r);
+  const marked = (r) => RISK_MARKER.test(r) || SCHEME.test(r) || UNSEEN_CHARACTER.test(r) || (f.kind === 'documentation' && HEX_WORD.test(r));
   return f.runs.some(marked)
     ? { clause: `the wording in ${f.display} contains a number, a price, a web address or an e-mail address`, cause: 'risk-marker' }
     : null;
