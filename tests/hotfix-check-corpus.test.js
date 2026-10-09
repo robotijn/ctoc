@@ -1400,7 +1400,16 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     'src/styles/brackets-deep.css': (n) => `a { color: red; }\nb { width: ${'calc('.repeat(40 * n)}1px${')'.repeat(40 * n)}; }\n`,
     'src/styles/reads.css': (n) => `:root { --brand-color: red; }\n${'a { color: var(--brand-color); }\n'.repeat(8 * n)}`,
     'src/styles/names.css': (n) => `:root { --brand-color: red; }\n${'.btn--brand-color, .x--y { margin: 0; }\n'.repeat(6 * n)}`,
-    'src/styles/statements.css': (n) => `a { color: red; }\n${'@media (min-width: 1px) { b { margin: 0; padding: 0 } }\n'.repeat(5 * n)}`
+    'src/styles/statements.css': (n) => `a { color: red; }\n${'@media (min-width: 1px) { b { margin: 0; padding: 0 } }\n'.repeat(5 * n)}`,
+    // What the coordinator's points at review added: a character set named many times, a value
+    // read as written and as decoded, a text read as its references spell it, and the ending
+    // of every line.
+    'src/pages/charsets.html': (n) => `<p>Old</p>\n${'<meta charset = "utf-8">\n'.repeat(10 * n)}`,
+    'src/pages/references.html': (n) => `<p>Old ${'&amp; &nbsp; &mdash; '.repeat(40 * n)}</p>\n`,
+    'src/styles/charsets.css': (n) => `@charset "utf-8";\na { color: red; }\n${'/* @charset "utf-8" */\n'.repeat(10 * n)}`,
+    'src/styles/endings.css': (n) => `a { color: red; }\r\n${'b { margin: 0; }\r\n'.repeat(12 * n)}`,
+    'locales/en/escapes.yml': (n) => `${Array.from({ length: 30 * n }, (_, i) => `key${i}: "Plain \\"words\\" here"`).join('\n')}\ntitle: "Old \\"words\\""\n`,
+    'locales/en/escapes.properties': (n) => `${Array.from({ length: 30 * n }, (_, i) => `key${i} = Plain\\: words here`).join('\n')}\ntitle = Old\\: words\n`
   };
   for (const [rel, build] of Object.entries(cases)) {
     const at = (n) => {
@@ -1412,7 +1421,7 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     if (/\.(?:rst|jsx|tsx|vue|scss)$/.test(rel)) assert.equal(at(1)().cause, 'unrecognised', rel);
     // The eighth round's inputs that end in a plain paragraph are read to the end and pass.
     // (`docs/comments-many.md` passed until the ninth round; a `<!--` anywhere now refuses the file.)
-    if (/^(?:docs\/(?:prose|fences-many|meta|spans|ticks-open|spaces|def-ends|fence-like|raw-near|items|colons)|NOTES|locales\/en\/|src\/styles\/(?:brackets|reads|names|statements))/.test(rel)) assert.equal(at(1)(), null, rel);
+    if (/^(?:docs\/(?:prose|fences-many|meta|spans|ticks-open|spaces|def-ends|fence-like|raw-near|items|colons)|NOTES|locales\/en\/|src\/styles\/(?:brackets|reads|names|statements|charsets|endings)|src\/pages\/(?:charsets|references))/.test(rel)) assert.equal(at(1)(), null, rel);
     // The largest input is about 1.6 million characters, four times the size a quadratic scan took seconds on.
     const { n, small, big, ratio } = growth(at, 16, Math.floor(1600000 / (build(64).length / 64)));
     assert.ok(ratio < 8, `${rel}: size ${n} took ${small.toFixed(1)} ms and size ${4 * n} took ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);

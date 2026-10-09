@@ -376,8 +376,8 @@ const DOC_TEXT_NAMES = new Set(['readme', 'changelog', 'changes', 'news', 'histo
 /**
  * Plain text qualifies only under a documentation name (the decision at review of
  * 2026-10-09), in any letter case, optionally with a language part: `README.txt`,
- * `README.en.txt`, `README.pt-BR.txt` (two or three letters, then at most two parts of two to
- * eight letters or digits behind `-` or `_`). Every other `.txt` is a kind the check does not
+ * `README.en.txt`, `README.pt-BR.txt` (a language tag, as one reader says for a catalogue and
+ * for this: {@link languageTag}). Every other `.txt` is a kind the check does not
  * recognise: a list of dependencies, a template with placeholders, a list of exclusions,
  * build options.
  * @param {string} lower the base name, lower case @returns {boolean}

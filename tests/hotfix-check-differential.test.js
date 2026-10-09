@@ -1031,7 +1031,8 @@ function yamlValue(r) {
     [W(2), () => `!!str ${w}`], [W(2), () => `&a ${w}`], [W(2), () => '*a'], [W(2), () => `[${w}, ${x}]`], [W(2), () => `{ a: ${w} }`],
     [W(2), () => '|'], [W(2), () => '>-'], [W(2), () => `${w} # ${x}`], [W(2), () => `${w}: ${x}`], [W(2), () => `${w}:`],
     [W(2), () => `"${w}" ${x}`], [W(1), () => `'${w}`], [W(1), () => `"${w}`], [W(1), () => `- ${w}`], [W(1), () => `-${w}`],
-    [W(1), () => `? ${w}`], [W(1), () => `%${w}`], [W(1), () => `@${w}`], [W(2), () => pick(r, ['~', 'true', 'True', 'no', 'null', '.inf', '.NaN', '12', '1.5', '2026-10-09', '0x1F', '1e3'])],
+    [W(1), () => `? ${w}`], [W(1), () => `%${w}`], [W(1), () => `@${w}`], [W(2), () => pick(r, ['~', 'true', 'True', 'no', 'null', '.inf', '.NaN', '12', '1.5', '2026-10-09', '0x1F', '1e3', 'yes', 'on', 'off', 'y', 'n', 'Yes', 'NO', 'Off', 'Null'])],
+    [W(1), () => `\`${w}`], [W(1), () => `,${w}`],
     [W(1), () => `"${w}\\q"`], [W(1), () => `${w}\t${x}`], [W(1), () => ''], [W(1), () => `${w} ${x}   `], [W(1), () => `:${w}`],
     [W(1), () => `${w}:${x}`], [W(1), () => `#${w}`], [W(1), () => `"${w}"   # ${x}`], [W(1), () => `!${w}`], [W(1), () => `>${w}`],
     [W(1), () => `[${w}`], [W(1), () => `${w}]`], [W(1), () => `{${w}}`], [W(1), () => `${w} \u2028 ${x}`], [W(1), () => `\u0007${w}`],
@@ -1327,14 +1328,16 @@ function hunksOf(oldText, newText) {
 
 const FILES = { html: 'site/page.html', markdown: 'docs/page.md', yaml: 'locales/en.yml', css: 'site/page.css' };
 
-function judge(kind, oldText, newText) {
-  const rel = FILES[kind];
+/** What the rules say of one edit of the file at `rel`; `carried`: what else the change holds (its repository's top, the linked files). */
+function judgeAt(rel, oldText, newText, carried = {}) {
   const hunks = hunksOf(oldText, newText);
   return ruleRefusal({
     files: [{ display: rel, topRel: rel, status: 'M', oldMode: '100644', newMode: '100644', oldSha: null, oldText, newText, hunks }],
-    lineCount: hunks.reduce((n, h) => n + h.removed.length + h.added.length, 0)
+    lineCount: hunks.reduce((n, h) => n + h.removed.length + h.added.length, 0),
+    ...carried
   });
 }
+const judge = (kind, oldText, newText) => judgeAt(FILES[kind], oldText, newText);
 
 // ---------------------------------------------------------------------------------------
 // The oracle: what the real parsers say the edit changed.
@@ -1610,13 +1613,28 @@ function cssEdit(r, text) {
   return edit(r, text, EDIT_WORDS.css);
 }
 
+/**
+ * What a YAML reader may take for something other than a string: a switch (to js-yaml, or only
+ * to a reader of the older YAML such as PyYAML and Ruby's), nothing, or a number.
+ */
+const YAML_SWITCHES = ['yes', 'no', 'on', 'off', 'y', 'n', 'true', 'false', 'null', '~', 'Yes', 'NO', 'Off', 'True', 'Null', '12', '1e3', '.inf'];
+const SWITCH_EDIT = 'a word replaced by a switch or a number';
+/** One edit of a YAML catalogue: one in ten replaces a word by a switch or a number, else one of the eleven kinds. */
+function yamlEdit(r, text) {
+  if (!chance(r, 0.1)) return edit(r, text, EDIT_WORDS.yaml);
+  const found = [...text.matchAll(WORD)];
+  if (found.length === 0) return null;
+  const m = pick(r, found);
+  return { newText: text.slice(0, m.index) + pick(r, YAML_SWITCHES) + text.slice(m.index + m[0].length), kind: SWITCH_EDIT };
+}
+
 const DOCUMENTS = { html: htmlDocument, markdown: markdownDocument, yaml: yamlDocument, css: cssDocument };
 /** Each kind has a stream of its own (the HTML and Markdown streams are those of the earlier rounds). */
 const SEED_OFFSET = { html: 0, markdown: 7919, yaml: 104729, css: 1299709 };
 function caseOf(kind, index, seed = SEED) {
   const r = stream(seed + SEED_OFFSET[kind], index);
   const oldText = DOCUMENTS[kind](r);
-  const e = kind === 'css' ? cssEdit(r, oldText) : edit(r, oldText, EDIT_WORDS[kind]);
+  const e = kind === 'css' ? cssEdit(r, oldText) : kind === 'yaml' ? yamlEdit(r, oldText) : edit(r, oldText, EDIT_WORDS[kind]);
   return e === null ? null : { oldText, newText: e.newText, edit: e.kind };
 }
 
@@ -1724,7 +1742,7 @@ function run(kind, count) {
   const patterns = Object.entries(INGREDIENTS[kind]);
   const ingredients = new Map(patterns.map(([name]) => [name, 0]));
   /** @type {Map<string, number[]>} for each kind of edit: how many were made, and how many passed */
-  const byEdit = new Map([...EDITS, ...MUST_PASS[kind]].map((name) => [name, [0, 0]]));
+  const byEdit = new Map([...EDITS, ...MUST_PASS[kind], ...(kind === 'yaml' ? [SWITCH_EDIT] : [])].map((name) => [name, [0, 0]]));
   const shown = [];
   for (let index = FROM; index < FROM + count; index++) {
     const c = caseOf(kind, index);
@@ -1907,6 +1925,202 @@ test('witnesses: every refusal rule of the HTML reader refuses the one document 
   }
   t.diagnostic(`${WITNESSES.length} witnesses for ${new Set(WITNESSES.map((w) => w[0])).size} rules`);
   assert.deepEqual(passed, [], 'each of these rules no longer refuses its witness');
+});
+
+// ---------------------------------------------------------------------------------------
+// The witnesses of the ninth round: one change per refusal rule the round added.
+// ---------------------------------------------------------------------------------------
+//
+// As above, for the rules of 2026-10-09 about Markdown, catalogue files, the wording of a
+// catalogue value, stylesheets, paths, byte-order marks and line endings: the smallest change
+// that one rule, and no other, refuses. Each row is [the rule, the path, the old text, the new
+// text, what else the change carries]. Without a new text the word `alpha` becomes `zulu`,
+// or, in a file that holds no `alpha`, the colour `red` becomes `blue`. To prove that a
+// witness bites, weaken its rule in a scratch copy of `src/lib/hotfix-check.js` and run this
+// test against the copy: that witness must then pass the check, and fail here. The plan's
+// Execution Record holds the last such run. Where a rule only changes which refusal is given,
+// the row names the clause it must give.
+const MD = 'docs/page.md';
+const JSON_FILE = 'locales/en/app.json';
+const YAML_FILE = 'locales/en/app.yml';
+const PROPERTIES_FILE = 'locales/en/app.properties';
+const CSS_FILE = 'site/page.css';
+const HTML_FILE = 'site/page.html';
+const PAGE = '<p>alpha</p>';
+const PROSE = 'Some alpha words.\n';
+const COLOUR = 'a { color: red }\n';
+const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
+/** The plain change of each kind: every one of these passes, so a witness is refused for what it adds. */
+const PLAIN_CHANGES = [[MD, PROSE], [JSON_FILE, json({ save: 'alpha' })], [YAML_FILE, 'save: alpha\n'], [PROPERTIES_FILE, 'save=alpha\n'], [CSS_FILE, COLOUR],
+  [HTML_FILE, PAGE], ['docs/readme.pt-BR.txt', PROSE], ['src/styles/design-tokens.css', COLOUR], ['locales/messages_fr.properties', 'save=alpha\n']];
+const RAW_STARTS = ['<script>x</script>', '<style>x</style>', '<pre>x</pre>', '<textarea>x</textarea>', '<xmp>x</xmp>', '<plaintext>', '<title>x</title>',
+  '<noscript>x</noscript>', '<iframe></iframe>', '<!-- x -->', '<![CDATA[x]]>', '<?x?>'];
+/** Every word a bare YAML value may not become: a switch, nothing, or a number without a digit. */
+const YAML_SWITCH_WORDS = ['true', 'false', 'yes', 'no', 'on', 'off', 'y', 'n', 'null', '.inf', '+.inf', '.nan'];
+const YAML_INDICATORS = ['!', '&', '*', '[', ']', '{', '}', '|', '>', '?', '-', ':', ',', '#', '@', '`', '%'];
+const WITNESSES_9 = [
+  // Markdown and plain text.
+  ...RAW_STARTS.map((tag) => [`a raw start tag anywhere refuses the file: ${/^<(?:[a-z]+|!--|!\[CDATA\[|\?)/.exec(tag)[0]}`, MD, `${PROSE}\n${tag}\n`]),
+  ['a raw start tag in any letter case', MD, `${PROSE}\n<SCRIPT>x</SCRIPT>\n`],
+  ['only an empty line bounds a paragraph', MD, 'Some alpha words.\n \n---\n'],
+  ['a colon follows a letter, a digit, a closing quote or a closing bracket', MD, 'Intro words.\n\nSee alpha : here.\n'],
+  ['a colon stands before a space or the end of the line', MD, 'Intro words.\n\nAt alpha a:b here.\n'],
+  ['no colon in the first paragraph of the file', MD, 'Note: alpha words.\n'],
+  ['a list marker is followed by one to four spaces', MD, 'Intro words.\n\n-     alpha words\n'],
+  ['in a paragraph that holds an item no line starts with a list word', MD, 'Intro words.\n\n- item alpha\na. more words\n'],
+  ['a changed line keeps its item prefix', MD, 'Intro words.\n\n- alpha words\n', 'Intro words.\n\n+ alpha words\n'],
+  ['a language part is a language tag', 'docs/readme.zh-hans-cn.txt', PROSE],
+  // Which file is a catalogue.
+  ['a dependency name is no catalogue', 'locales/en/package.json', json({ name: 'alpha' })],
+  ['a build name is no catalogue', 'locales/en/docker-compose.yml', 'services:\n  web:\n    image: alpha\n'],
+  ['a settings name is no catalogue', 'locales/en/tsconfig.json', json({ extends: 'alpha' })],
+  ['a catalogue carries a language tag or a wording bundle\'s name', 'locales/common.json', json({ save: 'alpha' })],
+  ['a catalogue carries a language tag or a wording bundle\'s name', 'i18n/routes.yml', 'save: alpha\n'],
+  ['a catalogue carries a language tag or a wording bundle\'s name', 'lang/settings.properties', 'save=alpha\n'],
+  ['the language tag stands below the catalogue folder', 'en/locales/common.json', json({ save: 'alpha' })],
+  ['a wording bundle carries nothing but a language tag behind `_`', 'locales/messages_backup.properties', 'save=alpha\n'],
+  // JSON.
+  ['the file is what JSON.stringify writes: no key twice', JSON_FILE, '{\n  "save": "x",\n  "save": "alpha"\n}\n'],
+  ['the file is what JSON.stringify writes: no escape it would not write', JSON_FILE, '{\n  "save": "caf\\u00e9 alpha"\n}\n'],
+  ['the file is what JSON.stringify writes: a number as it writes it', JSON_FILE, '{\n  "save": "alpha",\n  "n": 1.0\n}\n'],
+  ['the file is what JSON.stringify writes: its spacing', JSON_FILE, '{\n  "save":"alpha"\n}\n'],
+  ['the file is what JSON.stringify writes: keys in the order JavaScript keeps', JSON_FILE, '{\n  "b": "alpha",\n  "1": "x"\n}\n'],
+  ['a JSON file has an indentation', JSON_FILE, '{"save":"alpha"}\n'],
+  ['only string values differ', JSON_FILE, json({ save: 'alpha', n: 1 }), json({ save: 'zulu', n: 2 })],
+  ['the same keys in the same order', JSON_FILE, json({ a: 'alpha', b: 'x' }), json({ b: 'x', a: 'zulu' })],
+  ['a list stays a list', JSON_FILE, json({ a: ['alpha'] }), json({ a: { 0: 'zulu' } })],
+  ['the same indentation on both sides', JSON_FILE, '{\n  "save": "alpha"\n}\n', '{\n    "save": "zulu"\n}\n'],
+  ['no key holds __proto__', JSON_FILE, '{\n  "__proto__": {\n    "save": "alpha"\n  }\n}\n'],
+  // YAML: the strict subset.
+  ...YAML_INDICATORS.map((c) => [`a plain value starts with none of YAML's indicators: ${c}`, YAML_FILE, `save: alpha\nx: ${c}y\n`]),
+  ['no comment behind a value', YAML_FILE, 'save: alpha\nx: y # z\n'],
+  ['no `: ` inside a plain value', YAML_FILE, 'save: alpha\nx: y: z\n'],
+  ['a plain value does not end in a colon', YAML_FILE, 'save: alpha\nx: y:\n'],
+  ['a double-quoted value holds only escapes YAML knows', YAML_FILE, 'save: alpha\nx: "y\\qz"\n'],
+  ['a quoted value ends on its line', YAML_FILE, 'save: alpha\nx: "y\n'],
+  ['a quoted value ends on its line', YAML_FILE, 'save: alpha\nx: \'y\n'],
+  ['a quoted value ends on its line', YAML_FILE, 'save: alpha\nx: "y" z\n'],
+  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\nx: y\n  more\n'],
+  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\n---\nx: y\n'],
+  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\n...\n'],
+  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\n"x": y\n'],
+  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\nx : y\n'],
+  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\nx:y\n'],
+  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\n? x\n'],
+  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\nlist:\n  -\n'],
+  ['no tab, control character or line separator', YAML_FILE, 'save: alpha\nx: yTABz\n'],
+  ['no tab, control character or line separator', YAML_FILE, 'save: alpha\nx: yLSEPz\n'],
+  ['no key twice in one mapping', YAML_FILE, 'save: x\nsave: alpha\n'],
+  ['the indentation is a mapping\'s or a list\'s', YAML_FILE, 'save: alpha\n   x: y\n'],
+  ['the indentation is a mapping\'s or a list\'s', YAML_FILE, 'menu:\n  save: alpha\n - x\n'],
+  ['a key is none of YAML\'s switches', YAML_FILE, 'save: alpha\nyes: x\n'],
+  ['a key is none of YAML\'s switches', YAML_FILE, 'save: alpha\nno: x\n'],
+  ['a key is none of YAML\'s switches: y and n', YAML_FILE, 'save: alpha\ny: x\n'],
+  ['no key holds __proto__', YAML_FILE, 'save: alpha\n__proto__: x\n'],
+  ['a changed value is no switch', YAML_FILE, 'flag: yes\n', 'flag: no\n'],
+  ['a changed value is no switch: y and n', YAML_FILE, 'flag: y\n', 'flag: n\n'],
+  ...YAML_SWITCH_WORDS.map((w) => [`a changed value is none of the switches: ${w}`, YAML_FILE, 'flag: maybe\n', `flag: ${w}\n`]),
+  ...YAML_SWITCH_WORDS.map((w) => [`a switch in any letter case: ${w}`, YAML_FILE, 'flag: maybe\n', `flag: ${w.toUpperCase()}\n`]),
+  ['a changed line keeps its key', YAML_FILE, 'save: alpha\n', 'safe: zulu\n'],
+  ['a changed line keeps its quotes', YAML_FILE, 'save: "alpha"\n', 'save: \'zulu\'\n'],
+  ['a changed line keeps its trailing white space', YAML_FILE, 'save: alpha\n', 'save: zulu  \n'],
+  ['a line that carries no value does not change', YAML_FILE, 'save:\n  x: alpha\n', 'safe:\n  x: zulu\n'],
+  // Properties: the strict subset.
+  ['no line ends in a backslash', PROPERTIES_FILE, 'save=alpha\nlong=a \\\n  b\n'],
+  ['a key with a backslash carries no value that may change', PROPERTIES_FILE, 'a\\ b=alpha\n'],
+  ['white space alone ends no key of a line that may change', PROPERTIES_FILE, 'save x alpha\n'],
+  ['an escape Java does not know carries no value that may change', PROPERTIES_FILE, 'save=alpha\n', 'save=zulu\\uzzzz\n'],
+  ['no key holds __proto__', PROPERTIES_FILE, 'save=alpha\na.__proto__.b=x\n'],
+  // The wording of a catalogue value.
+  ['no number of any kind', JSON_FILE, json({ save: 'alpha CIRCLED' })],
+  ['no character nobody sees', JSON_FILE, json({ save: 'alphaZWSPbeta' })],
+  ['no bare host', JSON_FILE, json({ save: 'alpha at example.org' })],
+  ['no scheme anywhere', JSON_FILE, json({ save: 'alpha mailto:someone' })],
+  ['the same placeholders in the same order', JSON_FILE, json({ save: '{a} alpha {b}' }), json({ save: '{b} zulu {a}' })],
+  ['no start like a path', JSON_FILE, json({ save: '/alpha' })],
+  ['a letter outside the placeholders', JSON_FILE, json({ save: '{name}!' }), json({ save: '{name}?' })],
+  ['a value is read as it is written too', YAML_FILE, 'save: "alpha"\n', 'save: "zul\\x75"\n'],
+  ['a changed value differs as the program reads it', PROPERTIES_FILE, 'save=alpha\n', 'save=al\\pha\n'],
+  // Byte-order marks and line endings.
+  ['a byte-order mark stands on both sides or on neither', CSS_FILE, COLOUR, 'BOMa { color: blue }\n'],
+  ['as many carriage returns', HTML_FILE, '<p>alpha beta</p>', '<p>zulu\rbeta</p>'],
+  ['the same ending on every line', CSS_FILE, 'a { color: red }\r\nb { margin: 0 }\n', 'a { color: blue }\nb { margin: 0 }\r\n'],
+  // Stylesheets: the strict subset.
+  ['a semicolon inside brackets ends no statement', CSS_FILE, 'a { --shape: (a; color: red; x: y) }\n'],
+  ['a semicolon inside brackets ends no statement', CSS_FILE, 'a { --shape: [a; color: red; x: y] }\n'],
+  ['a brace inside brackets cannot be followed', CSS_FILE, 'a { x: (b { c; } d); color: red }\n'],
+  ['a closing bracket matches the one open', CSS_FILE, 'a { x: (]; y: 0 } b { color: red }\n'],
+  ['a closing bracket matches the one open', CSS_FILE, 'a { x: 1) } b { color: red }\n'],
+  ['every bracket is closed at the end', CSS_FILE, 'a { color: red }\n@import (x\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'a { color: red; foo }\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'a { color: red } b\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'a { *zoom: 1; color: red }\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'margin: 0;\na { color: red }\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'a { "x"; color: red }\n'],
+  ['an at-rule has a name', CSS_FILE, '@ { } a { color: red }\n'],
+  ['the head of a block starts with no `--`', CSS_FILE, '--x: { a: b } a { color: red }\n'],
+  ['a value holds no colon outside round brackets', CSS_FILE, 'a { margin: 0 padding: 1px; } c { color: red }\n'],
+  ['a colon in square brackets counts', CSS_FILE, 'a { grid-area: [a: b]; color: red }\n'],
+  ['a string ends at a carriage return or a form feed', CSS_FILE, 'a { content: "x\f"; color: red }\n'],
+  ['a string ends at a carriage return or a form feed', CSS_FILE, 'a { content: "x\r"; color: red }\n'],
+  ['a changed declaration holds no backslash', CSS_FILE, 'a { background: \\75 rl(a;color:red;b) }\n', undefined, { clause: /^I do not recognise/ }],
+  ['an escaped brace, semicolon, quote or comment start cannot be followed', CSS_FILE, '.a\\{b { color: red }\n'],
+  ['an escaped brace, semicolon, quote or comment start cannot be followed', CSS_FILE, '.a\\;b { color: red }\n'],
+  ['an escaped brace, semicolon, quote or comment start cannot be followed', CSS_FILE, '.a\\\'b { color: red }\n'],
+  ['an escaped brace, semicolon, quote or comment start cannot be followed', CSS_FILE, '.a\\/* { color: red }\n'],
+  ['a backslash before a line break escapes nothing', CSS_FILE, 'a { color: red } b\\\n{ }\n'],
+  ['only colour properties read a colour-named custom property', CSS_FILE, ':root { --brand-color: red }\na { animation-name: var(--brand-color) }\n'],
+  ['only colour properties read a colour-named custom property', CSS_FILE, ':root { --brand-color: red; --other: var(--brand-color) }\n'],
+  ['only colour properties read a colour-named custom property', CSS_FILE, ':root { --brand-color: red }\na { width: calc(var(--brand-color) * 2) }\n'],
+  ['a colour-named custom property is named only in a var()', CSS_FILE, ':root { --brand-color: red }\n@container style(--brand-color: tan) { a { margin: 0 } }\n'],
+  ['a colour-named custom property is named only in a var()', CSS_FILE, ':root { --brand-color: red }\n@property --brand-color { syntax: "<color>"; inherits: false; initial-value: tan }\n'],
+  ['a colour-named custom property is named only in a var()', CSS_FILE, ':root { --brand-color: red }\na { color: xvar(--brand-color) }\n'],
+  ['an @charset rule names UTF-8', CSS_FILE, '@charset "shift_jis";\na { color: red }\n'],
+  ['a colour name is compared in ASCII letters', CSS_FILE, ':root { --brand-color: red }\n', ':root { --brand-color: blacKELVIN }\n'],
+  // Paths and names.
+  ['IRON_LOOP.md governs the work', 'docs/IRON_LOOP.md', PROSE],
+  ['SKILL.md governs the work', 'docs/SKILL.md', PROSE],
+  ['MEMORY.md governs the work', 'docs/MEMORY.md', PROSE],
+  ['a folder named prompts governs the work', 'prompts/page.md', PROSE],
+  ['a folder named output-styles governs the work', 'output-styles/page.md', PROSE],
+  ['a file an instruction file links to governs the work', 'docs/guide.md', PROSE, undefined, { top: os.tmpdir(), governed: new Set(['docs/guide.md']) }],
+  ['a linked file is found in every form of its path', 'docs/guiZWSPde.md', PROSE, undefined, { top: os.tmpdir(), governed: new Set(['docs/guide.md']) }],
+  ['a run of capitals ends where its last capital starts a word', 'src/APIKey/page.html', PAGE],
+  ['a path is asked as its letters read', 'src/payZWSPment/page.html', PAGE],
+  ['a path is asked as its letters read', 'src/pAACUTEyment/page.html', PAGE],
+  ['a path is asked as it is written', 'src/authZWSPlogin/page.html', PAGE],
+  ['a path is asked with compatibility letters as plain ones', 'src/FWAuthZWSPpanel/page.html', PAGE],
+  ['in a stylesheet\'s name only `tokens` keeps its plural', 'src/styles/payments.css', COLOUR],
+  ['a governing name is found in every form of the path', 'docs/FWAGENTS.md', PROSE],
+  ['a test folder is found in every form of the path', 'teZWSPsts/page.html', PAGE],
+  ['a dependency name is found in every form of the path', 'locales/en/pacZWSPkage.json', json({ name: 'alpha' })],
+  // Markup: what the ninth round added.
+  ['a changed text is read as its references spell it', HTML_FILE, '<p>alpha&shy;beta</p>'],
+  ['a page names no character set but UTF-8', HTML_FILE, '<meta charset="shift_jis"><p>alpha</p>']
+];
+const SPELT = [['ZWSP', '\u200b'], ['LSEP', '\u2028'], ['TAB', '\t'], ['CIRCLED', '\u2461'], ['BOM', '\ufeff'], ['KELVIN', '\u212a'], ['AACUTE', '\u00e1'],
+  ['FWAGENTS', '\uff21\uff27\uff25\uff2e\uff34\uff33'], ['FWA', '\uff41']];
+const spelt = (text) => SPELT.reduce((t, [name, character]) => t.replaceAll(name, character), text);
+
+test('witnesses of the ninth round: every refusal rule it added refuses the one change written for it', (t) => {
+  for (const [rel, text] of PLAIN_CHANGES) {
+    const edited = text.includes('alpha') ? text.replace('alpha', 'zulu') : text.replace('red', 'blue');
+    assert.equal(judgeAt(rel, text, edited), null, `the plain change of ${rel} passes`);
+  }
+  const passed = [];
+  const wrongClause = [];
+  for (const [rule, rel, before, after, more = {}] of WITNESSES_9) {
+    const oldText = spelt(before);
+    const newText = spelt(after === undefined ? (before.includes('alpha') ? before.replace('alpha', 'zulu') : before.replace('red', 'blue')) : after);
+    assert.notEqual(newText, oldText, `${rule}: the witness holds an edit`);
+    const { clause, ...carried } = more;
+    const refusal = judgeAt(spelt(rel), oldText, newText, carried);
+    if (refusal === null) passed.push(`${rule}: ${spelt(rel)} ${JSON.stringify(oldText)}`);
+    else if (clause && !clause.test(refusal.clause)) wrongClause.push(`${rule}: ${refusal.clause}`);
+  }
+  t.diagnostic(`${WITNESSES_9.length} witnesses for ${new Set(WITNESSES_9.map((w) => w[0])).size} rules`);
+  assert.deepEqual(passed, [], 'each of these rules no longer refuses its witness');
+  assert.deepEqual(wrongClause, [], 'each of these rules no longer gives its own refusal');
 });
 
 // ---------------------------------------------------------------------------------------
