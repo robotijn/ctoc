@@ -22,6 +22,8 @@
     "eslint": "^9.36.0",
     "eslint-plugin-n": "^17.23.1",
     "eslint-plugin-security": "^3.0.1",
+    "markdown-it": "15.0.2",
+    "parse5": "8.0.1",
     "typescript": "^5.9.3"
   }
 }
