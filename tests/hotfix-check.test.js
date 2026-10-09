@@ -1272,21 +1272,25 @@ test('a run whose counters cannot be read is "no test ran"', async () => {
   await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], NO_TEST);
 });
 
-test('when the file-name selection names a test for every judged file, that selection runs', async (t) => {
-  // `tests/home.test.html` is the name the selection's heuristic maps `home.html` to.
+// The decision at review of 2026-10-09: the whole suite runs in the copy. Until then a test
+// file named after every judged file (`tests/home.test.html` for `home.html`) made the check
+// run that selection alone, and a failing test under another name never ran.
+test('the whole suite runs in the copy, whatever the test files are named', async (t) => {
   const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.html': '<p>marker</p>\n', 'tests/home.test.js': PASSING_TEST,
     'tests/other.test.js': PASSING_TEST.replace('has a button', 'still has a button') }, { testScript: SCRIPT });
   fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
   const selected = [];
-  const real = qualityAgent.runSpecificTests;
-  t.mock.method(qualityAgent, 'runSpecificTests', (tools, files) => { selected.push(...files); return real(tools, files); });
+  t.mock.method(qualityAgent, 'runSpecificTests', (tools, files) => { selected.push(...files); throw new Error('a selection of tests ran'); });
+  const whole = [];
+  const real = qualityAgent.runFullTests;
+  t.mock.method(qualityAgent, 'runFullTests', (tools) => { whole.push(process.cwd()); return real(tools); });
   const res = await check(root, '--run-tests', 'src/pages/home.html');
   t.mock.restoreAll();
+  assert.deepEqual(selected, [], 'no selection of tests runs');
   assertPass(res, ['src/pages/home.html']);
   assert.equal(res.tests, '2 tests passed.');
-  assert.equal(selected.length, 1);
-  assert.equal(path.basename(selected[0]), 'home.test.html');
-  assert.equal(path.basename(copyParent(selected[0])).startsWith('ctoc-hotfix-'), true, 'the selection reads the copy');
+  assert.equal(whole.length, 1, 'the whole suite ran once');
+  assert.equal(path.basename(copyParent(whole[0])).startsWith('ctoc-hotfix-'), true, 'and it ran in the copy');
 });
 
 test('edge shapes of every kind give the exact verdict', async () => {
@@ -3237,4 +3241,265 @@ test('round 9: stylesheets — brackets, statements outside the subset, escapes,
     else if (expected === null) assertChecking(res, [p]);
   }
   assert.deepEqual(wrong, []);
+});
+
+test('round 9: paths and names — governing names and folders, what the instruction files link to, sensitive words in every spelling, byte-order marks and line endings', async (t) => {
+  const un = (f) => `I do not recognise ${f} as wording or a colour`;
+  const area = (word) => (f) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
+  const PROSE = ['Some words here.\n', 'Some other words here.\n'];
+  const PAGE = [HOME, HOME_STORE];
+  const COLOUR = ['a { color: red; }\n', 'a { color: blue; }\n'];
+  const INSTRUCTIONS = [
+    '# Instructions',
+    '',
+    'Read [the guide](docs/linked.md) and [the rules](./docs/rules.md "Rules") first.',
+    'See [spaces](<docs/with space.md>), [encoded](docs/with%20pct.md), [part](docs/frag.md#part), [rooted](/docs/rooted.md),',
+    '[brackets](docs/a(b).md), ![image](docs/image.md), [cased](DOCS/Cased.md), [the reference][r] and',
+    'the badge [![badge](docs/badge.md)](docs/behind-badge.md).',
+    'No file of this repository: [site](https://example.com/docs/free.md), [mail](mailto:a@example.com), [top](#top),',
+    '[up](../outside.md) and [the folder](docs/).',
+    '',
+    '[r]: docs/ref.md',
+    '[page]: <site/linked page.html> "A page"',
+    ''
+  ].join('\n');
+  // [what the row shows, path, [before, after], the clause, or null for the first call's `checking`]
+  const rows = [
+    // 1. The names of files that govern the work, in any letter case and at any depth (red: `checking`).
+    ['governing name', 'docs/IRON_LOOP.md', PROSE, un],
+    ['governing name', 'guide/iron_loop.md', PROSE, un],
+    ['governing name', 'guide/SKILL.md', PROSE, un],
+    ['governing name', 'notes/skill.md', PROSE, un],
+    ['governing name', 'notes/MEMORY.md', PROSE, un],
+    ['governing folder', 'prompts/intro.md', PROSE, un],
+    ['governing folder', 'docs/Prompts/tone.md', PROSE, un],
+    ['governing folder', 'output-styles/terse.md', PROSE, un],
+    ['governing folder', 'site/output-styles/page.html', PAGE, un],
+    // Names that only resemble them (guards).
+    ['governing name', 'docs/memory-notes.md', PROSE, null],
+    ['governing name', 'docs/skills-we-need.md', PROSE, null],
+    ['governing folder', 'docs/prompting/tone.md', PROSE, null],
+    // 2. A file an instruction file of the last commit links to governs the work (red: `checking`).
+    ['linked', 'docs/linked.md', PROSE, un],
+    ['linked', 'docs/rules.md', PROSE, un],
+    ['linked', 'docs/with space.md', PROSE, un],
+    ['linked', 'docs/with pct.md', PROSE, un],
+    ['linked', 'docs/frag.md', PROSE, un],
+    ['linked', 'docs/rooted.md', PROSE, un],
+    ['linked', 'docs/a(b).md', PROSE, un],
+    ['linked', 'docs/image.md', PROSE, un],
+    ['linked', 'docs/cased.md', PROSE, un],
+    ['linked', 'docs/ref.md', PROSE, un],
+    ['linked', 'docs/badge.md', PROSE, un],
+    ['linked', 'docs/behind-badge.md', PROSE, un],
+    ['linked', 'site/linked page.html', PAGE, un],
+    // An instruction file in a folder links from that folder.
+    ['linked', 'packages/app/rules/style.md', PROSE, un],
+    ['linked', 'docs/shared.md', PROSE, un],
+    ['linked', 'src/styles/linked.css', COLOUR, un],
+    // Named by an address elsewhere only, under a linked folder, or beside a linked file (guards).
+    ['linked', 'docs/free.md', PROSE, null],
+    ['linked', 'docs/beside.md', PROSE, null],
+    ['linked', 'packages/app/docs/linked.md', PROSE, null],
+    // 3. A sensitive word behind capitals, a mark or a character nobody sees (red: `checking`).
+    ['sensitive word', 'src/APIKey/page.html', PAGE, area('key')],
+    ['sensitive word', 'src/SSOLogin/page.html', PAGE, area('login')],
+    ['sensitive word', 'src/JWTToken/page.html', PAGE, area('token')],
+    ['sensitive word', 'src/UIAdmin/page.html', PAGE, area('admin')],
+    ['sensitive word', 'src/HTMLAuth/page.html', PAGE, area('auth')],
+    ['sensitive word', 'src/pay\u200bment/page.html', PAGE, area('payment')],
+    ['sensitive word', 'src/p\u00e1yment/page.html', PAGE, area('payment')],
+    ['sensitive word', 'src/styles/payments.css', COLOUR, area('payment')],
+    ['sensitive word', 'src/styles/keys.css', COLOUR, area('key')],
+    // Words that only hold one, and the one plural a stylesheet's name may carry (guards).
+    ['sensitive word', 'src/HTMLAuthor/page.html', PAGE, null],
+    ['sensitive word', 'src/APIKeyboard/page.html', PAGE, null],
+    ['sensitive word', 'src/styles/design-tokens.css', COLOUR, null],
+    // 4. A byte-order mark on one side only, or another count of carriage returns, in a
+    // stylesheet and in a catalogue (red: `checking`).
+    ['mark and line ending', 'src/styles/marked.css', [COLOUR[0], `\ufeff${COLOUR[1]}`], un],
+    ['mark and line ending', 'src/styles/ending.css', ['a { color: red; }\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n'], un],
+    ['mark and line ending', 'locales/en/marked.yml', ['save: Save\nopen: Open\n', '\ufeffsave: Store\nopen: Open\n'], un],
+    ['mark and line ending', 'locales/en/ending.yml', ['save: Save\nopen: Open\n', 'save: Store\r\nopen: Open\n'], un],
+    ['mark and line ending', 'src/styles/both.css', ['\ufeffa { color: red; }\r\n', '\ufeffa { color: blue; }\r\n'], null]
+  ];
+  const base = { 'CLAUDE.md': INSTRUCTIONS,
+    'packages/app/AGENTS.md': 'Follow [the style](rules/style.md), [the shared guide](../../docs/shared.md) and [the colours](../../src/styles/linked.css).\n' };
+  for (const [, p, [before]] of rows) base[p] = before;
+  const root = makeRepo(base);
+  const wrong = [];
+  for (const [what, p, [before, after], expected] of rows) {
+    fs.writeFileSync(path.join(root, ...p.split('/')), after);
+    const res = await check(root, p);
+    fs.writeFileSync(path.join(root, ...p.split('/')), before);
+    const want = expected === null ? STATUS_LINE : refusal(expected(p));
+    if (res.text !== want) wrong.push(`${what} ${p}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
+    else if (expected === null) assertChecking(res, [p]);
+  }
+  assert.deepEqual(wrong, []);
+
+  await t.test('the links are those of the last commit: a link removed in the working folder still counts, one added there does not', async () => {
+    fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# Instructions\n\nRead [the free one](docs/free.md).\n');
+    fs.writeFileSync(path.join(root, 'docs', 'linked.md'), PROSE[1]);
+    fs.writeFileSync(path.join(root, 'docs', 'free.md'), PROSE[1]);
+    assert.equal((await check(root, 'docs/linked.md')).text, refusal(un('docs/linked.md')));
+    assertChecking(await check(root, 'docs/free.md'), ['docs/free.md']);
+    for (const f of ['CLAUDE.md', 'docs/linked.md', 'docs/free.md']) git(root, ['checkout', '-q', '--', f]);
+  });
+
+  await t.test('an instruction file that is a link: what it points to is read in its place, from both folders', async () => {
+    const linked = makeRepo({ 'docs/instructions.md': 'Read [more](extra.md).\n', 'docs/extra.md': PROSE[0], 'tools/extra.md': PROSE[0],
+      'docs/free.md': PROSE[0] }, { commit: false });
+    fs.symlinkSync('../docs/instructions.md', path.join(linked, 'tools', 'CLAUDE.md'));
+    git(linked, ['add', '-A']);
+    git(linked, ['commit', '-q', '-m', 'base']);
+    for (const p of ['docs/instructions.md', 'docs/extra.md', 'tools/extra.md']) {
+      fs.writeFileSync(path.join(linked, ...p.split('/')), p === 'docs/instructions.md' ? 'Read [much more](extra.md).\n' : PROSE[1]);
+      assert.equal((await check(linked, p)).text, refusal(un(p)), p);
+      git(linked, ['checkout', '-q', '--', p]);
+    }
+    fs.writeFileSync(path.join(linked, 'docs', 'free.md'), PROSE[1]);
+    assertChecking(await check(linked, 'docs/free.md'), ['docs/free.md']);
+  });
+
+  await t.test('an instruction file the check cannot read refuses every change', async () => {
+    // Each of these is a committed `AGENTS.md` whose links cannot be listed: no hotfix until it can.
+    const cases = [
+      ['bytes that are no text', (r) => fs.writeFileSync(path.join(r, 'AGENTS.md'), Buffer.from([0x23, 0x20, 0xff, 0xfe, 0x0a])), 'AGENTS.md is not text'],
+      ['a link that leaves the repository', (r) => fs.symlinkSync('../elsewhere/AGENTS.md', path.join(r, 'AGENTS.md')), 'AGENTS.md is a link the check cannot follow'],
+      ['a link to nothing', (r) => fs.symlinkSync('docs/gone.md', path.join(r, 'AGENTS.md')), 'AGENTS.md is a link the check cannot follow'],
+      ['a link to a folder', (r) => fs.symlinkSync('docs', path.join(r, 'AGENTS.md')), 'AGENTS.md is a link the check cannot follow'],
+      ['a link to a link', (r) => { fs.symlinkSync('docs/free.md', path.join(r, 'second.md')); fs.symlinkSync('second.md', path.join(r, 'AGENTS.md')); },
+        'AGENTS.md is a link the check cannot follow']
+    ];
+    for (const [what, make, why] of cases) {
+      const r = makeRepo({ 'docs/free.md': PROSE[0] }, { commit: false });
+      make(r);
+      git(r, ['add', '-A']);
+      git(r, ['commit', '-q', '-m', 'base']);
+      fs.writeFileSync(path.join(r, 'docs', 'free.md'), PROSE[1]);
+      assert.equal((await check(r, 'docs/free.md')).text, unreadable(why), what);
+      assert.equal((await check(r, '--run-tests', 'docs/free.md')).text, unreadable(why), `${what}, the test call`);
+    }
+  });
+});
+
+test('round 9: an instruction file of any size is read in time proportional to its size, and so is a long path', async (t) => {
+  // Shapes that make a link reader which looks ahead from every start quadratic: starts
+  // with no end, brackets never closed, angle brackets never closed, definitions, and many
+  // real links.
+  const hostile = (kb) => [']('.repeat(kb * 512), `](${'('.repeat(kb * 1024)}`, '](<'.repeat(kb * 341), '[a]: '.repeat(kb * 204),
+    '[a](b) '.repeat(kb * 146), '[a]: b\n'.repeat(kb * 146)].join('\n');
+  const repoWith = (kb) => {
+    const root = makeRepo({ 'CLAUDE.md': `${hostile(kb)}\n`, 'docs/free.md': 'Some words here.\n' });
+    fs.writeFileSync(path.join(root, 'docs', 'free.md'), 'Some other words here.\n');
+    return root;
+  };
+  const wall = async (call) => {
+    const start = process.hrtime.bigint();
+    await call();
+    return Number(process.hrtime.bigint() - start) / 1e6;
+  };
+  // What a call costs with an empty instruction file (git's own calls, mostly): taken off.
+  const emptyRoot = repoWith(0);
+  const emptyCall = () => check(emptyRoot, 'docs/free.md');
+  const idle = Math.min(await wall(emptyCall), await wall(emptyCall), await wall(emptyCall));
+  const at = (kb) => {
+    const root = repoWith(kb);
+    return async () => assertChecking(await check(root, 'docs/free.md'), ['docs/free.md']);
+  };
+  const file = await growth(at, 32, 2048, async (call) => Math.max(await wall(call) - idle, 0));
+  t.diagnostic(`an instruction file of 6 x ${file.n} KiB: ${file.small.toFixed(1)} ms over an empty one, 6 x ${4 * file.n} KiB: ${file.big.toFixed(1)} ms, ${file.ratio.toFixed(1)} times as long`);
+  assert.ok(file.ratio < 8, `6 x ${file.n} KiB took ${file.small.toFixed(1)} ms and 6 x ${4 * file.n} KiB took ${file.big.toFixed(1)} ms`);
+
+  // A folder name of capitals, small letters, marks and characters nobody sees: every piece is one sub-word.
+  const piece = `aB${String.fromCharCode(0x301, 0x200b)}`;
+  const longPath = (n) => {
+    const change = changeOf(`src/${piece.repeat(256 * n)}/page.html`, HOME, HOME_STORE);
+    return () => assert.equal(ruleRefusal(change), null);
+  };
+  const name = await growth(longPath, 16, 1600);
+  t.diagnostic(`a path of ${name.n} KiB: ${name.small.toFixed(1)} ms, ${4 * name.n} KiB: ${name.big.toFixed(1)} ms, ${name.ratio.toFixed(1)} times as long`);
+  assert.ok(name.ratio < 8, `a path of ${name.n} KiB took ${name.small.toFixed(1)} ms and one of ${4 * name.n} KiB took ${name.big.toFixed(1)} ms`);
+});
+
+test('round 9: an added or deleted path is refused before anything is staged, so no untracked file reaches the object store', async () => {
+  const root = makeRepo({ 'src/pages/home.html': HOME, 'docs/old.md': 'Old.\nWords.\n' });
+  const objects = () => git(root, ['count-objects', '-v']);
+  const last = () => withoutTime(logLines(root)).pop();
+  // A 40 MiB file nobody has added (655,360 lines), beside a wording change.
+  fs.writeFileSync(path.join(root, 'big.txt'), `${'x'.repeat(63)}\n`.repeat(40 * 16384));
+  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+  let before = objects();
+  assert.equal((await check(root)).text, refusal('it adds, removes or renames big.txt'));
+  assert.equal(objects(), before, 'the unnamed first call wrote nothing to the object store');
+  assert.deepEqual(last(), { verdict: 'refused', cause: 'adds-removes-renames', urgent: false, files: 2, lines: 655362 });
+  assert.equal((await check(root, '--run-tests')).text, refusal('it adds, removes or renames big.txt'));
+  assert.equal((await check(root, 'big.txt')).text, refusal('it adds, removes or renames big.txt'));
+  assert.equal(objects(), before, 'neither did the test call, nor the call that names the file');
+  fs.rmSync(path.join(root, 'big.txt'));
+
+  // A deleted file, a file without a final line break, an empty one and a link, all new.
+  fs.rmSync(path.join(root, 'docs', 'old.md'));
+  writeFiles(root, { 'docs/new.md': 'One.\nTwo', 'docs/empty.md': '' });
+  fs.symlinkSync('old.md', path.join(root, 'docs', 'link.md'));
+  before = objects();
+  assert.equal((await check(root)).text, refusal('it adds, removes or renames docs/empty.md'));
+  assert.deepEqual(last(), { verdict: 'refused', cause: 'adds-removes-renames', urgent: false, files: 5, lines: 7 });
+  assert.equal((await check(root, 'docs/old.md')).text, refusal('it adds, removes or renames docs/old.md'));
+  assert.deepEqual(last(), { verdict: 'refused', cause: 'adds-removes-renames', urgent: false, files: 1, lines: 2 });
+  assert.equal(objects(), before);
+
+  // A file the owner added to git's index and never committed is an added path too.
+  git(root, ['add', 'docs/new.md']);
+  before = objects();
+  assert.equal((await check(root, 'docs/new.md')).text, refusal('it adds, removes or renames docs/new.md'));
+  assert.deepEqual(last(), { verdict: 'refused', cause: 'adds-removes-renames', urgent: false, files: 1, lines: 2 });
+  assert.equal(objects(), before);
+});
+
+test('round 9: the copy is removed whatever the tests leave in it, and a removal that fails keeps both ends of its reason', async (t) => {
+  await t.test('a test that leaves folders nobody may write to, or read', async () => {
+    const locking = nodeTest('has a button', "  assert.ok(read('src/pages/home.html').includes('<button>'));", { prelude: [
+      "fs.mkdirSync(path.join(process.cwd(), 'locked', 'inner'), { recursive: true });",
+      "fs.writeFileSync(path.join(process.cwd(), 'locked', 'inner', 'kept.txt'), 'x');",
+      "fs.chmodSync(path.join(process.cwd(), 'locked', 'inner'), 0o000);",
+      "fs.chmodSync(path.join(process.cwd(), 'locked'), 0o555);"
+    ].join('\n') });
+    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': locking }, { testScript: SCRIPT });
+    const before = worktrees(root);
+    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    const left = leftovers();
+    // Whatever the answer, this test removes what the check left, so no later test inherits it.
+    const open = (dir) => {
+      fs.chmodSync(dir, 0o700);
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) if (e.isDirectory()) open(path.join(dir, e.name));
+    };
+    for (const name of left) {
+      open(path.join(PRIVATE_TMP, name));
+      fs.rmSync(path.join(PRIVATE_TMP, name), { recursive: true, force: true });
+    }
+    git(root, ['worktree', 'prune']);
+    assert.deepEqual(left, [], `the copy is gone: ${JSON.stringify(res.detail)}`);
+    assertPass(res, ['src/pages/home.html']);
+    assert.equal(worktrees(root), before);
+  });
+  await t.test('a removal that still fails names the start and the end of its reason', async () => {
+    const root = testedProject();
+    const probe = probeDir();
+    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    const reason = `EACCES: permission denied, rmdir '${'/a-folder-with-a-long-name'.repeat(12)}/the-last-folder'`;
+    const realRm = fs.rmSync;
+    t.mock.method(fs, 'rmSync', (p, options) => {
+      if (path.basename(String(p)).startsWith('ctoc-hotfix-')) throw Object.assign(new Error(reason), { code: 'EACCES' });
+      return realRm(p, options);
+    });
+    const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+    t.mock.restoreAll();
+    const parent = copyParent(probeRead(probe));
+    assert.equal(res.verdict, 'hotfix');
+    assert.equal(res.detail, `the temporary copy at ${parent} could not be removed: ${reason.slice(0, 80)} … ${reason.slice(-80)}`);
+    fs.rmSync(parent, { recursive: true, force: true });
+  });
 });
