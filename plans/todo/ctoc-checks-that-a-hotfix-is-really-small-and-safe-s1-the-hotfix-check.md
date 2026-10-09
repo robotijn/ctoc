@@ -1655,6 +1655,169 @@ instead of "tests failed" — still not a pass.
     now an open construct; and an emptied `.rst` or `.txt` file passed as a wording edit
     (the Markdown one already refused): a side emptied, or filled from empty, now holds the
     content of a removal or an addition and is not recognised, in every qualifying kind.
+105. **OWNER DECISION (2026-10-09, answer "a"): the hotfix check keeps only the formats it
+    can read exactly.** The reason, as the owner decided it: five rounds of security attacks
+    with real runs each found new ways to get a behaviour change committed as a hotfix, and
+    the last ones were in Vue, MDX, reStructuredText and Less, where a hand-written reader
+    disagrees with the real compiler. So the hotfix check keeps only the formats it can read
+    exactly.
+    *The formats that stay:* plain HTML (`.html`, `.htm`); colours in plain CSS (`.css`), on
+    real colour-valued properties (and, by Decision 115, in a custom property named for a
+    colour); catalogue wording in JSON, YAML and Java properties files (`.json`, `.yaml`,
+    `.yml`, `.properties` under a catalogue folder); plain prose in Markdown (`.md`) and
+    plain text (`.txt`).
+    *The formats removed:* `.vue` and `.svelte`; `.jsx` and `.tsx`; `.mdx` (never read as
+    its own format; a guard case pins that it stays unrecognised); `.rst`; `.scss`, `.sass`
+    and `.less`; gettext `.po`. The module read no other format. Each removed format gets the
+    plan's existing sentence for a kind the check does not recognise, `I do not recognise
+    <file> as wording or a colour`, through the last row of the table in "Rule 4 — the four
+    kinds, and everything else", so the change goes through the normal build loop. The rows
+    above that one still come first, as the table says: a removed-format file that is a test
+    is still `it changes a test (<file>)` (rule 7 runs before rule 4), and one in a
+    database or build folder still gets that folder's clause.
+    *The sentences of the specification this decision supersedes* (the text is left as
+    written, so its hash holds):
+    - "Rule 4 — the four kinds", kind 1: "**Documentation**: `.md`, `.txt`, `.rst`" — now
+      `.md` and `.txt`.
+    - Kind 2: "**Markup**: `.html`, `.htm`, `.jsx`, `.tsx`, `.vue`, `.svelte`." — now `.html`
+      and `.htm`; and with it both `.jsx`/`.tsx` clauses of that paragraph: "in `.jsx` and
+      `.tsx` the `>` must end an opening tag `<name …>` and the `<` after the text must begin
+      `</name` with the same name, letter case exact (so a generic type such as
+      `Box<A>|Box<B>` and a comparison chain such as `a<b>limit<c` are refused)" and "and in
+      `.jsx` and `.tsx` also no `(`, `)`, `;`, `=`, `"` or `'`".
+    - Kind 3: "**Message catalogue**: `.json`, `.yaml`, `.yml`, `.po`, `.properties`" — now
+      without `.po`; and "Gettext `msgstr "value"` (also `msgstr[n]`)".
+    - Kind 4: "**Colour**: `.css`, `.scss`, `.sass`, `.less`." — now `.css`; and in the
+      declaration pattern the alternatives `\$[\w-]+` and `@[\w-]+` (Sass and Less
+      variables).
+    - The acceptance criterion on the corpus where it says "a `.tsx` comparison chain and a
+      generic type are refused": they still are, now because the file's kind is not
+      recognised (the same sentence as before).
+    - The first row of "Risks", where it names "JavaScript comparisons and generic types in
+      `.jsx`/`.tsx`" and their mitigation: no such file is read.
+    - Step 8's corpus list where it names `Greeting.jsx`, `CancelButton.tsx`,
+      `NameField.vue`, `Loading.svelte`, `translations/de.po`, `theme.scss`, `accent.less`
+      and `docs/guide.rst` as shapes that qualify, and its `.jsx` and `.vue` traps; Step 11's
+      first box where it asks for "`.jsx`/`.tsx` lines where `<` and `>` are code".
+    *Earlier decisions it supersedes, in whole or in the named part:* 89 (reStructuredText
+    roles), 93 and 94 (reStructuredText literal blocks and directives; the doctest rule for
+    `.txt` and `.md` stays), 97 (Vue's conditional templates), 101 (TypeScript type
+    parameter lists); the JSX, Vue and Svelte parts of 90 and 95; the Sass and Less
+    variable part of 92; the reStructuredText and JSX rows of the property-test tables of 87
+    and 102; and in 104 the JavaScript, JSX, Sass and reStructuredText constructs.
+    *How it was carried out.* The scanners and their code are removed (the JavaScript and
+    JSX reader, the type-parameter reader, the Vue and Svelte modes, the reStructuredText
+    line and span readers, the Sass indented-statement reader, the Sass and Less variable
+    reader, the gettext entry and escape reader); nothing is left as a stub. No corpus or
+    test case was deleted: every qualifying shape and every trap of a removed format is
+    kept and now asserts the "not recognised" refusal, grouped under a comment that names
+    this decision (`REMOVED_FORMATS` in the corpus file; the last group of each table in the
+    main test file).
+106. **Host elements are a fixed list** (the session's fix 1 of this round, 2026-10-09).
+    Decision 90 called every lower-case name without a hyphen a host element, so
+    `<runsql>SELECT name FROM users</runsql>` passed. The host elements are now the HTML,
+    SVG and MathML element names of Vue's `isHTMLTag`, `isSVGTag` and `isMathMLTag` lists,
+    copied into the module with a comment naming the source, and matched in lower case. An
+    element of any other name, a custom element (a hyphen in the name, whatever the lists
+    hold: `color-profile` and `annotation-xml` therefore hold their text) and any element
+    carrying an `is` attribute hold their text. Honest status of the copy: this machine has
+    no copy of Vue and the round ran without network, so the three lists were written from
+    the executor's memory of `packages/shared/src/domTagConfig.ts` (believed, not compared
+    with the source in this round); a name missing from the copy only makes its text
+    refused, never passed, and a wrongly added name would pass text the browser treats as
+    an unknown element's — the reviewers should compare the list with the source. This also
+    supersedes Decision 90's choice (a): the open-element count was keyed by the name as
+    written, so `<DIV>…</div>` never closed; names are lower-cased, and `<DIV>Save</DIV>` is
+    the host element `div`, whose text is wording. The round-4 branch case
+    `src/pages/upper.html` therefore changes from "not recognised" to `checking`, by this
+    fix as the session specified it.
+107. **A stack of open elements** (fix 2). The scanner keeps every open element, lower-cased,
+    on a stack. An end tag that closes the top pops it. Any other end tag, while an element
+    that holds text is open, is a fault: `I could not read the change (<file> holds
+    something I cannot follow)`. The reason: HTML ignores such an end tag when a "special"
+    element lies between (`<run-sql><div></run-sql>SELECT …</div></run-sql>` keeps the text
+    inside `run-sql`), and closes several elements with it otherwise; this scanner does not
+    copy those rules, so it does not guess where the held text ends. With no such element
+    open, the same end tag closes the nearest open element of its name or nothing (`<li>`
+    and `<p>` without end tags are everyday HTML and change no verdict). The executor's
+    choices, each on the refusing side: a void element never opens; `/>` closes nothing
+    (HTML does not let an element close itself; inside SVG it really does, and reading it
+    as open only refuses more, while honouring it there would be wrong inside
+    `foreignObject`); a `<template>` is an element that holds its text; text after a
+    custom element that is never closed stays held to the end of the file. The round-4
+    branch case `src/pages/pre.html` (`<pre></code>…`) keeps its refusal with the new
+    sentence.
+108. **Markdown that may be built as MDX** (fix 3). In `.md`, a changed run of prose that
+    holds `{` or `}` is code, and so are a line that starts `import ` or `export ` where a
+    block starts and the lines after it up to a blank line. The executor's reading: the
+    brace test is on the whole changed text between two tags, not on the changed line
+    alone, because an MDX expression may run over several lines (`Hello {` / `eval(x)` /
+    `}`); so a typo beside an unchanged `{name}` in the same paragraph is refused too. The
+    property test no longer names `{` and `}` as wording in Markdown.
+109. **Backticks pair inside one run of inline text** (fix 4): one paragraph, heading, list
+    item or table row, never across a blank line, a code line, or the start or end of a
+    block. The block boundaries come from the Markdown line reader, after CommonMark: a
+    heading, a setext underline, a thematic break, a list item, a block quote; a lazy
+    continuation line continues its paragraph, and such a paragraph takes no underline.
+    The executor's addition, because splitting too much is as wrong as splitting too
+    little (a span cut in two leaves its code as prose): where the pairing itself is not
+    sure — the run holds `|` (a table cell ends there), a backslash before a backtick, or
+    `<` (a tag or autolink takes its backticks out of the pairing) — everything from the
+    run's first backtick to its last is compared exactly. Also from this work, each a pass
+    on `6de2f75c`: an ordered item not numbered 1 after a bullet item starts no item; an
+    indented line right after a closed fence, a heading or a quote that did not end in a
+    paragraph is code.
+110. **Block quotes are read like the document they quote** (fix 5; closes the residual
+    recorded in Decision 100). The marker (`>` after at most three spaces, and one space)
+    is taken off each line of a run of quoted lines, the rest is classified by the same
+    Markdown line reader, and the classes are copied back. A list item's own text is now
+    read the same way, as a line of its own at the item's content column, so `- >     code`
+    and an item that opens a quote, a fence, a doctest or another item are all read. The
+    executor's choices, each on the refusing side: a quote whose marker holds a tab is code
+    whole; so is a quote nested deeper than 16, and a line with more than 16 list markers
+    (both also keep the reader linear); a fence still open where its quote ends counts as
+    left open; a line starting `>>>` stays a doctest (Decision 93), not three quotes; a
+    reference definition is also recognised behind the markers of a quote or a list item.
+111. **Link labels fold case as CommonMark does** (fix 6):
+    `.toLowerCase().toUpperCase().toLowerCase()` after the white space is collapsed, so
+    `[ẞ]` names the definition `[SS]`.
+112. **`listing` and `tt` are code elements** (fix 7). Both are also outside the host list
+    of Decision 106; they are named so the reason stays with the code elements.
+113. **A stylesheet's own name** (fix 8; replaces Decision 98). Rule 5 matches the sensitive
+    words as whole words on a stylesheet's own name again and drops only the plural ending
+    there: `login.css` and `payment.css` sit in a sensitive area, `tokens.css` and
+    `design-tokens.css` do not. Folders are matched as before, plural included.
+114. **The earlier safe default for custom properties, as first asked in this round** (fix
+    9): every `--x` value change refused. Replaced during the round by Decision 115.
+115. **A custom property named for a colour may change its colour** (the session's decision
+    of 2026-10-09, made on the owner's instruction to decide it; it changes item 9 of this
+    round and the custom-property part of Decision 92). The reason: design-token projects
+    keep their colours in custom properties, and a script can read a real property's
+    computed colour just as well as a custom property's, so a colour-named custom property
+    carries the same kind of risk the check already accepts. In `.css`, a custom property
+    (`--x`) value change qualifies as a colour change only when all of these hold: the
+    property name contains `color` or `colour`, in any letter case; the whole old value and
+    the whole new value are each exactly one colour — a hexadecimal colour, a named colour,
+    or one `rgb()`, `rgba()`, `hsl()`, `hsla()`, `hwb()`, `lab()`, `lch()`, `oklab()`,
+    `oklch()` or `color()` function — with no `var()`, no `url()`, no second token and no
+    `!important` added or removed; and everything else in the two files is identical (or a
+    colour in a real colour property, as before). Every other custom-property change stays
+    refused with the settings clause. The executor's choices: a comment inside the value is
+    a second token; the functions are read in their written forms only (three numbers and
+    an optional `/ alpha`; `color()` after its colour space's name), so a function the
+    reader does not follow is refused; a renamed, added or removed custom property is a
+    setting; a custom property whose value opens a block (`--x: { color: red }`) cannot be
+    followed (`I could not read the change`), because its inside would otherwise read as
+    declarations — a pass on `6de2f75c`. The new functions count only in a custom
+    property's value; in real colour properties the colour tokens stay those of the
+    specification. In plain CSS `$x` and `@x` are no variables, so a declaration that starts
+    with one is no longer a "setting" but simply not recognised.
+116. **The corpus counts** (replaces the count in Decision 103). The corpus file holds 30
+    shapes that qualify and 195 traps, 42 of them the kept cases of removed formats (41
+    converted, of which 8 were qualifying shapes and 33 were traps, plus the `.mdx` guard),
+    plus the mode change: 229 tests in the file with the two property cases and the
+    linear-time case. The main test file holds 99 tests; 75 rows of its four tables are
+    converted cases of removed formats.
 
 ## Execution Record
 
@@ -2278,6 +2441,115 @@ linked for the run and removed after):
   ℹ tests 13083 | ℹ suites 2117 | ℹ pass 13083 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
   ℹ all files | 99.87 | 93.74 | 99.34 |
   [CTOC test-gate] coverage 99.87% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
+
+### Fix round 5 — the owner's decision and the fixes that still apply (2026-10-09)
+
+A fifth round, in this worktree from `6de2f75c`: the owner's decision to keep only the
+formats the check reads exactly (Decision 105), the fixes that still apply in those formats
+(Decisions 106 to 113) and the session's decision on colour-named custom properties, which
+arrived during the round (Decision 115). Test first: commit `5c032859` holds only the two
+test files, run on `6de2f75c`'s module; commit `ddb7f201` holds the module and the test
+corrections named below. The specification hash after every plan edit:
+`4aaf099b44f61ce1721e1bd2309bc781e49f2b8a2896c60aff3ecb22e80f8003`.
+
+**The module.** `src/lib/hotfix-check.js`: 2,930 lines and 141,393 bytes on `6de2f75c`;
+2,734 lines and 136,470 bytes now. Removed: the JavaScript and JSX reader, the TypeScript
+type-parameter reader, the Vue and Svelte modes, the reStructuredText line and span readers,
+the Sass indented-statement reader, the Sass and Less variable reader, the gettext entry and
+escape reader. Added: the fixed host-element list, the stack of open elements, the Markdown
+block reader with block quotes, the per-paragraph backtick pairing, and the colour-named
+custom property reader. The formats that stay: `.html`, `.htm`; `.css`; `.json`, `.yaml`,
+`.yml`, `.properties` under a catalogue folder; `.md`, `.txt`.
+
+**Red on `6de2f75c`** (commit `5c032859`: the two test files, 329 tests, 292 pass, 37 fail):
+26 corpus traps (16 of this round's traps answered `checking`; 10 kept cases of removed
+formats were still read: the 8 former qualifying shapes answered `checking`, `theme.scss`
+and `accent.less` answered with the settings clause), 3 new qualifying shapes refused, the
+two property cases, the linear-time case (its removed-format inputs were still read), the
+four table tests of rounds 3 and 4 and the edge shapes (75 converted rows), and the round-5
+table. Per fix, each answer read from the round-5 table's run:
+
+| Fix | Red (on `6de2f75c`) | Green |
+|---|---|---|
+| The owner's decision | the 8 qualifying shapes of removed formats answered `checking` (`Greeting.jsx`, `CancelButton.tsx`, `NameField.vue`, `Loading.svelte`, `de.po`, `guide.rst`, `shortcuts.rst`, `Cond.vue`), and so did every converted row that was a pass | each answers `I do not recognise <file> as wording or a colour`; a `.mdx` guard case answers the same (it did before) |
+| 1 host elements | `<button is="run-sql">SELECT name FROM users</button>` → `SELECT pass FROM admins` and `<runsql>…</runsql>` answered `checking`; `<DIV>Save</div>` was refused | not recognised; `<DIV>…</div>` `checking`; `<P IS="x">` refused, text in `<svg><text>` and `<math><mtext>` `checking` (guards) |
+| 2 the stack | `<run-sql><div></run-sql>SELECT name FROM users</div></run-sql>` in `.html` and in `.md`, and `<my-card><p>one<p>two</my-card>` before a changed paragraph, answered `checking` | `I could not read the change (<file> holds something I cannot follow)`; `<ul><li>One<li>Save</ul>`, a stray `</b>`, and text after a closed custom element still `checking`; text after `<my-widget/>` not recognised |
+| 3 MDX | `Hello {eval(name)} there.` → `eval(code)`, the same over three lines, a typo beside `{name}`, a changed `import` line, a wrapped `import`, a changed `export` line answered `checking` | not recognised; prose after `<p>Hello {name}</p>` and a line starting `important` still `checking` |
+| 4 backticks | a lone backtick in one paragraph, heading, list item, setext heading, before a thematic break, before a quote, in a table cell and behind a backslash, each followed by `` `rm -rf build` `` → `rm -rf dist`, answered `checking`; found while fixing, also `checking`: an item's setext heading before the span, and `pip install requests` indented right after a closed fence, a heading and a quoted code line | not recognised; a typo beside a lone backtick in another paragraph, between two list items that hold spans, and in an ordered item after another one still `checking`; a span across a lazy line, across an indented line after a quote, and beside a mid-paragraph `import` stay refused (guards, refused before) |
+| 5 block quotes | `>     pip install requests` (indented), a `> ~~~` fence, a `> >>>` doctest, indented code under a list item in a quote, a nested quote, `- >     code`, a tab after `>`, a quote 40 deep, `[guide]` → `[other]` with `[other]: /u/delete` defined inside a quote and inside a list item, 20 list markers on one line answered `checking` | not recognised; a quote's prose and prose after a quoted fence still `checking` |
+| 6 labels | `[guide]` → `[ẞ]` with `[SS]: /u/delete` answered `checking` | not recognised |
+| 7 code elements | `<listing>pip install requests</listing>` and `<tt>…</tt>` → `reqests` answered `checking` | not recognised |
+| 8 stylesheet names | a colour in `src/styles/login.css` and `payment.css` answered `checking` | `<file> sits in an area named login` / `payment`; `tokens.css` still `checking`; `src/tokens/base.css` sits in `token` (a guard) |
+| 9 custom properties (Decision 115) | `--color-brand: #0b5ed7` → `#1a73e8`, `--button-colour: red` → `blue`, `--Brand-COLOR: RED` → `Transparent`, `hwb()` → `oklch()`, `lab()` → `color()`, and a colour-named property beside a real colour property were refused as a setting; `--color-a: { color: red }` → `blue` answered `checking` | `checking`; the block value cannot be followed; `--enabled: green` → `red`, `--mode: red` → `lime`, `--color-mode: dark` → `light`, `--brand-color: red` → `red url(x)`, `--color-a: var(--b)` → `var(--c)`, `!important` kept or added, a comment in the value, a renamed property, `oklch()` with two numbers and an added property stay a setting (refused before, guards); the same edit beside a changed `width` is not recognised |
+
+The rows found while fixing (the second half of rows 4 and 5) were judged by the pure rules
+of `6de2f75c`'s module, read from git into a scratch file, before their fix was kept.
+
+**Test corrections in `ddb7f201`, each named.** Two round-4 rows changed their expected
+answer, both by a fix as the session specified it: `src/pages/upper.html` (`<DIV>Save</DIV>`)
+from "not recognised" to `checking` (Decision 106), and `src/pages/pre.html`
+(`<pre></code>…`) from "not recognised" to the "cannot follow" sentence (Decision 107). Four
+of this round's own new rows were wrong as first written and were corrected, not loosened:
+an ordered item after another ordered item really starts an item (the row now uses a bullet
+item, and a second row pins the pass); a row meant to change two colours added a line;
+`and-more.css` adds a property, which is a setting; a backtick inside a tag's attribute
+leaves the tag open (refused before and after, with that sentence). One qualifying corpus
+shape of this round (`docs/tick-alone.md`) was moved to the round-5 table only, because the
+cut-short case's own check reads an odd number of backticks at the end as unfinished.
+
+**Counts.** The corpus: 30 shapes that qualify and 195 traps, 42 of them the kept cases of
+removed formats, plus the mode change; 229 tests in the file. The main test file: 99 tests,
+75 converted rows in four tables, and the round-5 table of 84 rows. Both files: 328 tests,
+all passing. The character property test: 7,820 variants (each of 23 characters at each
+position of each qualifying shape's changed text, and the 115 inside the role span of
+`docs/shortcuts.rst`, all refused now); 5,087 pass, each with its character named; 59
+variants give the same answer through the real route. The two colour-named custom property
+shapes are in it: no inserted character passes. The cut-short property case: 1,586 cuts,
+456 pass, each ending in closed plain text. The linear-time case keeps its 20 inputs (those
+of removed formats now also assert the "not recognised" refusal) and gains 9: 30,000 open
+elements closed by 30,000 end tags of another name, with and without a custom element
+open; 20,000 differently named elements; a quote 40,000 deep; 30,000 quoted lines; 60,000
+paragraphs with backticks; 20,000 lines of items and quotes; 40,000 list markers on one
+line; 50,000 custom properties; each under the case's 250 ms of processor time.
+
+Coverage of `hotfix-check.js` under its own two test files: lines 99.96%, branches 97.40%,
+functions 98.22%; the one line not run is the "texts differ, no changed-line group"
+refusal, as before.
+
+**One real run of a documentation typo (item 10)**, on `ddb7f201`, in a scratch project
+made for it and committed: `package.json` with `"test": "node --test"`, `tests/app.test.js`
+with two node:test tests, and `docs/guide.md` (`# Guide`, `Read teh guide before you
+start.`, and a quoted line ``> Run `npm test` first.``). The typo was fixed (`teh` → `the`),
+and through `node src/commands/start.js`, run in the project:
+- `hotfix check docs/guide.md` →
+  `{ "verdict": "checking", "text": "Checking the hotfix against the existing tests.", "next": "hotfix check --run-tests 'docs/guide.md'", "ask": { "questions": [] }, "actions": {} }`;
+- `hotfix check --run-tests 'docs/guide.md'` →
+  `{ "verdict": "hotfix", "text": "", "tests": "2 tests passed.", "commit": { "files": [ "docs/guide.md" ], "add": "git --literal-pathspecs add -- 'docs/guide.md'", "message": "git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- 'docs/guide.md'", "judged": [ { "path": "docs/guide.md", "blob": "289cb59eff66f3f1004d7100f8939808562af97e" } ] }, "ask": { "questions": [] }, "actions": {} }`;
+- the answer's two commands, run from the project root with the message filled in
+  (`hotfix: a typo in the guide`), made commit `10a567e`, `1 file changed, 1 insertion(+),
+  1 deletion(-)`, holding `docs/guide.md` only; `git rev-parse HEAD:docs/guide.md` gives
+  `289cb59eff66f3f1004d7100f8939808562af97e`, the judged id;
+- the log's one line: `{"at":"2026-10-09T09:41:00.813Z","verdict":"hotfix","cause":null,"urgent":false,"files":1,"lines":2}`;
+  no `ctoc-hotfix-` folder remains and `git worktree list` lists one worktree. The menu
+  process also wrote its own `.ctoc/`, `CLAUDE.md` and `IRON_LOOP.md` into the scratch
+  project on its first call, untracked and not in the commit.
+
+**Not done, said plainly.** The host-element list was written from memory, not compared
+with Vue's source (Decision 106). Steps 11, 13 and 16 stay with the session's reviewers, as
+before; no box is ticked in this round.
+
+Step 14, on `ddb7f201`, in this worktree (the main checkout's `node_modules` linked for
+the run and removed after), before this record was written:
+- `npx eslint --max-warnings 0` on the three changed files: exit 0. `npx tsc --noEmit -p .`:
+  exit 0.
+- `npm test`:
+  ```
+  ℹ tests 13108 | ℹ suites 2117 | ℹ pass 13108 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.88 | 93.70 | 99.34 |
+  [CTOC test-gate] coverage 99.88% (threshold 99%), skipped 0, failed 0
   [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
   [CTOC test-gate] PASS
   ```
