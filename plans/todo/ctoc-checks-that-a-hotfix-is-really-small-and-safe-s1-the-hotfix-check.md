@@ -1457,6 +1457,205 @@ instead of "tests failed" — still not a pass.
     The property test inserts each of the 16 characters at every position inside a role
     span: every variant refuses.
 
+90. **Text inside a component or a custom element is never wording** (decision at review,
+    2026-10-09; source: the security attack, item A1, high). Committed passes on `51cb8267`:
+    `.jsx` `<RunSql>SELECT name FROM users</RunSql>` → `SELECT pass FROM admins`, and `.vue`
+    `<MyAction>charge</MyAction>` → `refund`. The session's decision, a safe default:
+    *"limit text-bearing elements to HTML host elements, meaning a lowercase name with no
+    hyphen. Refuse the text children of capitalised components and of custom elements (names
+    with a hyphen), in JSX, Vue, Svelte and HTML alike. This includes Vue slot content passed
+    to a component through `<template #x>`."* The scanner now counts every open element whose
+    name fails `^[a-z][a-z0-9]*$` (by its own name, so another element's end tag does not
+    end it) and marks all text inside it quiet, at any depth; a JSX fragment `<>` is no
+    element. The clause is the markup kind's existing sentence, `I do not recognise <file> as
+    wording or a colour`, the nearest one: the refusal comes from the same token comparison
+    as raw text and templates, and the program-code clause names "program code", which a
+    `.html` file is not. The executor's choices, each stricter: (a) the rule reads the name as
+    written, so in a `.html` file `<DIV>` and `<MyAction>` hold their text too (HTML would
+    lower-case them); (b) a name with a colon (`svelte:head`) or a dot (`ui.p`) is no host
+    name; (c) in `.html`, `.htm` and Markdown a self-closing `<my-widget/>` still opens the
+    element, as HTML reads it, while `.vue` and `.svelte` (now read in a `svelte` mode, as
+    `html` otherwise) close it. **The owner will be offered an alternative**: an allowlist of
+    presentational component names (`Button`, `Link`, `Label`, ...) whose text is wording.
+91. **A reference definition's destination and title may stand on the next lines** (decision
+    at review, 2026-10-09; source: the security attack, item A2, high). Committed passes:
+    `[a]:` with `/u/profile` on the next line changed to `/u/delete`, and to
+    `//evil.example/x`. When `[label]:` has no inline destination, the next non-blank line
+    (the destination) joins the exact-compare text; when the destination has no title after
+    it, a next line opening a title (`"`, `'`, `(`) joins it with every following line up to
+    a blank one (a title may run over lines, never over a blank one). The executor's choice:
+    a next line that is itself a definition is read as its own definition, not as the
+    destination.
+92. **A custom property or a Sass or Less variable is a setting; a colour passes only in a
+    real colour property** (decision at review, 2026-10-09; source: the security attack, item
+    A3, medium). `--enabled: green` → `red` and `--mode: red` → `lime` passed as colour, but a
+    script reads them (`getComputedStyle`). The session's decision, a safe default: *"any value
+    change in a custom property (`--x`), a Sass variable (`$x`) or a Less variable (`@x`) is
+    refused, with the settings clause. Colour passes stay limited to real colour-valued CSS
+    properties."* Every declaration `name: value` whose name starts `--`, `$` or `@` is read
+    from the whole file (the stylesheet scanner's statements, the value as written, comments
+    and strings in it included); when the two sequences differ, at any depth, the answer is
+    `it changes a setting in <file>, and settings changes are a common cause of outages`,
+    before the colour comparison. The real colour properties, exactly as the code has them: a
+    name matching `/(?:^|-)color$/i` (`color`, `background-color`, `border-color`,
+    `border-top-color`, `outline-color`, `text-decoration-color`, `caret-color`,
+    `accent-color`, `column-rule-color`, `flood-color`, `lighting-color`, `stop-color`,
+    `scrollbar-color`, ...) and the shorthands `background`, `border`, `border-top`,
+    `border-right`, `border-bottom`, `border-left`, `border-block`, `border-block-start`,
+    `border-block-end`, `border-inline`, `border-inline-start`, `border-inline-end`,
+    `outline`, `column-rule`, `fill`, `stroke`, `box-shadow`, `text-shadow`,
+    `text-decoration`, `text-emphasis` (`COLOUR_SHORTHANDS`); never a name starting `--`, `$`
+    or `@`. A hexadecimal or functional colour no longer passes in any other property either
+    (`width: #fff` was a pass). The earlier qualifying shape "a named colour in a custom
+    property" (`src/styles/custom.css`, `--accent: red` → `blue`) is now a trap, with this
+    decision as its reason, and so are the three other variable shapes (`vars.css`
+    `--brand`, `theme.scss` `$brand`, `accent.less` `@accent`); the branch case `main.scss`
+    now expects the settings clause, and `end.scss` keeps its purpose (a `//` comment at the
+    file's end) on `a { color: … }`. Residual, recorded: a Less detached ruleset
+    (`@x: { … }`) is a block, not a variable value; the declarations inside it are judged
+    like any other. **The owner will be offered an alternative**: colour-named tokens
+    (`--color-*` and similar) whose colour values pass as colours.
+93. **reStructuredText literal blocks and doctests are code** (decision at review,
+    2026-10-09; source: the code review, item B1). The block after a paragraph ending in
+    `::` or a line `::` alone, after a blank line, is code: indented deeper than that line,
+    or (the executor's addition, by the same reasoning) a quoted literal block, the lines at
+    its indentation starting with the same punctuation. A doctest, a line starting `>>> ` (or
+    `>>>` alone) and the lines after it up to a blank line, is code in `.rst`, in `.txt` (a
+    new plain-text reader; `.txt` had none) and in `.md` (where `>>>` would otherwise be a
+    triple quote: reading it as code only refuses more).
+94. **Every reStructuredText directive is code but the prose ones** (decision at review,
+    2026-10-09; source: the code review, item B2). The prose directives: `note`, `warning`,
+    `tip`, `important`, `caution`, `danger`, `error`, `hint`, `attention`, `seealso`,
+    `admonition`, `topic`, `sidebar`, `rubric`. Their line and body are read as prose, line
+    by line (so a code directive nested in one is code); their options, the body's leading
+    `:name:` lines, are code. Every other directive (`ifconfig`, `doctest`, `image`,
+    `toctree`, `automodule`, `replace`, a domain directive such as `py:function`, ...) is
+    code with its indented body. The executor's addition: a prose directive whose own line
+    ends in `::` (`.. note:: Run this::`) is code whole, because a literal block follows.
+    Comments, footnotes and citations (`.. text`, `.. [1] text`) stay prose.
+95. **HTML code elements hold code** (decision at review, 2026-10-09; source: the code
+    review, item B3). Text inside `<code>`, `<pre>`, `<kbd>`, `<samp>` and `<var>` is quiet,
+    counted like a component (Decision 90), in HTML and in Markdown's inline HTML; the
+    executor applied it in JSX, Vue and Svelte too (the same elements, the same reasoning).
+96. **`<title>` text is wording** (decision at review, 2026-10-09; source: the code review,
+    item B4). Its content is read to `</title>` as one text token (HTML reads it as text,
+    tags included), judged by the normal text rules, so a `<` inside still refuses. The
+    branch case `src/pages/title.html` now expects `checking`.
+97. **Vue's conditional templates render** (decision at review, 2026-10-09; source: the code
+    review, item B5). In `.vue`, a nested `<template>` with `v-if`, `v-else-if` or `v-else`
+    and no slot (`#x`, `v-slot…`) is markup; its text qualifies unless something around it
+    holds it (a component, Decision 90; a slot template). The executor added `v-else-if` (the
+    same chain) and left `v-for` templates quiet. The branch case `src/components/Slot.vue`
+    (a `v-if` template inside the component's markup, despite its name no slot) now expects
+    `checking`.
+98. **A stylesheet's own file name is no sensitive area** (decision at review, 2026-10-09;
+    source: the code review, item B6). `tokens.css` and `design-tokens.css` matched `token`
+    through its plural. For `.css`, `.scss`, `.sass` and `.less` the sensitive words are
+    matched in the folders only; CTOC's secret-file guard still reads the whole path.
+99. **The reused CTOC checks** (decision at review, 2026-10-09; source: the code review,
+    item B7). (a) CTOC's secret-file guard, `src/hooks/guard-files.js`, pattern
+    `/id_(rsa|dsa|ed25519|ecdsa|\w+)/i`, refuses `src/styles/grid_theme.css` and
+    `docs/android_setup.html` (both `isSecretTarget` true, run 2026-10-09). The module is not
+    changed here; the false positive is recorded for a fix to the guard itself. (b)
+    `isProtectedEnforcementPath` (`src/lib/protected-paths.js`) names CTOC's own enforcement
+    surface: its only other caller, `plan-coverage.js`, refuses an autonomous plan's write
+    over "CTOC's own gate-enforcement code", and its list is CTOC's files (`src/hooks/`,
+    `plan-coverage.js`, ...). So it is meant for CTOC's repository only: the hotfix check now
+    asks it only when `isCtocProject(top).isCtocRepo` (`src/lib/ctoc-project-detector.js`,
+    the detection `SessionStart.js` uses: `package.json` named `ctoc` at the project
+    boundary). A React project's `src/hooks/README.md` is a qualifying corpus shape again; a
+    branch case pins the refusal in a repository that is CTOC.
+100. **Markdown list items** (decision at review, 2026-10-09; source: the code review, item
+    B8). An indented code block is four columns beyond the content column of the list item
+    it stands in, read after CommonMark's list rules, so a paragraph indented to the content
+    column after a blank line is prose. The executor's choices, each keeping the reading on
+    the safe side where it cannot follow CommonMark exactly: every line indented less than
+    an item's content column ends the item (a lazy continuation line too, which only makes
+    more lines code); a thematic break (`* * *`) and an item with no text are no items; an
+    ordered item not numbered 1 starts an item only after a blank line or another item (it
+    cannot interrupt a paragraph); a fence inside an item opens at most three columns beyond
+    the item's content column and closes only at that column (a closing fence further left
+    would really open a new block); an item whose text opens a fence or a doctest opens it,
+    and one whose text starts five columns after its marker is code. Residual, recorded: a
+    block quote's own indented code (`>     code`) is still read as prose, as before.
+101. **TypeScript type parameter lists are no element** (decision at review, 2026-10-09;
+    source: the code review, item B9). After `<T,>(…) =>` in a `.tsx` file the rest of the
+    file was read as element children, so a later string `"<b>Save</b>"` passed. Where JSX
+    could start, a `<` followed by a name (after an optional `const`, `in` or `out`) and then
+    `,` or `extends` starts a type parameter list, skipped to its matching `>` (strings
+    skipped, the `>` of `=>` not counted) as code.
+102. **The property test inserts 23 characters, and found the reStructuredText reference**
+    (decision at review, 2026-10-09; source: the code review, item B10). `` ` ``, `&`, `$`,
+    `[`, `]`, `|` and `_` were added. On `51cb8267` they gave 1,730 passes no table named;
+    one class was a real hole: `handbook_` is a reStructuredText simple reference, a link to
+    the target `handbook`. Simple references (`name_`, `name__`) and footnote and citation
+    references (`[1]_`) are now compared exactly, read word by word with the surrounding
+    punctuation stripped by hand. The other passes are named, each with its reason: in markup
+    and JSX text `[ ] | _` are shown as typed (`&`, `$` and the backtick refuse); in catalogue
+    values `[ ] | _ &`; in Markdown prose `| _` (a table cell or emphasis), `[ ]` (a bracket
+    that names no definition; targets are compared exactly), an unpaired backtick, and an
+    `&` that starts no character reference (one that does is not named, so it fails the
+    test); in reStructuredText every new character but an `_` that ends a reference name; in
+    plain text all of them. `$` never passes (a currency sign, rule 6). The test now
+    separates `.rst` from `.txt`.
+103. **The corpus counts in the specification are stale** (the executor, 2026-10-09; source:
+    the code review, item B12). The Step 8 box and the acceptance criterion say 82 edit
+    shapes (24 that qualify, 58 traps); the file now holds 34 shapes that qualify and 167
+    traps, plus the mode change (202 cases; 204 tests in the file with the property test and
+    the linear-time case). The reason: each review round added the shapes and traps its
+    findings named (Decisions 51 to 64, 65 to 77, 78 to 89, 90 to 102), and this round moved
+    four variable shapes to the traps (Decision 92) and `src/hooks/README.md` back to the
+    shapes (Decision 99). The specification text is left as written, so its hash holds; this
+    decision is the current count (with Decision 104's cut-short case, 205 tests in the
+    corpus file).
+104. **Every scanner fails closed** (decision at review, 2026-10-09; source: an automated
+    commit security review that named "fail-open state drift" and "parser differential" in
+    `hotfix-check.js` without details, and the session's item C1). (a) *End-of-file state*:
+    every scanner reports `open` when either side ends inside an unfinished construct (an
+    unclosed tag, attribute quote, comment, `<!…>`, CDATA, raw-text element or `<title>`,
+    an unclosed `{…}` in HTML, Vue or Svelte or `{{`/`{%` in Markdown, a Vue `<template>`
+    never closed; in JavaScript an unclosed string, template literal, regular expression,
+    block comment, brace, JSX element or type parameter list; in stylesheets an unclosed
+    comment, string, `url(`, or block; in Markdown an unclosed fence, front matter in any of
+    its three forms, or link destination; in reStructuredText a backtick run left unpaired,
+    an open role span, interpreted text or inline literal). Rule 4 then answers
+    `I could not read the change (<file> leaves a tag, quote, comment, block, fence or span
+    open)`, log cause `unreadable`. (c) *Desync*: a scanner reports `lost` where it meets
+    something it cannot follow where it expects structure: an attribute name starting with
+    `<`, `"`, `'` or `=` (an unclosed `<div` swallowing the next tag), a JavaScript or CSS
+    string or regular expression running into a line break, a `}` with nothing open (in
+    JavaScript and in stylesheets); the answer is `I could not read the change (<file>
+    holds something I cannot follow)`. (b) *Matching state at each changed line*: for
+    markup and JSX the token comparison already demands identical token kinds on both sides
+    with each changed text token on one line, so the state at every changed line is the same
+    by construction; for stylesheets the two whole texts must be identical but colour
+    tokens; for Markdown, reStructuredText and plain text the line classes of every changed
+    line are compared (`lineClassChange`). The one scanner that read a changed line without
+    knowing its state was the message catalogue: a changed line is now read alone only
+    where it starts an entry, never inside a YAML block scalar (`|`, `>` and the lines
+    indented beneath), a YAML quoted value or flow collection begun on an earlier line, or a
+    properties value continued by a `\` on the line above (`lost` otherwise). The executor's
+    reading of the state rule: the state where wording must be allowed is taken at the
+    changed text, not at the line's first character, because the qualifying shape
+    `wrapped.html` (a tag whose attributes run onto the changed line) starts that line inside
+    a tag on both sides. A reStructuredText directive body that runs to the end of the file
+    is closed by the format's own rule (its content ends at a dedent or at the end), so it is
+    not counted as open: the qualifying branch case `docs/note.rst` ends in a note's body.
+    Superseded pins, each now the unreadable answer: the round-3 branch cases `Str.jsx`,
+    `Tick.jsx` and `Re.jsx` (an unclosed string, template literal and regular expression at
+    the end of the file were passes), `unclosed.html` (an unclosed script), `open-json.md`
+    (an unclosed JSON front matter, a setting before), `unfence.md`, the round-4 case
+    `fence-out.md`, and the edge shape `docs/rule.md` (an unclosed first-line `---` was no
+    front matter and passed; Decision of round 2). In the property test a backtick inserted
+    in reStructuredText now refuses, so the table no longer names it. A new property case
+    cuts the new side of every qualifying corpus file at every point (1,874 cuts): a cut that
+    passes must leave the file ending in plain visible text with every construct before it
+    closed, by a separate check in the test. It found two holes, both fixed red first: a
+    Markdown link destination cut before its `)` (`[the new guide](/guide`) passed, and is
+    now an open construct; and an emptied `.rst` or `.txt` file passed as a wording edit
+    (the Markdown one already refused): a side emptied, or filled from empty, now holds the
+    content of a removal or an addition and is not recognised, in every qualifying kind.
+
 ## Execution Record
 
 Built by the iron-loop executor in the worktree `.claude/worktrees/hotfix-s1-build`
@@ -1950,6 +2149,134 @@ run and removed after):
   ```
   ℹ tests 13050 | ℹ suites 2117 | ℹ pass 13050 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
   ℹ all files | 99.87 | 93.59 | 99.34 |
+  [CTOC test-gate] coverage 99.87% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
+
+### Fix round 4 — the security attack and the code review (2026-10-09)
+
+A fourth fix round, in this worktree from `51cb8267`, on the security attack's three
+findings (real runs) and the code review's twelve items (reading). Every trap and shape was
+written first and run on `51cb8267`: the corpus gave 33 failures, each for the stated reason
+(a trap answered `checking`, a shape was refused), and the property test failed; the
+round-4 branch cases, judged by the pure rules of `51cb8267`'s module, differed on 22 of 47
+(the rest already held and stay as guards). Decisions 90 to 103 hold the reasons. Commit
+`2a97bb84`: the module and both test files. The coordinator's item C1 (every scanner fails
+closed), which arrived during the round, was handled the same way, red first on
+`2a97bb84`; Decision 104 holds its reasons; commit `4cf78f79`. The specification hash after every plan edit:
+`4aaf099b44f61ce1721e1bd2309bc781e49f2b8a2896c60aff3ecb22e80f8003`.
+
+| Item | Red (on `51cb8267`) | Green |
+|---|---|---|
+| A1 components | `RunSql.jsx` (`SELECT name FROM users` → `SELECT pass FROM admins`), `Charge.vue` (`charge` → `refund`), `widget.html` (`<my-widget>x</my-widget>`), `Pay.svelte` answered `checking`; branch cases `<DIV>`, `<MyAction><b>…</b></MyAction>`, `<Box><p>`, `<ui.p>` passed | not recognised; `home.html` `<button>Save</button>` → `Store` still `checking`; `SlotPass.vue` (`<template #label>` inside a component) was already refused, kept as a guard |
+| A2 wrapped references | `wrapped-ref.md` (`/u/profile` → `/u/delete`, and → `//evil.example/x`), `wrapped-title.md` (a title on the third line), `inline-title.md` answered `checking` | not recognised; prose after a definition (`after-def.md`) still `checking` |
+| A3 variables | `flags.css` (`--enabled: green` → `red`, `--mode: red` → `lime`), `custom.css`, `vars.css`, `theme.scss`, `accent.less` answered `checking`; `width: #fff` passed; `gap.less`, `map.scss`, `font.css` answered "not recognised" | the settings clause; `width.css` not recognised; `fill`, `stroke`, `outline-color`, `border-color` changes still `checking` |
+| B1 literal blocks, doctests | `literal.rst`, `expanded.rst` (`pip install requests` → `reqests`), `quoted.rst`, `doctest.rst`, `notes/doctest.txt`, `doctest.md` (an output line changed) answered `checking` | not recognised |
+| B2 directives | `ifconfig.rst`, `doctest-dir.rst`, `image.rst`, `toctree.rst`, `automodule.rst`, `note-class.rst` (a prose directive's option) answered `checking` | not recognised; a `note` body and a `warning` line still `checking`; `.. note::` → `.. raw::` refused |
+| B3 code elements | `code-el.md`, `code-el.html` (`<code>pip install requests</code>` → `reqests`), `Kbd.jsx`, `pre.html` (`</code>` inside `<pre>`) answered `checking` | not recognised; text after `</code>` still `checking` |
+| B4 title | `titled.html` and the branch case `title.html` were refused | `checking` |
+| B5 conditional templates | `Cond.vue`, `Else.vue`, `ElseIf.vue` and the branch case `Slot.vue` were refused | `checking`; `v-for`, `#x v-if` and a `v-if` inside a slot stay refused (guards) |
+| B6 token stylesheets | `src/styles/tokens.css` and `design-tokens.css` "sit in an area named token" | `checking` |
+| B7 reused checks | `src/hooks/README.md` in a project that is not CTOC "sits in an area named enforcement" | `checking`; in a repository whose `package.json` is named `ctoc`, refused as before. The secret guard's false positive is recorded (Decision 99), not changed |
+| B8 Markdown lists | `list.md` (a paragraph at the sub-item's content column) was refused; `wide.md`, `fence-out.md`, `item-fence.md`, `item-doctest.md` answered `checking` | `list.md` `checking`; the others not recognised; `list-code.md` (code six columns in) was already refused, kept |
+| B9 generics | `GenStr.tsx` (`<T,>` then `"<b>Save</b>"`), `Ext.tsx` (`<T extends object>`), `Const.tsx` (`<const T,>`) answered `checking` | not recognised; `<p>Save</p>` after a generic with `=>` inside still `checking` |
+| B10 property test | 1,730 unnamed passes with the seven new characters, `handbook_` among them | green (below) |
+| C1 fail closed | on `2a97bb84`, 32 of the 36 cases of the new fail-closed test differed: an unclosed `<div` before the change, an unclosed attribute quote, `<!--`, `<script>`, tag, `{{`, Vue root `<template>` and CDATA after it; in JSX an unclosed `{`, `/*`, element, string, template literal and regular expression, a string into a line break, a stray `}`; in CSS an unclosed `/*`, block and string, a stray `}`; in Markdown a change above an unclosed fence, an unclosed `---`, `{{` and `<!--`; in reStructuredText an open role span and inline literal answered `checking`; under an unclosed fence, and one side well-formed and the other not (HTML, Markdown), refused with another clause; the emptied `.rst` and `.txt` and the filled `.txt` answered `checking`. Catalogue states: a changed line inside a block scalar (`|`, `>-`), a quoted value, a flow collection, a properties continuation answered `checking`. The cut-short case failed at `docs/linktext.md` cut to `Read [the new guide](/guide` | the unreadable answer, `open` or `lost` as above, for each trap; the `.tsx` generic arrow (B9) stays not recognised (a guard); well-formed HTML, Markdown and reStructuredText beside the same constructs, a line after a block scalar and after a continuation still `checking`; the emptied and filled files not recognised |
+
+Self-review findings fixed before the commit, each red first in a branch case: a list item
+whose own text opens a fence or a doctest, a second definition right after `[a]:`, a
+`.. note:: Run this::` literal, and an ordered item not numbered 1 inside a paragraph. Lint
+refused two patterns as unsafe (the thematic break and the reference name); both are read by
+hand now. A trailing-punctuation pattern first written for the reference words took
+16,980 ms on a 200,000-character word (it rescans from every position); it is a hand loop
+now, 1 ms, and the linear-time case holds that input.
+
+The corpus: 34 shapes that qualify and 167 traps plus the mode change, 205 tests in the
+file with the two property cases and the linear-time case; the main test file 98 tests (303
+in the two files, all passing). The character property test: 8,487 variants (each of 23
+characters at each position of each qualifying shape's changed text, and 115 inside the
+role span of `docs/shortcuts.rst`); 6,110 pass, each with its character named in the table
+of Decision 102; the rest refuse; 69 variants (one refused and one passing per shape) give
+the same answer through the real route. The cut-short property case: 1,874 cuts, 490 pass,
+each ending in closed plain text (all in documentation and catalogue files; no markup, JSX
+or stylesheet cut passes). The linear-time case gained nine inputs (nested list items,
+literal blocks, wrapped definitions, a 200,000 `)` word, 30,000 directive options,
+unclosed type parameter lists, 30,000 open components, 50,000 variable declarations, 30,000
+open YAML quotes and blocks); each is judged in 1 to 46 ms of processor time.
+
+Coverage of `hotfix-check.js` under its own two test files: lines 99.97%, branches 97.49%,
+functions 98.41%; the one line not run is the "texts differ, no changed-line group"
+refusal, as before.
+
+**The mutation sample (item B11).** Twenty one-line mutations of the module, each aimed at
+one of the 58 round-3 branch cases, covering every scanner: for each, the pure rules judged
+all 58 shapes (which ones flip) and the real round-3 test ran (it must fail). The module was
+restored after each (the script compares nothing by hand: it rewrites one line and puts the
+original text back).
+
+| Case | Scanner | Line | Mutation | Shapes flipped | Round-3 test |
+|---|---|---|---|---|---|
+| `Tpl.jsx` | JavaScript, template literal | 836 | a backtick no longer closes the template | 1 (it) | fails |
+| `Gen.tsx` | JavaScript, type parameters | 936 | the type parameter list is not skipped | 1 (it) | fails |
+| `escaped.html` | markup, script escapes | 1080 | `<script>` inside `<!--` no longer escapes twice | 1 (it) | fails |
+| `title.html` | markup, title | 1209 | the title's text runs to the end of the file | 1 (it) | fails |
+| `tpl.html` | markup, template | 1199 | a `<template>` no longer counts as quiet | 1 (it) | fails |
+| `After.vue` | markup, Vue | 1195 | the top-level template is not the component's markup | 2 (it, `Slot.vue`) | fails |
+| `cdata.html` | markup, CDATA | 1221 | CDATA ends at the first `>` | 1 (it) | fails |
+| `Each.svelte` | markup, Svelte braces | 882 | a brace expression runs to the end | 1 (it) | fails |
+| `esc.po` | catalogue, Gettext | 1420 | octal escapes read no digit | 1 (it) | fails |
+| `short.yaml` | catalogue, YAML | 1426 | a short `\x` escape is accepted | 1 (it) | fails |
+| `ctl.json` | catalogue, JSON | 1450 | the raw value is used undecoded | 1 (it) | fails |
+| `top.sass` | stylesheet, Sass | 1557 | every Sass line counts as inside a block | 1 (it) | fails |
+| `space.css` | stylesheet, colour function | 1661 | the space form needs four numbers | 1 (it) | fails |
+| `span.md` | Markdown, code spans | 2224 | code spans and targets are not compared | 2 (it, `full.md`) | fails |
+| `open-json.md` | Markdown, front matter | 1766 | an unclosed JSON front matter is none | 1 (it) | fails |
+| `sub.rst` | reStructuredText, substitution | 1938 | `.. |name| raw::` is not read past the name | 1 (it) | fails |
+| `note.rst` | reStructuredText, prose directive | 1901 | `note` is no prose directive | 1 (it) | fails |
+| `interp.rst` | reStructuredText, interpreted text | 2117 | interpreted text is not compared | 1 (it) | fails |
+| `.vscode/notes.txt` | kinds, dot-folders | 2293 | no folder is a dot-folder | 1 (it) | fails |
+| `GEMINI.local.md` | kinds, instruction files | 247 | `GEMINI*.md` is no instruction file | 1 (it) | fails |
+
+20 of 20: the aimed-at case flips and the round-3 test fails, run on `2a97bb84` and again on
+`4cf78f79` (the same result; line numbers are of `4cf78f79`, each mutation found by its
+unique line text; the CDATA mutation was rewritten for the new comment reader). Where the
+first failing case shows as `{"verdict"…}` the aimed-at shape expects `checking` and its
+assertion message is the answer's JSON; the pure-rule judgement attributes the flip.
+
+**The real flow (item B12)**, on `2a97bb84` and again on `4cf78f79` (the same answers), in a scratch project made by one bare menu
+call and committed (`src/styles/button.css`, `locales/en.json`, `package.json` with
+`"test": "node --test"`, `tests/app.test.js` with two node:test tests). A first attempt used
+`"test": "node --test tests/"`, which Node 24 runs as one failing test named `tests`; the
+check refused it correctly (`the existing tests fail (tests: tests)`), and the project's
+command was fixed and committed. Through `node src/commands/start.js`:
+- a colour change, `.save { background-color: #0a58ca; }` → `#0b5ed7`:
+  `hotfix check src/styles/button.css` →
+  `{ "verdict": "checking", "text": "Checking the hotfix against the existing tests.", "next": "hotfix check --run-tests 'src/styles/button.css'", "ask": { "questions": [] }, "actions": {}}`;
+  `hotfix check --run-tests src/styles/button.css` (375 ms for the whole call on `4cf78f79`) →
+  `{ "verdict": "hotfix", "text": "", "tests": "2 tests passed.", "commit": { "files": [ "src/styles/button.css" ], "add": "git --literal-pathspecs add -- 'src/styles/button.css'", "message": "git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- 'src/styles/button.css'", "judged": [ { "path": "src/styles/button.css", "blob": "26d9708543d05ebc3bef99ddc4a2a0ff8b7eec67" } ] }, "ask": { "questions": [] }, "actions": {} }`;
+- a catalogue wording change, `"Save {count} items"` → `"Store {count} items"`:
+  `hotfix check locales/en.json` →
+  `{ "verdict": "checking", "text": "Checking the hotfix against the existing tests.", "next": "hotfix check --run-tests 'locales/en.json'", "ask": { "questions": [] }, "actions": {}}`;
+  `hotfix check --run-tests locales/en.json` (357 ms) →
+  `{ "verdict": "hotfix", "text": "", "tests": "2 tests passed.", "commit": { "files": [ "locales/en.json" ], "add": "git --literal-pathspecs add -- 'locales/en.json'", "message": "git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- 'locales/en.json'", "judged": [ { "path": "locales/en.json", "blob": "2d04620e18ddae077f01341157b2c1e4e6b3a435" } ] }, "ask": { "questions": [] }, "actions": {} }`;
+- each call's standard output parses as one JSON document; the log's last two lines:
+  `{"at":"2026-10-09T00:13:30.207Z","verdict":"hotfix","cause":null,"urgent":false,"files":1,"lines":2}`
+  and `{"at":"2026-10-09T00:13:30.748Z","verdict":"hotfix","cause":null,"urgent":false,"files":1,"lines":2}`;
+  no `ctoc-hotfix-` folder remains, `git worktree list --porcelain` lists one worktree, and
+  `git status --porcelain` shows only `.ctoc/logs/`.
+
+**Baselines.** `git diff f486ee4a..HEAD -- .ctoc` is empty: no baseline file changed (and
+this round touches nothing under `.ctoc/`).
+
+Step 14, on `4cf78f79` with this record, in this worktree (the main checkout's `node_modules`
+linked for the run and removed after):
+- `npx eslint --max-warnings 0` on the three changed files: exit 0. `npx tsc --noEmit -p .`:
+  exit 0. (On `2a97bb84` alone `npm test` also passed: 13,081 tests, coverage 99.87%.)
+- `npm test`:
+  ```
+  ℹ tests 13083 | ℹ suites 2117 | ℹ pass 13083 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.87 | 93.74 | 99.34 |
   [CTOC test-gate] coverage 99.87% (threshold 99%), skipped 0, failed 0
   [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
   [CTOC test-gate] PASS
