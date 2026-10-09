@@ -3153,8 +3153,8 @@ findings, both in packages that were there before this round and that only eslin
 they are named under "Not done". Nothing under `src/` requires parse5 or markdown-it (the
 only `require` of either is in `tests/hotfix-check-differential.test.js`).
 
-**Red on `e43ea9ae`** (the tests of `4d389b06` against that commit's module, extracted
-with `git archive`). The differential test's default sample, seed 20261009:
+**Red on `e43ea9ae`** (this round's tests against that commit's module, extracted with
+`git archive`). The differential test's default sample as `2fd8113b` sets it, seed 20261009:
 
 | | edits | passed by the check | disagreements | plain visible-text edits refused |
 |---|---|---|---|---|
@@ -3162,6 +3162,10 @@ with `git archive`). The differential test's default sample, seed 20261009:
 | HTML, green | 49,837 | 4,773 | 0 | 20,854 |
 | Markdown, red | 11,975 | 4,875 | 425 | 2,217 |
 | Markdown, green | 11,975 | 2,954 | 0 | 3,713 |
+
+(The Markdown rows were measured with the generator of `2fd8113b`. `5eefe57b` added pieces
+to it; with those the fixed module passes 2,922 of the 11,975 edits and refuses 3,813 plain
+ones, 0 disagreements.)
 
 The red classes, with the count in that sample and the smallest case of each (the test cuts
 a failing case down before it prints it; the cut also shortens the words):
@@ -3393,6 +3397,17 @@ Step 14, in this worktree with its own `node_modules` (`npm ci`):
   ```
   The one line of `hotfix-check.js` not run (771) is the "texts differ, no changed-line
   group" refusal, as before.
+- `npm test` on `d77e0511`, the commit that holds this record (its code and tests are
+  `48ca2c1e`'s); these lines were added after that run:
+  ```
+  ℹ tests 13138 | ℹ suites 2117 | ℹ pass 13138 | ℹ fail 0 | ℹ cancelled 0 | ℹ skipped 0 | ℹ todo 0
+  ℹ all files | 99.88 | 93.87 | 99.35 |
+  ℹ hotfix-check.js | 99.97 | 98.27 | 98.64 | 771
+  [CTOC test-gate] coverage 99.88% (threshold 99%), skipped 0, failed 0
+  [CTOC test-gate] corpus claims: verified 3  refuted 0  unverifiable 0  (offline ledger gate: PASS)
+  [CTOC test-gate] PASS
+  ```
+  In that run "finding 2c" measured 95.5 ms of extra processor time against its 100 ms.
 - A timing case this round did not touch has almost no room: "finding 2c" (a colour change in
   a 300 KB one-line stylesheet) allows 100 ms of extra processor time and measured 99.4 ms in
   that gated run; by itself under coverage it measures 88 to 92 ms on `e43ea9ae` and 87 to
