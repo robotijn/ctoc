@@ -820,6 +820,21 @@ function linkTargets(text) {
 }
 
 /**
+ * @param {string} text a link's destination @returns {string} the destination with every run
+ * of `%XX` bytes read as the characters it spells; a run that spells no UTF-8 (`50%done`
+ * holds none, `%FF` is none) stays as it is written, as a browser leaves it
+ */
+function percentDecoded(text) {
+  return text.replace(/(?:%[0-9A-Fa-f][0-9A-Fa-f])+/g, (run) => {
+    try {
+      return decodeURIComponent(run);
+    } catch {
+      return run;
+    }
+  });
+}
+
+/**
  * Rule 4, the files that govern the work by being linked (the decision at review of
  * 2026-10-09): every file a relative Markdown link in a `CLAUDE.md` or an `AGENTS.md` of
  * the LAST COMMIT names, at any depth, each link read from its file's folder (a leading `/`
@@ -864,13 +879,7 @@ function instructionLinks(ctx) {
     for (const written of linkTargets(text)) {
       if (/^[A-Za-z][A-Za-z0-9+.-]*:|^\/\/|^#/.test(written)) continue; // an address elsewhere, or a place in this file
       const spellings = new Set([written, written.split(/[#?]/)[0]]);
-      for (const spelling of [...spellings]) {
-        try {
-          spellings.add(decodeURIComponent(spelling));
-        } catch {
-          // no percent-encoding a reader could decode: the spelling as written stays
-        }
-      }
+      for (const spelling of [...spellings]) spellings.add(percentDecoded(spelling));
       for (const spelling of spellings) {
         for (const folder of spelling.startsWith('/') ? ['.'] : folders) {
           const rel = path.posix.normalize(path.posix.join(folder, spelling.replace(/^\/+/, '')));
@@ -3537,23 +3546,19 @@ function removeCopy(ctx) {
  * Give the owner back the right to read, write and enter every real folder under `dir`
  * (and `dir` itself), so that what a test left read-only can be removed. A link is never
  * followed and never changed: only what `lstat` calls a folder is opened and entered. A
- * folder that cannot be opened or listed is left to the removal, which then names it.
- * Iterative: the depth of what a test left does not grow the call stack.
+ * folder that cannot be opened or listed throws: {@link removeCopy} stops there, as at any
+ * first failure, and names it. Iterative: the depth of what a test left does not grow the
+ * call stack.
  * @param {string} dir
  */
 function openFolders(dir) {
   const todo = [dir];
   while (todo.length > 0) {
     const folder = /** @type {string} */ (todo.pop());
-    try {
-      const st = safeFs.lstatSync(folder);
-      if (!st.isDirectory()) continue;
-      if ((st.mode & 0o700) !== 0o700) safeFs.chmodSync(folder, st.mode | 0o700);
-      for (const e of safeFs.readdirSync(folder, { withFileTypes: true })) {
-        if (e.isDirectory()) todo.push(path.join(folder, String(e.name)));
-      }
-    } catch {
-      // not ours to open, or gone: the removal below reports what it cannot remove
+    const st = safeFs.lstatSync(folder);
+    if ((st.mode & 0o700) !== 0o700) safeFs.chmodSync(folder, st.mode | 0o700);
+    for (const e of safeFs.readdirSync(folder, { withFileTypes: true })) {
+      if (e.isDirectory()) todo.push(path.join(folder, String(e.name)));
     }
   }
 }

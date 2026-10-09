@@ -3267,7 +3267,8 @@ test('round 9: paths and names — governing names and folders, what the instruc
     'Read [the guide](docs/linked.md) and [the rules](./docs/rules.md "Rules") first.',
     'See [spaces](<docs/with space.md>), [encoded](docs/with%20pct.md), [part](docs/frag.md#part), [rooted](/docs/rooted.md),',
     '[brackets](docs/a(b).md), ![image](docs/image.md), [cased](DOCS/Cased.md), [the reference][r] and',
-    'the badge [![badge](docs/badge.md)](docs/behind-badge.md). Half done: [progress](docs/50%done.md).',
+    'the badge [![badge](docs/badge.md)](docs/behind-badge.md). Half done: [progress](docs/50%done.md),',
+    '[the menu](docs/caf%C3%A9.md) and [bytes that spell nothing](docs/x%FFy.md).',
     'No file of this repository: [site](https://example.com/docs/free.md), [mail](mailto:a@example.com), [top](#top),',
     '[up](../outside.md) and [the folder](docs/).',
     '',
@@ -3308,6 +3309,8 @@ test('round 9: paths and names — governing names and folders, what the instruc
     ['linked', 'docs/cased.md', PROSE, un],
     ['linked', 'docs/ref.md', PROSE, un],
     ['linked', 'docs/50%done.md', PROSE, un],
+    ['linked', 'docs/caf\u00e9.md', PROSE, un],
+    ['linked', 'docs/x%FFy.md', PROSE, un],
     ['linked', 'docs/badge.md', PROSE, un],
     ['linked', 'docs/behind-badge.md', PROSE, un],
     ['linked', 'site/linked page.html', PAGE, un],
@@ -3662,6 +3665,10 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
       const same = { display: rel, topRel: rel, status: 'M', oldMode: '100644', newMode: '100644', oldSha: null, oldText: 'Some words here.\n',
         newText: 'Some words here.\n', hunks: [] };
       assert.notEqual(ruleRefusal({ files: [same], lineCount: 0 }), null, rel);
+      // Nor is a file whose texts differ while the diff shows no changed line (git never gives
+      // such a change; the rule that refuses it had no test until now).
+      const silent = { ...same, newText: 'Some other words here.\n' };
+      assert.deepEqual(ruleRefusal({ files: [silent], lineCount: 0 }), { clause: `I do not recognise ${rel} as wording or a colour`, cause: 'unrecognised' }, rel);
     }
   });
 
