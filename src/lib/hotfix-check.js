@@ -72,7 +72,8 @@
  *                                          statements across the whole file, in a STRICT SUBSET held
  *                                          to postcss by a differential test
  *                                          (`tests/hotfix-check-differential.test.js`): strings,
- *                                          comments, `url(…)` and escaped characters blanked; a
+ *                                          comments and `url(…)` blanked; a stylesheet that holds a
+ *                                          backslash is refused before it is read; a
  *                                          semicolon ends no statement inside brackets; a statement
  *                                          that is no declaration, at-rule or rule head, a control
  *                                          character, or an `@charset` other than UTF-8 refuses the
@@ -138,10 +139,10 @@
  *   character taken out
  *   a passing run's output read again       only to refuse: a failure or skip counter above zero
  *                                           anywhere, or a line holding `FAILED`
- *   CSS comments, strings, `url(…)` and     structure only: the two files are compared on their own
- *   escapes blanked (an escape in           text, every character outside a colour identical; a
- *   hexadecimal with its digits and one     stylesheet that holds one of the control characters
- *   white space)                            written in their place cannot be followed
+ *   CSS comments, strings and `url(…)`      structure only: the two files are compared on their own
+ *   blanked                                 text, every character outside a colour identical; a
+ *                                           stylesheet that holds one of the control characters
+ *                                           written in their place, or a backslash, is refused
  *   a CSS value trimmed, and `!important`   only to ask whether a colour is its declaration's whole
  *   taken off its end                       value; the files are still compared on their own text
  *   CSS keywords in ASCII lower case        as a browser compares them; no other letter folds
@@ -904,7 +905,8 @@ const asciiLower = (s) => s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
 const isSpace = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f';
 
 /**
- * Skip a quoted string from its opening quote: to the matching unescaped quote, or to the
+ * Skip a quoted string from its opening quote: to the matching quote (a stylesheet that holds
+ * a backslash never reaches this reader), or to the
  * end of the line (an unclosed string; a carriage return and a form feed end a line too) or
  * of the text.
  * @param {string} s @param {number} i @returns {number} the index after it
@@ -914,8 +916,7 @@ function skipString(s, i) {
   let j = i + 1;
   while (j < s.length) {
     const c = s[j];
-    if (c === '\\') j += 2;
-    else if (c === q) return j + 1;
+    if (c === q) return j + 1;
     else if (c === '\n' || c === '\r' || c === '\f') { fault('lost'); return j; } // each ends a line for a stylesheet's reader
     else j++;
   }
@@ -942,20 +943,17 @@ function* linePairs(hunks) {
 const CSS_CONTROL = /(?![\t\n\f\r])\p{Cc}/u;
 /** What a blanked stylesheet holds in place of a comment: white space to its structure, and no part of a value that is one colour. */
 const CSS_COMMENT = '\u0002';
-/** What a blanked stylesheet holds in place of a string, an unquoted `url(…)` and an escaped character: something, and no structure. */
+/** What a blanked stylesheet holds in place of a string and an unquoted `url(…)`: something, and no structure. */
 const CSS_HELD = '\u0003';
 
 /**
- * Rule 4 (colour) — the stylesheet with every `/* … *\/` comment, every string, every
- * unquoted `url(…)` and every character behind a backslash replaced by a filler character
- * of the same length (line breaks kept), so neither a `;`, `{` or `}` nor a colour inside
- * them counts, and an escaped bracket or colon (`.w-\[calc\(1px\)\]`, `.sm\:flex`) is no
- * structure. The backslash itself stays (a declaration that holds one is not read:
- * {@link escapedStatement}). `url(` is one only where no name runs into it: a letter, a
- * digit, `_`, `-`, a character above U+007F or an escape right before it makes it the end of
- * another function's name (`éurl(`, `\41 url(`), whose brackets are read as brackets. A backslash cannot be followed before a line break or the end
- * of the file, where it escapes nothing, and before a brace, a semicolon, a quote or the
- * `/` of `/*`: what this reader's earlier form read as structure may not be escaped. One pass.
+ * Rule 4 (colour) — the stylesheet with every `/* … *\/` comment, every string and every
+ * unquoted `url(…)` replaced by a filler character of the same length (line breaks kept), so
+ * neither a `;`, `{` or `}` nor a colour inside them counts. A stylesheet that holds a
+ * backslash never reaches this reader ({@link readKind}): an unquoted `url(` ends at the first
+ * `)`. `url(` is one only where no name runs into it: a letter, a digit, `_`, `-` or a
+ * character above U+007F right before it makes it the end of another function's name
+ * (`éurl(`), whose brackets are read as brackets. One pass.
  * @param {string} s @returns {string}
  */
 function blankCss(s) {
@@ -963,28 +961,10 @@ function blankCss(s) {
   const n = s.length;
   let at = 0;
   let i = 0;
-  let nameEnd = -1; // where the last escape ends: what stands there goes on the name the escape is part of
-  const hex = (/** @type {(string|undefined)} */ ch) => ch !== undefined && /[0-9A-Fa-f]/.test(ch);
   while (i < n) {
     const c = s[i];
     let end = -1;
     let filler = CSS_HELD;
-    if (c === '\\') {
-      const x = s[i + 1];
-      const held = x !== undefined && x !== '\n';
-      if (!held || '{};"\''.includes(x) || (x === '/' && s[i + 2] === '*')) fault('lost');
-      let past = i + (held ? 2 : 1);
-      // An escape in hexadecimal runs over up to six digits and one white space behind them.
-      if (hex(x)) {
-        while (past < i + 7 && hex(s[past])) past++;
-        if (s[past] === ' ' || s[past] === '\t') past++;
-      }
-      parts.push(s.slice(at, i + 1), CSS_HELD.repeat(past - i - 1));
-      nameEnd = isSpace(s[past] || '') ? past + 1 : past; // a line break may end the escape too, and stays a line break
-      i = past;
-      at = i;
-      continue;
-    }
     if (c === '/' && s[i + 1] === '*') {
       filler = CSS_COMMENT;
       const e = s.indexOf('*/', i + 2);
@@ -992,7 +972,7 @@ function blankCss(s) {
       end = e < 0 ? n : e + 2;
     } else if (c === '"' || c === "'") {
       end = Math.min(skipString(s, i), n);
-    } else if ((c === 'u' || c === 'U') && asciiLower(s.slice(i, i + 4)) === 'url(' && i !== nameEnd && !/[\w\-\u0080-\uffff]/.test(s[i - 1] || '')) {
+    } else if ((c === 'u' || c === 'U') && asciiLower(s.slice(i, i + 4)) === 'url(' && !/[\w\-\u0080-\uffff]/.test(s[i - 1] || '')) {
       let j = i + 4;
       while (j < n && isSpace(s[j])) j++;
       if (s[j] !== '"' && s[j] !== "'") {
@@ -1020,8 +1000,9 @@ function blankCss(s) {
  * declaration's value, exactly one colour on both sides). One reader, {@link readCss}, reads
  * the whole file once; a stylesheet with anything outside the subset "holds something I
  * cannot follow" ({@link fault}). Inside the subset:
- *   - comments, strings, unquoted `url(…)` and escaped characters are blanked first
- *     ({@link blankCss}); a comment is white space to everything below;
+ *   - no backslash anywhere (refused before this reader: {@link readKind}); comments, strings
+ *     and unquoted `url(…)` are blanked first ({@link blankCss}); a comment is white space to
+ *     everything below;
  *   - a statement runs to the `{`, `;` or `}` that ends it, and none of those ends it inside
  *     round or square brackets (`--shape: (a; color: red; b)` is one declaration). Inside
  *     brackets a brace cannot be followed, and neither can a closing bracket of another kind
@@ -1048,7 +1029,6 @@ function blankCss(s) {
  * @property {string} term what ends it: `{`, `;`, `}` or nothing (the end of the file)
  * @property {number} depth how many blocks are open where it starts
  * @property {({name: string, at: number, valueAt: number}|null)} decl the declaration it is: its property, where the name and the value start
- * @property {boolean} [escaped] it holds a backslash (asked once: {@link escapedStatement})
  * @property {string} [value] its value without `!important` (asked once, in {@link colourSlots})
  */
 
@@ -1138,12 +1118,6 @@ function colonOutside(blank, from, to) {
   return false;
 }
 
-/** @param {string} blank @param {CssStatement} st @returns {boolean} the statement holds a backslash: an escape may spell what this reader does not see (`\75 rl(` is `url(`) */
-function escapedStatement(blank, st) {
-  if (st.escaped === undefined) st.escaped = blank.slice(st.start, st.end).includes('\\');
-  return st.escaped;
-}
-
 /**
  * Rule 4 (colour) — every colour token of a whole stylesheet, each standing alone between
  * the separators the plan names, with the property whose declaration value it stands in,
@@ -1153,10 +1127,10 @@ function escapedStatement(blank, st) {
  * a selector or a rule's head, wherever its `{` stands; a declaration starts with `name:`,
  * and at depth 0 only a custom property (`--x`) is one. The property's name must stand on
  * the token's own line. `whole`: the token is the declaration's whole value (an `!important`
- * after it aside). `escaped`: its statement holds a backslash. What a colour is, one
+ * after it aside). What a colour is, one
  * function says ({@link oneColour}). One forward pass.
  * @param {{blank: string, statements: CssStatement[]}} read the stylesheet as {@link readCss} read it
- * @returns {Array<{t: string, i: number, j: number, prop: (string|null), whole: boolean, escaped: boolean}>}
+ * @returns {Array<{t: string, i: number, j: number, prop: (string|null), whole: boolean}>}
  */
 function colourSlots({ blank, statements }) {
   const re = /#[0-9A-Fa-f]+|(?:rgba?|hsla?)\([^()]*\)|[A-Za-z]+/g;
@@ -1180,7 +1154,7 @@ function colourSlots({ blank, statements }) {
     const st = statements[si];
     const d = st.decl;
     if (d && st.value === undefined) st.value = blank.slice(d.valueAt, st.end).replace(/![ \t\n]*important[ \t\n]*$/i, '').trim();
-    out.push({ t, i, j, prop: d && d.valueAt <= i && d.at >= lineStart ? d.name : null, whole: Boolean(d) && st.value === t, escaped: escapedStatement(blank, st) });
+    out.push({ t, i, j, prop: d && d.valueAt <= i && d.at >= lineStart ? d.name : null, whole: Boolean(d) && st.value === t });
   }
   return out;
 }
@@ -1259,9 +1233,7 @@ function masked(text, toks) {
  * identical (strings and comments included), at least one token differs, and every changed
  * token stands, on both sides, in the value of a real colour property
  * ({@link colourSlots}, {@link colourMayStand}), so `animation: red 2s` and `width: #fff`
- * are never a colour, in a declaration that holds no backslash (the decision at review of
- * 2026-10-09: an escape may spell what this reader does not see, `\75 rl(a;color:red;b)`
- * is a `url(`). `inexact`: a changed colour stands in a real colour property on both
+ * are never a colour. `inexact`: a changed colour stands in a real colour property on both
  * sides but is not its whole value (`border: 1px solid red`), which the functional plan
  * refuses as a change the check cannot read exactly. Linear in the files' length.
  * @param {string} o @param {string} n the two stylesheets
@@ -1277,7 +1249,7 @@ function colourEdit(o, n, oldRead, newRead) {
   for (let k = 0; k < a.length; k++) {
     if (a[k].t === b[k].t) continue;
     changed++;
-    if (!colourMayStand(a[k].prop) || !colourMayStand(b[k].prop) || a[k].escaped || b[k].escaped) return false;
+    if (!colourMayStand(a[k].prop) || !colourMayStand(b[k].prop)) return false;
     if (!a[k].whole || !b[k].whole) inexact = true;
   }
   return inexact ? 'inexact' : changed > 0;
@@ -1420,6 +1392,13 @@ function readKind(f) {
   const body = (text) => lineFeeds(text).slice(marked(text) ? 1 : 0);
   // One kind, one reader: a kind no reader is written for stops the check, never a fall-back.
   if (kind !== 'colour') throw new Error(`no reader for the kind ${kind}`);
+  // ESCAPES ARE NOT READ (the final re-check of 2026-10-10). An escape fixed in round 10 still
+  // let an escaped bracket end a `url(` early for this reader and not for a browser; by the
+  // two-rounds rule the sub-area is out: a stylesheet that holds a backslash on either side
+  // never qualifies, and the reader below never meets one.
+  if (oldText.includes('\\') || newText.includes('\\')) {
+    return { clause: `${d} holds an escape (a backslash), which the check does not read in a stylesheet`, cause: 'unrecognised' };
+  }
   const o = body(oldText);
   const n = body(newText);
   const oldRead = readCss(o);

@@ -2191,6 +2191,9 @@ test('round 9: stylesheets — brackets, statements outside the subset, escapes,
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const open = (f) => `I could not read the change (${f} leaves a string, a comment, a bracket or a block open)`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  // Since the final re-check of 2026-10-10 a stylesheet that holds a backslash never qualifies:
+  // every row with an escape, whatever it answered before, answers so.
+  const escape = (f) => `${f} holds an escape (a backslash), which the check does not read in a stylesheet`;
   const colour = ['red', 'blue'];
   let count = 0;
   const row = (item, template, expected, pair = colour) => {
@@ -2206,7 +2209,7 @@ test('round 9: stylesheets — brackets, statements outside the subset, escapes,
     // postcss in square brackets too.
     row('brackets', 'a { grid-area: [a; color: ~; b] }\n', lost),
     row('brackets', 'a { grid-area: [a; b]; color: ~ }\n', null),
-    row('brackets', 'a { background: \\75 rl(a;color:~;b) }\n', un),
+    row('brackets', 'a { background: \\75 rl(a;color:~;b) }\n', escape),
     row('brackets', '@media (a; b) { a { color: ~ } }\n', null),
     row('brackets', 'a { width: calc(1px + (2px * 3)); color: ~; }\n', null),
     // A brace inside brackets, a closing bracket of another kind and a bracket never closed
@@ -2234,14 +2237,14 @@ test('round 9: stylesheets — brackets, statements outside the subset, escapes,
     // comment start cannot be followed, and neither can a backslash before a line break (red:
     // each was read as the structure it escapes; four answered `checking`, `.a\{b` left a
     // block open and the colour behind `\/*` stood in a comment).
-    row('escape', 'a\\{ color: ~ }\n', lost),
-    row('escape', 'a { b\\;c: d; color: ~ }\n', lost),
-    row('escape', 'a { color: ~ } b\\\n{ }\n', lost),
-    row('escape', '.c-\\[\\\'x\\\'\\] { color: ~ }\n', lost),
-    row('escape', '.a\\{b { color: ~ }\n', lost),
-    row('escape', '.a\\/* { color: ~ } */ b { margin: 0 }\n', lost),
+    row('escape', 'a\\{ color: ~ }\n', escape),
+    row('escape', 'a { b\\;c: d; color: ~ }\n', escape),
+    row('escape', 'a { color: ~ } b\\\n{ }\n', escape),
+    row('escape', '.c-\\[\\\'x\\\'\\] { color: ~ }\n', escape),
+    row('escape', '.a\\{b { color: ~ }\n', escape),
+    row('escape', '.a\\/* { color: ~ } */ b { margin: 0 }\n', escape),
     // An escaped colon, slash or bracket in a selector, as a utility stylesheet writes them (guard).
-    row('escape', '.sm\\:w-1\\/2, .w-\\[calc\\(1px\\)\\] { color: ~ }\n', null),
+    row('escape', '.sm\\:w-1\\/2, .w-\\[calc\\(1px\\)\\] { color: ~ }\n', escape),
     // A comment is white space to the statements; a declaration right behind one is still a
     // declaration, and a colour changed in it is not recognised, as before (guards).
     row('comment', 'a {\n  /* brand */\n  color: ~;\n}\n', un),
@@ -2250,7 +2253,7 @@ test('round 9: stylesheets — brackets, statements outside the subset, escapes,
     // What a stylesheet may hold beside rules (guards).
     row('statement', '@charset "utf-8";\n@import "x.css";\n@layer a, b;\n:root { --gap: 4px; }\n--top: 1;\n@media (min-width: 10px) {\n  a { @apply x; color: ~; ; }\n}\n', null),
     row('statement', '{ color: ~ }\n', null),
-    row('statement', '.sm\\:flex, #fff, .red { COLOR : ~ !important }\n', null),
+    row('statement', '.sm\\:flex, #fff, .red { COLOR : ~ !important }\n', escape),
     // 3. A string ends at a carriage return or a form feed too (red).
     row('string', 'a { content: "x\r"; color: ~ }\n', lost),
     row('string', 'a { content: "x\f"; color: ~ }\n', lost),
@@ -2797,8 +2800,10 @@ test('round 10, B5 to B7: a control character in a stylesheet, the exact grammar
   // B7. A character above U+007F, or an escape, is part of a name: what follows is no `url(`,
   // so its brackets are read as brackets, and the brace inside them cannot be followed.
   assert.equal(css('a { x: \u00e9url({); color: red }\n', 'a { x: \u00e9url({); color: blue }\n'), LOST, 'a letter above U+007F before url(');
-  assert.equal(css('a { x: \\41 url({); color: red }\n', 'a { x: \\41 url({); color: blue }\n'), LOST, 'a hexadecimal escape before url(');
-  assert.equal(css('a { x: \\ url({); color: red }\n', 'a { x: \\ url({); color: blue }\n'), LOST, 'an escaped space before url(');
+  // (An escape before `url(` was a case of its own until the final re-check of 2026-10-10; a stylesheet with a backslash is refused whole now.)
+  const ESCAPE = 'src/styles/site.css holds an escape (a backslash), which the check does not read in a stylesheet';
+  assert.equal(css('a { x: \\41 url({); color: red }\n', 'a { x: \\41 url({); color: blue }\n'), ESCAPE, 'a hexadecimal escape before url(');
+  assert.equal(css('a { x: \\ url({); color: red }\n', 'a { x: \\ url({); color: blue }\n'), ESCAPE, 'an escaped space before url(');
   assert.equal(css('a { x: url({); color: red }\n', 'a { x: url({); color: blue }\n'), 'passed', 'a real url( holds what it holds');
   assert.equal(css('a { x: 1px url({); color: red }\n', 'a { x: 1px URL({); color: blue }\n'), NOT_COLOUR, 'and is compared exactly');
 });
@@ -3074,4 +3079,33 @@ test('the second fix: every runner\'s failing summary refuses and its passing on
     }
   }
   assert.deepEqual(wrong, []);
+});
+
+// The final re-check of b5decfc6 (the session coordinator, 2026-10-10): an escaped bracket
+// ended an unquoted `url(` early for this reader and not for a browser, so `color:` inside an
+// image address read as a declaration. Escapes in stylesheets had their fix in round 10 (B7);
+// by the two-rounds rule that sub-area comes out: a stylesheet that holds a backslash, in the
+// committed or in the changed version, never qualifies.
+test('the final re-check: a stylesheet that holds a backslash never qualifies', async () => {
+  const ESCAPE = (f) => `${f} holds an escape (a backslash), which the check does not read in a stylesheet`;
+  const sheet = (before, after) => reasonOf(ruleRefusal(changeOf('src/styles/site.css', before, after)));
+  const witness = 'a{background-image:url(x\\);color:red;/*);*/}\n';
+  assert.equal(sheet(witness, witness.replace('red', 'blue')), ESCAPE('src/styles/site.css'), 'the reviewer\'s case');
+  const lines = 'a {\n  background-image: url( x\\) ;\n  color: red;\n  /* ); */\n}\n';
+  assert.equal(sheet(lines, lines.replace('red', 'blue')), ESCAPE('src/styles/site.css'), 'over several lines, with spaces inside url(');
+  // On either side, anywhere: in a selector, a comment, a string.
+  for (const [before, after] of [['.sm\\:flex { color: red }\n', '.sm\\:flex { color: blue }\n'], ['a { color: red } /* \\ */\n', 'a { color: blue } /* \\ */\n'],
+    ['a { color: red; content: "\\"" }\n', 'a { color: blue; content: "\\"" }\n'], ['a { color: red }\n', 'a { color: blue } /* \\ */\n'],
+    ['a { color: red } /* \\ */\n', 'a { color: blue }\n']]) {
+    assert.equal(sheet(before, after), ESCAPE('src/styles/site.css'), JSON.stringify(after));
+  }
+  // Through the real menu, both calls.
+  const root = makeRepo({ 'src/styles/site.css': witness });
+  fs.writeFileSync(path.join(root, 'src/styles/site.css'), witness.replace('red', 'blue'));
+  for (const args of [['src/styles/site.css'], ['--run-tests', 'src/styles/site.css']]) {
+    assert.equal((await check(root, ...args)).text, refusal(ESCAPE('src/styles/site.css')));
+  }
+  // Two choices recorded as decided: the extension is compared without letter case, and several colour changes in one file qualify within the size limits.
+  assert.equal(ruleRefusal(changeOf('site/site.CSS', 'a { color: red; }\n', 'a { color: blue; }\n')), null);
+  assert.equal(ruleRefusal(changeOf('site/site.css', 'a { color: red; }\nb { fill: red; }\n', 'a { color: blue; }\nb { fill: blue; }\n')), null);
 });

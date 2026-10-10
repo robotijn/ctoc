@@ -358,7 +358,7 @@ TRAPS.push(
   // escape that spells `url(`; a custom property that an animation name and a style query
   // read; and a stray word, at which a browser and postcss part ways.
   [{ 'src/styles/shape.css': BASE['src/styles/shape.css'].replace('red', 'blue') }, null, setting('src/styles/shape.css')],
-  [{ 'src/styles/escaped-url.css': BASE['src/styles/escaped-url.css'].replace('red', 'blue') }, null, unrecognised('src/styles/escaped-url.css')],
+  [{ 'src/styles/escaped-url.css': BASE['src/styles/escaped-url.css'].replace('red', 'blue') }, null, 'src/styles/escaped-url.css holds an escape (a backslash), which the check does not read in a stylesheet'],
   [{ 'src/styles/animated.css': BASE['src/styles/animated.css'].replace('red', 'blue') }, null, setting('src/styles/animated.css')],
   [{ 'src/styles/queried.css': BASE['src/styles/queried.css'].replace('--brand-color: red;', '--brand-color: blue;') }, null, setting('src/styles/queried.css')],
   [{ 'src/styles/stray-word.css': BASE['src/styles/stray-word.css'].replace('red', 'blue') }, null, 'I could not read the change (src/styles/stray-word.css holds something I cannot follow)'],

@@ -126,13 +126,18 @@ function cssValue(r, colourful) {
       [W(2), () => `"${c}"`], [W(2), () => `${c} /* ${cssColour(r)} */`], [W(2), () => `/* ${w} */ ${c}`], [W(1), () => `${c};;`],
       [W(1), () => `${c} color: ${cssColour(r)}`], [W(1), () => `(b { c; } d) ${c}`], [W(1), () => `(${c}`], [W(1), () => `${c})`], [W(1), () => `"${w}`],
       [W(1), () => 'rgb(<1, 2, 3)'], [W(1), () => `${c}\\`], [W(1), () => `{ color: ${c} }`], [W(1), () => `:${c}`], [W(1), () => `progid:${w}(a=1)`],
-      [W(1), () => `(]) ${c}`], [W(1), () => `${c} \\; ${cssColour(r)}`]
+      [W(1), () => `(]) ${c}`], [W(1), () => `${c} \\; ${cssColour(r)}`],
+      // The final re-check of 2026-10-10: addresses, strings and comments that hold what ends a
+      // statement or a bracket, and backslashes.
+      [3, () => `url(${w}.png) ${c}`], [3, () => `url( "${w});{.png" ) ${c}`], [2, () => `url('${w};x') ${c}`], [2, () => `url(${w}\\);color:${cssColour(r)};/*);*/`],
+      [2, () => `${c} /* ); ${w} */`], [2, () => `/* ;) */ ${c}`], [W(2), () => `url( ${w}\\) ;\n  color: ${cssColour(r)}`]
     ])();
   }
   return weighted(r, [
     [10, () => '1px'], [8, () => 'none'], [8, () => w], [6, () => `"${w} ${word(r)}"`], [5, () => `${c} 2s`], [4, () => c],
     [4, () => `var(${pick(r, CUSTOM_PROPERTIES)})`], [3, () => `${w} 1s ease`], [3, () => `url(${w}.svg#fff)`], [2, () => `'${w}'`], [2, () => 'calc(1px + (2px * 3))'],
-    [W(1), () => '(a; b)'], [W(1), () => `"${w}\\"; color: ${c}; x: \\""`], [W(1), () => `\\"; color: ${c}; x: \\"`], [W(1), () => `"${w}\r"`]
+    [W(1), () => '(a; b)'], [W(1), () => `"${w}\\"; color: ${c}; x: \\""`], [W(1), () => `\\"; color: ${c}; x: \\"`], [W(1), () => `"${w}\r"`],
+    [3, () => `"${w}); {color: ${c};"`], [3, () => `'${w} ;)'`], [2, () => `url(${w}.svg)`], [2, () => `url("${w});")`], [2, () => `"\\${w}"`], [2, () => `\\${w}`]
   ])();
 }
 
@@ -474,7 +479,8 @@ function shrink(kind, oldText, newText, reason) {
 const INGREDIENTS = {
   css: {
     'an at-rule with a block': /@media|@supports|@container/, 'an at-rule without one': /@import|@charset|@layer/, 'a nested rule': /\{[^{}]*\{[^{}]*\{|&/, 'a comment': /\/\*/,
-    'a string': /"/, 'an escape': /\\/, 'a custom property': /--[a-z-]+: /i, 'a custom property that is read': /var\(/, 'a colour function': /rgb|hsl/,
+    'a string': /"/, 'an unquoted url': /url\([^"')]/, 'a quoted url holding ) or ;': /url\( *["'][^"'\n]*[);]/, 'a string holding ) ; or {': /["'][^"'\n]*[);{][^"'\n]*["']/,
+    'a comment holding ) or ;': /\/\*[^*]*[);]/, 'a custom property': /--[a-z-]+: /i, 'a custom property that is read': /var\(/, 'a colour function': /rgb|hsl/,
     'a colour keyword': /\b(?:red|blue|tomato|transparent)\b/i, '!important': /!\s*important/i, 'a shorthand': /\b(?:background|border|box-shadow|fill|stroke): /,
     'a selector that looks like a colour': /^(?:#fff|#bad:hover|\.red|red) \{/m, 'a url': /url\(/, 'several declarations on one line': /; [a-z-]+: [^;\n]+;/,
     'Windows line endings': /\r\n/, 'a byte-order mark': /^\ufeff/, 'a style query': /@container style/
@@ -493,11 +499,12 @@ const NEVER_PASSES = {
 const MUST_PASS = { css: ['a colour replaced'] };
 /**
  * The share of the generated edits the check must pass: 90% of the share measured on the
- * default seed and size after the last change to the reader (the re-check of 2026-10-10:
- * 1,622 of 27,083 edits, 5.99%), so that a rule which starts to refuse a tenth more than it
- * did fails here.
+ * default seed and size after the last change to the reader and the generator (the final
+ * re-check of 2026-10-10: 947 of 27,573 edits, 3.43%; the generator now writes backslashes,
+ * and a stylesheet that holds one never passes), so that a rule which starts to refuse a tenth
+ * more than it did fails here.
  */
-const PASS_FLOOR = { css: 0.0539 };
+const PASS_FLOOR = { css: 0.0309 };
 
 function run(kind, count) {
   const started = Date.now();
@@ -532,6 +539,13 @@ function run(kind, count) {
     }
     stats.passed++;
     byEdit.get(c.edit)[1]++;
+    // A stylesheet that holds a backslash, on either side, never passes (the final re-check of 2026-10-10).
+    if (c.oldText.includes('\\') || c.newText.includes('\\')) {
+      const reason = 'a stylesheet that holds a backslash passed';
+      const seen = classes.get(reason);
+      if (!seen) classes.set(reason, { count: 1, index, ...c }); else seen.count++;
+      continue;
+    }
     for (const [name, pattern] of patterns) if (pattern.test(c.oldText)) ingredients.set(name, ingredients.get(name) + 1);
     const reason = ORACLES[kind](c.oldText, c.newText);
     if (reason === null) continue;
@@ -570,9 +584,10 @@ function assertRun(t, kind, count) {
   if (stats.cases >= 10000) assert.deepEqual(missing, [], `the check passed no edit in a document with: ${missing.join(', ')}`);
 }
 
-// Measured on 2026-10-10, seed 20261009, default size, after the re-check: 27,083 edits, 1,622
-// passed (6.0%). (The ninth round's reader passed 12.3%: custom properties named for a colour,
-// the colour functions written with spaces and the two shadows passed then.)
+// Measured on 2026-10-10, seed 20261009, default size, after the final re-check: 27,573 edits,
+// 947 passed (3.4%). (The ninth round's reader passed 12.3%: custom properties named for a
+// colour, the colour functions written with spaces, the two shadows and stylesheets with
+// escapes passed then.)
 test('CSS: every stylesheet edit the check passes changes exactly one colour for postcss', (t) => {
   assertRun(t, 'css', CSS_CASES);
 });
@@ -590,6 +605,7 @@ function reasonOf(refusal) {
   if (/^it changes a setting in /.test(clause)) return 'setting';
   if (/holds something I cannot follow\)$/.test(clause)) return 'lost';
   if (/ open\)$/.test(clause)) return 'open';
+  if (/ holds an escape \(a backslash\)/.test(clause)) return 'escape';
   if (/ sits in an area named /.test(clause)) return `area ${/ named (\p{L}+),/u.exec(clause)[1]}`;
   if (/^it changes a test /.test(clause)) return 'test';
   if (/^the wording in /.test(clause)) return 'risk';
@@ -635,12 +651,12 @@ const LATER_WITNESSES = [
   ['a colon in square brackets counts', 'lost', CSS_FILE, 'a { grid-area: [a: b]; color: red }\n'],
   ['a string ends at a carriage return or a form feed', 'lost', CSS_FILE, 'a { content: "x\f"; color: red }\n'],
   ['a string ends at a carriage return or a form feed', 'lost', CSS_FILE, 'a { content: "x\r"; color: red }\n'],
-  ['a changed declaration holds no backslash', 'unrecognised', CSS_FILE, 'a { background: \\75 rl(a;color:red;b) }\n'],
-  ['an escaped brace, semicolon, quote or comment start cannot be followed', 'lost', CSS_FILE, '.a\\{b { color: red }\n'],
-  ['an escaped brace, semicolon, quote or comment start cannot be followed', 'lost', CSS_FILE, '.a\\;b { color: red }\n'],
-  ['an escaped brace, semicolon, quote or comment start cannot be followed', 'lost', CSS_FILE, '.a\\\'b { color: red }\n'],
-  ['an escaped brace, semicolon, quote or comment start cannot be followed', 'lost', CSS_FILE, '.a\\/* { color: red }\n'],
-  ['a backslash before a line break escapes nothing', 'lost', CSS_FILE, 'a { color: red } b\\\n{ }\n'],
+  ['a stylesheet that holds a backslash never qualifies', 'escape', CSS_FILE, 'a { background: \\75 rl(a;color:red;b) }\n'],
+  ['a stylesheet that holds a backslash never qualifies', 'escape', CSS_FILE, '.a\\{b { color: red }\n'],
+  ['a stylesheet that holds a backslash never qualifies', 'escape', CSS_FILE, '.a\\;b { color: red }\n'],
+  ['a stylesheet that holds a backslash never qualifies', 'escape', CSS_FILE, '.a\\\'b { color: red }\n'],
+  ['a stylesheet that holds a backslash never qualifies', 'escape', CSS_FILE, '.a\\/* { color: red }\n'],
+  ['a stylesheet that holds a backslash never qualifies', 'escape', CSS_FILE, 'a { color: red } b\\\n{ }\n'],
   ['an @charset rule names UTF-8', 'lost', CSS_FILE, '@charset "shift_jis";\na { color: red }\n'],
   ['a colour name is compared in ASCII letters', 'unrecognised', CSS_FILE, 'a { color: red }\n', 'a { color: blacKELVIN }\n'],
   ['a property name holds ASCII letters and hyphens only', 'lost', CSS_FILE, 'a { stroKELVINe: red }\n'],
@@ -653,7 +669,7 @@ const LATER_WITNESSES = [
   ['only rgb and hsl are colour functions', 'unrecognised', CSS_FILE, 'a { color: oklch(60% 0.2 240) }\n', 'a { color: oklch(60% 0.2 250) }\n'],
   ['a hexadecimal colour has 3, 4, 6 or 8 digits', 'unrecognised', CSS_FILE, 'a { color: red }\n', 'a { color: #abcde }\n'],
   ['a name before `url(` makes it no url: a character above U+007F', 'lost', CSS_FILE, 'a { x: EACUTEurl({); color: red }\n'],
-  ['a name before `url(` makes it no url: an escape', 'lost', CSS_FILE, 'a { x: \\41 url({); color: red }\n'],
+  ['a stylesheet that holds a backslash never qualifies', 'escape', CSS_FILE, 'a { x: \\41 url({); color: red }\n'],
   // Stylesheets: custom properties never qualify (the tenth round).
   ['a changed custom property is a setting', 'setting', CSS_FILE, ':root { --brand-color: red }\n'],
   ['a changed custom property is a setting', 'setting', CSS_FILE, ':root { --brand-color: red }\na { color: var(--brand-color) }\n'],
