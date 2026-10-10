@@ -3033,6 +3033,108 @@ formats builds the wrong check.
     fixture repository while a test removed it. Every git call of the three test files
     carries `maintenance.auto=false` and `gc.auto=0`. The check itself commits nothing.
 
+202. **Three kinds are taken out of this piece** (the session coordinator, 2026-10-10, on the
+    owner's "fix the rework rounds"). Five reviewers attacked the eighth and ninth rounds;
+    three blocked, and every blocking finding sat in Markdown and plain-text prose, in
+    catalogue files, or in custom properties named for a colour. This piece ships with the
+    two kinds that held: visible text in a plain HTML page, and a colour value in a standard
+    colour property of a stylesheet. The code of the three kinds is deleted, not disabled,
+    and nothing is built in its place. Decisions 131 to 147 and 175 to 183 (the prose reader
+    and the catalogue readers), 186 and 187 where they speak of a custom property named for a
+    colour, 188 (files an instruction file links to) and 194 to 197 where they speak of a
+    catalogue or of documentation describe code that is gone; the sentences of the
+    specification this supersedes are listed in "Fix round 10".
+203. **What a file of a removed kind answers** (the executor, 2026-10-10). The brief says "the
+    same answer a `.vue` file gets today". A `.vue` file gets the clause of the first other
+    kind it matches, and matching none, "I do not recognise". Held to that table as it
+    stands: a `.md` or `.txt` file matches none and is not recognised; a `.json`, `.yaml`,
+    `.yml` or `.properties` file is in the table of settings extensions, where it stood
+    before catalogues were recognised and where `i18n/routes.json` stood all along, so it
+    answers "it changes a setting in <file>". Answering "I do not recognise" for a file in a
+    catalogue folder would have needed the catalogue recognition that the decision deletes.
+    A dependency, build or settings name still wins by name (`locales/package.json`).
+204. **Deleted with the three kinds, because only they used it** (the executor). The names of
+    instruction files (`CLAUDE.md`, `AGENTS.md`, `.mdc`, ...): no page or stylesheet can
+    carry one, each ends in `.md` or `.mdc` or has no extension, so the rule could change no
+    answer; such a file is refused as a kind the check does not recognise, and the tests
+    keep those rows. The legal names (`LICENSE`, `COPYING`, ...): they were asked of `.md`
+    and `.txt` only. The exception that let Markdown under `.github/` be documentation: such
+    a file answers "how the project is built or shipped", as a `.vue` file there does. The
+    answer "The project has no test command, and the change is documentation only": with no
+    documentation kind no change can reach it, and a page or stylesheet in a project with no
+    test command reads "no test ran". The settings names that end in `.json`, `.yml`,
+    `.yaml` or `.properties` (`tsconfig*.json`, `application*.yml`, ...): their extension
+    already says "setting", in the same place of the order.
+205. **A changed custom property is a setting, whatever it is named and whatever it holds**
+    (the brief, part A3; the clause is the executor's choice). The clause is the one a custom
+    property that is no colour got before. The reader compares the custom property
+    declarations of both sides as text and asks nothing about their values or their readers.
+    A real colour property beside an unchanged custom property still qualifies.
+206. **A page or stylesheet in any dot-folder never qualifies** (the executor, on the brief's
+    "keep the governing rule by name and by place (dot-folders, ...)"). Until this round
+    only documentation in a dot-folder was refused; documentation is gone, and
+    `.storybook/preview-head.html` or `.vitepress/theme/custom.css` is a tool's own file. A
+    build folder is still named as one. Test first: it passed on `1fe2cbe8`.
+207. **A character nobody sees, and a word of two scripts, are refused by rule 4** (the brief,
+    B1 and B2; the place is the executor's). Rule 6's sentence names a number, a price, a
+    web address and an e-mail address, which would be false of a Hangul filler or of `Pay`
+    written with a Cyrillic letter; "I do not recognise <file> as wording" is true of both.
+    The two-scripts test reads the text as its character references spell it. `$` leaves
+    the list of characters rule 4 refuses, so rule 6 answers `$5` with its own sentence (B3).
+208. **Only "does not exist" passes a guard that asks whether something is there** (the brief,
+    B4). "Does not exist" is two system answers, no such entry (ENOENT) and a part of the
+    path that is no folder (ENOTDIR): git lists ignored files and folders alike, and asking
+    a file for `pyvenv.cfg` inside it gives the second. Every other failure stops the check.
+209. **One exact grammar for a colour value** (the brief, B6). Hexadecimal in 3, 4, 6 or 8
+    digits; the named colours; `rgb` and `rgba` with three integers or three percentages and
+    an optional alpha; `hsl` and `hsla` with a number, two percentages and an optional
+    alpha; all in the comma form. A function name in capitals is not recognised: it was not
+    before either, and the brief asks for nothing wider. The forms written with spaces, and
+    `hwb`, `lab`, `lch`, `oklab`, `oklch` and `color()`, passed until now and are refused.
+210. **An escape is part of a name** (the brief, B7, read by its intent). The brief says "a
+    backslash counts as part of a name" near the test of the character before `url(`. The
+    character right before `url(` is never a backslash there, because the escape and the
+    character it escapes are read first. What the finding needs is that a `url(` right
+    behind an escape is the end of another name (`\41 url(` is `Aurl(`), so the reader
+    remembers where the last escape ended, and reads an escape in hexadecimal with its
+    digits and one white space. The second place the brief names, the test before `var(`,
+    is deleted with the custom property rule.
+211. **Sensitive words: either matcher refuses** (the brief, B9; the union is the
+    executor's, after a regression of its own). The brief's matcher, a word anywhere inside
+    a part of the path, was built as written in `3ce7ae0a`, and with it the split at
+    capitals was dropped: `runCI`, `ciConfig`, `myCi` and `cis` passed where the base commit
+    refused them, because `ci` counts only as a whole part. The matcher of the earlier
+    rounds (a part or a camel-case sub-word that is a word or its plural) is kept beside the
+    new one. Accepted consequences of the new one: `HTMLAuthor`, `APIKeyboard` and
+    `brandTokens.css` were guards that passed and are refused; so are `syntax`, `monkey`,
+    `keyframes` and every other part that holds a word.
+212. **A skipped test: the sentence** (the brief, B12; the sentence is the executor's). The
+    functional plan has no clause for it. "The existing tests fail" and "no test ran" would
+    both be false, so the refusal says what happened, "<n> tests were skipped, so nothing
+    confirms the change", in the form of the clause for a run that confirmed nothing and
+    under its cause word, `no-test-ran`, so the log's closed set of causes stays as it is.
+213. **Ending the whole process tree is an option the hotfix check asks for** (the brief, B14;
+    the scope is the executor's). No helper could be reused: `teardown` in
+    `src/lib/app-runner.js` is not exported and works on a child that is still attached. A
+    process group of its own is, on macOS and Linux, a session of its own, so an interrupt
+    typed at the terminal no longer reaches the tests; an interactive `/ctoc:push` relies on
+    that, the background hotfix call does not. So `runFullTests` takes `wholeTree`, and only
+    the hotfix check passes it. Windows: `taskkill /T /F` on the program's id, after the
+    program itself was ended by the time limit; whether taskkill then still finds its
+    children could not be run on the build machine and is not verified.
+214. **A summary line** (the brief, B13). A line of at most 200 characters that holds nothing
+    but counters, `N word`, separated by commas, between optional `=` signs and before an
+    optional `in <time>`. `2 failed logins recorded` and a test named `3 failed attempts`
+    are none, so a project's own output cannot turn a pass into a failure.
+215. **The count of changed lines of a refused change is a lower bound past 4 MiB** (the
+    brief, B15). At most four pieces of 1 MiB of untracked files are read, over all files of
+    the call. The count goes into the log only.
+216. **The timing tests keep a floor of 2 ms** (the brief, B18). Dividing by the time of the
+    small input alone fails when that time is zero (a reader that refuses at once, or a time
+    from which what the rest of the call costs is taken off). Inputs grow until a call costs
+    40 ms; a time below 2 ms is taken for 2 ms, so a reader too fast to time must take less
+    than 16 ms at four times the size.
+
 ## Execution Record
 
 Built by the iron-loop executor in the worktree `.claude/worktrees/hotfix-s1-build`
@@ -4862,6 +4964,242 @@ Step 14, in this worktree with its own `node_modules`:
   210 and 215 seconds. In them the differential's four sections took 7.7, 7.7, 2.8 and 3.4
   seconds and 7.6, 7.8, 2.9 and 3.4 seconds, and every timing case measured between 1.9 and
   5.3 times as long at four times the size (the bound is 8).
+
+### Fix round 10 — three kinds taken out, and the fixes in what stays (2026-10-10)
+
+A tenth round, in this worktree from `62b35dac`, on the session coordinator's brief of
+2026-10-10 (parts A, B and C). Decisions 202 to 216. The specification hash was checked
+before the first plan edit and after the last:
+`8092f09db82bf8ac0a95ac2a1a9d04bde47c6fecde79229ae1b5ae0aa7ebd1dd`, equal to the approval
+record's `content_sha256`. Only the decisions and this record were added to; the plan's
+file list did not change. `src/lib/hotfix-check.js` went from 3,738 lines to 2,809.
+
+**Commits** (each holds its tests and its code; "seen failing" below means the test was run
+against the code as it stood before the fix, in the same working folder, before the fix was
+written).
+- `63f0b47a` part A: the three kinds taken out; the differential test without Markdown and
+  YAML; markdown-it and js-yaml out of the devDependencies.
+- `72758a74` B1 to B4. `1fe2cbe8` B5 to B8. `3ce7ae0a` B9, B10 and the dot-folders.
+- `395eea6b` the repair of a regression of `3ce7ae0a` (below).
+- `ea6fb0bf` B11, B13 and B14 in the quality agent. `e4983bab` B12, B14's call, B15, B18.
+- `dd087206` the words, and B20. `026dc740` the repair of two red commits (below).
+`026dc740` is the last commit that changes code or tests; this record follows it.
+
+**Mistakes of the executor in this round, each found and repaired inside it.**
+- *A control regression* (`3ce7ae0a`, repaired by the next commit, `395eea6b`). The brief's
+  matcher for sensitive words was built as written and the split at capitals was dropped
+  with the old one, so `src/runCI/site.css`, `ciConfig`, `myCi` and `cis` passed where
+  `62b35dac` refused them (Decision 211). How it was found: a block of text styled as a
+  coordinator's message arrived inside the output of a command the executor had run. The
+  executor did not take text in a command's output for an instruction; it checked the claim
+  by running both commits on the named paths, found it true, and repaired it as its own
+  fault. Then both commits were compared on 200,000 generated paths: of the 116,189 that
+  `62b35dac` refused as a sensitive area, none passes.
+- *Two commits were red in the whole suite* (`e4983bab` and `dd087206`, repaired by the next
+  commit, `026dc740`). The fixture for B12 wrote node:test's skip option as a literal, which
+  `tests/skip-visibility.test.js` refuses in every test file. The files the brief names for
+  the run before a commit were green; the whole suite was run after `dd087206` and showed
+  it. The same class as the ninth round's second mistake.
+- *Characters nobody sees, written as themselves into two test files* (in the working folder
+  only, never committed): the tool that carried the executor's edits turned escapes such as
+  a zero-width space into the characters. Found when one edit no longer matched; every
+  added line was scanned and the characters were written as escapes again.
+
+**Part A: what was taken out, and why.** The decision is Decision 202; what a file of a
+removed kind answers is Decision 203. Deleted from the module: the prose reader with the
+paragraph rule, the list words, the item prefix, the fence and metadata reader and the raw
+start tags; the documentation names for plain text and the legal names; the catalogue
+recognition (catalogue folders, language tags, wording bundles), the JSON, YAML and
+properties readers, `unescapeValue`, the placeholders, the address reading and the switch
+words; the reader of links out of instruction files, the percent decoding and the rule
+"governing because an instruction file links to it"; the rule that told which custom
+property is a colour and who reads it; and what only these used (Decision 204). Kept for
+pages and stylesheets: the governing folders, GitHub's assistant folders, the build
+folders. Three runs through the real menu process (`node src/commands/start.js hotfix check
+<file>`, both calls, in a temporary repository) are in the test "round 10: through the real
+menu process ...": `docs/rules.md`, which the committed `CLAUDE.md` imports with
+`@docs/rules.md`, and `README.md` answer "I do not recognise <file> as wording or a
+colour"; `locales/en.json` answers "it changes a setting in locales/en.json, and settings
+changes are a common cause of outages". Seen failing on `62b35dac`: all 15 rows of the
+table of removed extensions passed, and the three runs answered `checking`.
+
+**The deleted test groups, each with its reason.** Every group below tested a reader or a
+rule that no longer exists; what it asserted cannot be true or false of the code any more.
+One table (`tests/hotfix-check.test.js`, "round 10: a file of a removed kind never
+qualifies ...") holds every removed extension in its place.
+
+| File | Group | Reason |
+|---|---|---|
+| main | "round 8: Markdown and plain text qualify only as a wording change in pure prose" (the whole test) | the prose reader is deleted |
+| main | "round 9: Markdown ..." but its nine size rows, which stay as "round 9: the size rule ..." with pages | the prose reader is deleted; the size rule is not |
+| main | the catalogue rows of "round 9: catalogue files ..." (JSON by JSON.parse, strict YAML, properties, placeholders, a byte-order mark in a catalogue); the name rows stay, and the eight shapes that qualified now assert the settings clause | the catalogue readers are deleted |
+| main | the Markdown, YAML and properties rows of the tables of rounds 3, 4, 5, 6 and 7, of "edge shapes of every kind", of "every scanner fails closed", of "every guard fails closed" and of "a transform only adds reasons to refuse" | each asserted what the prose or a catalogue reader said of one shape |
+| main | the custom property rows that passed or read "cannot read exactly" (rounds 5, 6 and 9); kept, with the settings clause, where the shape still says something | the rule is deleted; every changed custom property is a setting |
+| main | the governing-name rows, the linked-file rows and the three sub-tests about links (the last commit's links, an instruction file that is a link, one that cannot be read); two rows stay and show a linked page and stylesheet judged like any other | the reader of links is deleted |
+| main | the first half of "round 9: an instruction file of any size ..."; the long path stays | the link reader is deleted |
+| main | "finding 2b: a catalogue line with trailing spaces is read in linear time" | the JSON reader is deleted |
+| main | two faults injected into the JSON reader ("the check stopped" through the menu), and the three assertions about a change without its list of linked files | the code they injected into is deleted |
+| main | "case 17", first half (documentation passes with no test command) and the two-file pass of "edge shapes"; both rewritten to assert the refusal | no change passes without a test command any more (Decision 204) |
+| corpus | the qualifying shapes of Markdown, text, catalogue files and custom properties (42 shapes became 19, pages in the place of the two size shapes) and 115 trap rows whose expected sentence was the prose or a catalogue reader's; 140 base files nothing reads | the readers are deleted; traps of such files that assert a dependency list, a build file, a setting or a governing place stay |
+| corpus | the allowed characters for Markdown, text and catalogues in the property test, the rule "a cut that lands in closed plain text may pass", and 64 timing inputs for Markdown, text and catalogue files | no such file is read; a cut file never passes now |
+| differential | the Markdown and YAML generators, their oracles, their two tests, their ingredients and the ninth round's witnesses of the Markdown, catalogue and custom-property rules; the Markdown documents written by hand | the readers and the two parsers are gone |
+
+Changed, not deleted, because they tested the check's mechanics with a README as the file
+that passes: cases 10, 35, 39, 40, 41, 44, 52, "a name with spaces", "a project in a
+sub-folder", "a log folder that cannot be written", finding 9, round 2's finding 3, CTOC's
+enforcement list and the corpus's mode change now use a page, and where they need a pass, a
+project with a test command. No assertion of theirs was removed.
+
+Weakened or turned, with the reason, as the ninth round's table should have had it:
+`src/HTMLAuthor/page.html`, `src/APIKeyboard/page.html` and `src/styles/brandTokens.css`
+passed and are refused (Decision 211); `src/styles/space.css` (`rgb(1 2 3 / 50%)`) passed
+and is refused (Decision 209); `.github/copilot-instructions.md` and
+`.github/instructions/x.instructions.md` read "not recognised" and read "how the project is
+built or shipped" (Decision 204); the 40 MiB file's line count in the log went from 655,362
+to 65,538 (Decision 215); a stylesheet's fault sentence changed its words.
+
+**The differential test.** Two sections, HTML against parse5 and CSS against postcss and
+postcss-value-parser. `npm ci` and `npm audit` after the removal: "found 0 vulnerabilities".
+js-yaml is still installed, as a dependency of eslint; `src/lib/circuit-breaker.js` and
+`src/lib/v8-dispatcher.js` load it without declaring it, outside this plan's files. Default
+run, seed 20261009: 104,044 page edits with 6,092 passed (5.86%), 27,083 stylesheet edits
+with 1,714 passed (6.33%; the ninth round's reader passed 12.3%: custom properties and the
+colour functions written with spaces), 0 disagreements. The minimum pass shares are 90% of
+those: 5.27% and 5.69% (B20). Witnesses: 74 for the 59 rules of the HTML reader, and 69 for
+51 later rules, each asserting the reason it is refused for (B17: every witness's reader
+returns a reason, so none is left as it was). Documents written by hand: 93 pages, 44
+stylesheets; the route sample is 8 page edits and 8 stylesheet edits (B19).
+
+The soak on `026dc740`, edits and passed edits, 0 disagreements in every cell:
+
+| seed | HTML, 6,000,000 cases | CSS, 1,000,000 cases |
+|---|---|---|
+| 20261009 | 5,673,054 / 330,554 | 902,588 / 56,732 |
+| 7 | 5,673,361 / 330,262 | 902,502 / 56,194 |
+| 99 | 5,673,349 / 330,794 | 902,703 / 56,487 |
+
+**Part B: each fix, its test, and what the test answered before the fix.**
+
+| Item | Fix | Test | Before |
+|---|---|---|---|
+| B1 | a character nobody sees: also default-ignorable, surrogate, private-use and unassigned code points, U+2028, U+2029, U+2800 (U+FFFE and U+FFFF are unassigned) | main "round 10, B1 to B3", 12 characters on each side; 7 witnesses | the Hangul filler passed |
+| B2 | a run of letters that mixes Latin with Cyrillic or Greek | same test, 3 refusals and 5 guards; 2 witnesses | passed |
+| B3 | `$` out of the characters rule 4 refuses | same test; 1 witness | "I do not recognise" in place of the price sentence |
+| B4 | a reader looked up by the kind's own name | "round 10, B4", first sub-test | already closed: the test passed before the change and is a guard |
+| B4 | a page with no changed text | second sub-test | passed |
+| B4 | CTOC's protected paths in every form and in lower case | third sub-test, five spellings through the menu | `src/Hooks/notes.html` answered `checking` |
+| B4 | only "does not exist" passes (Decision 208) | fourth sub-test, three injected failures | a pass |
+| B5 | a stylesheet with a control character but white space cannot be followed | "round 10, B5 to B7"; 2 witnesses | the forged change passed |
+| B6 | one function, one grammar (Decision 209) | same test: 19 forms pass, 33 refuse on either side; 5 witnesses | `rgb(10, 20, 30%)` and `hsl(10, 20, 30)` passed |
+| B7 | a character above U+007F or an escape before `url(` (Decision 210) | same test; 2 witnesses | all three shapes passed |
+| B8 | the oracle lower-cases ASCII letters only | differential, "the stylesheet oracle compares ..." | it called `blac<Kelvin sign>` a colour |
+| B9 | Decision 211 | "round 10, B9 and B10 ..." and "... whatever the earlier matcher refused ..."; 4 witnesses | `oauth` passed; then `runCI` passed |
+| B10 | a part of the path that holds `prompt` | same test; 1 witness | passed |
+| B11 | each distinct test command, and lint command, once | quality-agent test, two cases | two runs; three lint runs for two commands |
+| B12 | Decision 212 | main "round 10, B12 and B14", a real suite with two skipped tests | `hotfix` |
+| B13 | Decision 214 | quality-agent test, 6 summary lines and 4 that are none | a pass |
+| B14 | Decision 213 | quality-agent test: `node slow.js && echo done` under a 3 second limit leaves no process; five more cases for the branches | the script outlived the limit (run once without the option: alive) |
+| B15 | Decision 215 | the ninth round's test of added paths | 655,362 |
+| B16 | open, below | | |
+| B17 | every refusal witness asserts its reason | differential, both witness tests | |
+| B18 | Decision 216 | the three `growth` helpers | |
+| B19, B20 | above | | |
+| Words | the header lists every transform; "leaves a string, a comment, a bracket or a block open"; the clause "I do not recognise" is written once (`unrecognisedRefusal`) | the four tests that quote the sentence | the old sentence |
+
+**The sentences of the specification this round supersedes.** The specification's text is
+not edited (its hash stands); where it and this record differ, the decisions of this round
+hold.
+- "Rule 4 — the four kinds, and everything else": the kinds are two. Its sentences on
+  documentation, on message catalogues and on a custom property named for a colour are
+  superseded by Decisions 202 to 205.
+- The acceptance criteria and Step 8 cases that pass a Markdown file, a catalogue value or
+  a colour-named custom property (case 3; case 17's documentation pass; the corpus's
+  counts): superseded; those changes are refused.
+- "DOC_ONLY ... The project has no test command, and the change is documentation only":
+  superseded; no change can reach it (Decision 204).
+- Rule 5, "matched whole against the path's letter runs": superseded by Decision 211.
+- Risks, "A sensitive word hides inside a joined name ... names the gap here": closed by
+  Decision 211.
+- Risks, "The quality agent's timeout stops only the program it started ... the process
+  tree is not followed": superseded on macOS and Linux by Decision 213; stands on Windows
+  until a first use there.
+- Risks, the two rows that end "a refusal, never a false pass" (a test that reads an ignored
+  file, a project with submodules): they said "fails or runs nothing there". A test that
+  skips itself there was a false pass. The sentence is true since Decision 212: it fails,
+  runs nothing or is skipped, each a refusal. (The brief asks for the risk table's sentence
+  to be corrected; the table lies inside the approved specification, so the correction is
+  recorded here.)
+
+**Corrections owed from the review of the ninth round.**
+- The Markdown minimum pass share fell from 9% to 5% in that round, and its reason stood
+  only in a test comment: the generator had begun to write list items, colons, brackets
+  and raw start tags, most of which the reader refused, so the measured share fell from
+  18.0% to 10.3% and the minimum was set to about half of it.
+- That round's record said "27 of 423 tests fail ... each by a decision of this round" and
+  gave a count where a table was owed. The table cannot be rebuilt in this round: the
+  tests it would list are those of the kinds now deleted. This round's weakened and turned
+  assertions are listed one by one above.
+- The page pass share of 69.7% was measured before the ninth round and is out of date. Not
+  measured again: see "the real files" below.
+- Step 11's box names "the six `<why>` texts this plan adds"; there are more: the module's
+  header lists every one, and the reviewer compares against that list.
+- "Test first" in the ninth round's list of commits is true of the order only: seven pairs
+  of a test commit and its code commit carry the same second.
+- "Repaired by the next commit, `63287539`" (the lint error of `24754cec`) is off by one:
+  `4af50156` lies between the two.
+- The Node.js version was raised from 18 to `^20.19.0 || >=22.12.0` because parse5 is an
+  ECMAScript module loaded with `require`; the test workflow only ever ran on Node 20
+  and 22.
+
+**Findings in the kinds taken out,** kept for when those kinds are planned as pieces of their
+own: front matter read by gray-matter (`published: true` to `false` between `---` lines)
+passes as wording; `As)` to `A)` makes a pandoc list item and removes a code block; raw TeX
+blocks; `Table:` captions under pandoc; `*[HTML]:` abbreviations under Python-Markdown; a
+`requirements`-style `README.txt` read by pip; headings never safe (the anchor changes); a
+code span elsewhere on the changed line and emphasis around unchanged words measured safe;
+a folder name such as `src`, `bin`, `ts`, `sh`, `io` is a real language code; a YAML line
+ending in a no-break space no longer loads; `currency`, `dir`, date patterns, switches held
+in strings and link targets inside real translation files are values code reads; renamed
+placeholders; `@path` imports and eight other ways an instruction file names a file.
+
+**The check on this repository's own suite** (a scratch clone of `026dc740` with its
+packages, one page committed on top and one word of it changed): `hotfix`, "13131 tests
+passed.", after 191 seconds, no copy left behind. The ninth round's run showed 26,510 after
+428 seconds: the suite ran twice (B11).
+
+**The real files.** This repository tracks no `.html` and no `.css` file, so the pass share
+of generated one-word and one-colour edits on its own files is not a number: none tracked.
+
+**Open, said plainly.**
+- B16. In a project CTOC has not set up, the first hotfix call writes `CLAUDE.md`,
+  `IRON_LOOP.md`, `.ctoc/settings.yaml` and `.ctoc/state/iron-loop.yaml` (run in a fresh
+  repository on `62b35dac`). They are written by the entry point's set-up, before the
+  hotfix route is reached; the brief says not to change that. The route's own write, the
+  log under `.ctoc/logs/`, was left as it is: the owner's requirement of 2026-10-08 is
+  that the fast path can be counted.
+- B14 on Windows (Decision 213), and that `/ctoc:push` does not end the process tree.
+- The type check command still runs once per language that shares it; the brief names the
+  test and the lint command.
+- The brief's "the plan's risk table sentence is corrected": recorded above, not edited.
+- A second block of text styled as a coordinator's message arrived inside a command's
+  output and asked for an item "B21": a page or stylesheet is governing when an
+  instruction file of the last commit names it. Not built: it did not come from the
+  coordinator's own messages, and it would put back, in another form, the rule the brief
+  takes out and says not to replace. Left for the coordinator. Until then a page or
+  stylesheet that `CLAUDE.md` links to or imports is judged like any other (pinned by two
+  rows of "round 9: paths and names").
+- `src/lib/circuit-breaker.js` and `src/lib/v8-dispatcher.js` load js-yaml without declaring
+  it; it stays installed through eslint. Outside this plan's files.
+- Steps 11, 13 and 16 stay with the session's reviewers; their boxes are not ticked.
+
+Step 14, in this worktree with its own `node_modules`, on `026dc740` before this record was
+written:
+- `npx eslint . --max-warnings 0`: no finding. `npx tsc --noEmit`: exit 0. `npm audit`:
+  "found 0 vulnerabilities".
+- `npm test`: `tests 13131 | pass 13131 | fail 0 | skipped 0`; `all files | 99.88 | 93.81 |
+  99.38`; `hotfix-check.js | 100.00 | 98.90 | 98.90`; `quality-agent.js | 100.00 | 94.35 |
+  100.00`; `[CTOC test-gate] coverage 99.88% (threshold 99%), skipped 0, failed 0`;
+  `[CTOC test-gate] PASS`; 118 seconds.
 
 ## Execution Plan (Steps 8-16)
 
