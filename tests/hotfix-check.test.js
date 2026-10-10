@@ -3009,3 +3009,69 @@ test('after the re-check: a test run passes only when no failure or skip counter
   assertPass(named, ['src/styles/home.css']);
   assert.equal(named.tests, '2 tests passed.');
 });
+
+// The second fix in the area "reading a run's output to refuse a run that exited 0" (the
+// session coordinator, 2026-10-10, after the automated review of 35133851). One failing and
+// one passing summary of each runner. Taken from a runner run on the build machine on a tiny
+// failing and passing test where one is installed (node:test spec and TAP, mocha 11, jest 29,
+// vitest 2.1.9, cargo, Python's unittest, Ruby's minitest 5.11.3; stack frames left out), and
+// from the runner's documented output format where none is (pytest, go test -v, rspec,
+// phpunit, deno, playwright). Each failing sample exits with 0 here: what refuses it is the
+// output alone.
+const RUNNER_OUTPUT = {
+  "cargo-fail": "   Compiling cr v0.1.0 (<tmp>/cr)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/cr-9cdeb411950a20d4)\n\nrunning 3 tests\ntest tests::one ... ok\ntest tests::two ... ok\ntest tests::three ... FAILED\n\nfailures:\n\n---- tests::three stdout ----\n\nthread 'tests::three' (55431595) panicked at src/lib.rs:5:26:\nassertion `left == right` failed\n  left: 1\n right: 2\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n\n\nfailures:\n    tests::three\n\ntest result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\nerror: test failed, to rerun pass `--lib`\n",
+  "cargo-pass": "   Compiling cr v0.1.0 (<tmp>/cr)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/cr-9cdeb411950a20d4)\n\nrunning 3 tests\ntest tests::one ... ok\ntest tests::three ... ok\ntest tests::two ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n   Doc-tests cr\n\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n\n",
+  "deno-fail": "running 3 tests from ./a_test.ts\none ... ok (1ms)\ntwo ... ok (0ms)\nthree ... FAILED (1ms)\n\n ERRORS \n\nthree => ./a_test.ts:7:6\nerror: AssertionError: Values are not equal.\n\n FAILURES \n\nthree => ./a_test.ts:7:6\n\nFAILED | 2 passed | 1 failed (12ms)\n\nerror: Test failed\n",
+  "deno-pass": "running 3 tests from ./a_test.ts\none ... ok (1ms)\ntwo ... ok (0ms)\nthree ... ok (0ms)\n\nok | 3 passed | 0 failed (12ms)\n\n",
+  "go-fail": "=== RUN   TestA\n--- PASS: TestA (0.00s)\n=== RUN   TestX\n    x_test.go:8: got 1, want 2\n--- FAIL: TestX (0.00s)\nFAIL\nFAIL\texample.com/pkg\t0.002s\nok  \texample.com/pkg/b\t0.001s\n",
+  "go-pass": "=== RUN   TestA\n--- PASS: TestA (0.00s)\n=== RUN   TestB\n--- PASS: TestB (0.00s)\n=== RUN   TestC\n--- PASS: TestC (0.00s)\nPASS\nok  \texample.com/pkg\t0.002s\n",
+  "jest-fail": "FAIL ./fail.test.js\n  \u25cf four\n\n    expect(received).toBe(expected) // Object.is equality\n\n    Expected: 2\n    Received: 1\n\n    > 1 | test('four',()=>{expect(1).toBe(2);});\n        |                            ^\n      2 |\n\n\nPASS ./pass.test.js\n\nTest Suites: 1 failed, 1 passed, 2 total\nTests:       1 failed, 3 passed, 4 total\nSnapshots:   0 total\nTime:        0.155 s, estimated 1 s\nRan all test suites.\n",
+  "jest-pass": "PASS ./pass.test.js\n  \u2713 one\n  \u2713 two\n  \u2713 three\n\nTest Suites: 1 passed, 1 total\nTests:       3 passed, 3 total\nSnapshots:   0 total\nTime:        0.18 s\nRan all test suites matching /pass.test.js/i.\n",
+  "minitest-fail": "Run options: --seed 39175\n\n# Running:\n\n.F\n\nFinished in 0.000291s, 6872.8535 runs/s, 3436.4268 assertions/s.\n\n  1) Failure:\nT#test_b [mt_fail.rb:4]:\nExpected: 1\n  Actual: 2\n\n2 runs, 1 assertions, 1 failures, 0 errors, 0 skips\n",
+  "minitest-pass": "Run options: --seed 24810\n\n# Running:\n\n...\n\nFinished in 0.000279s, 10752.6893 runs/s, 0.0000 assertions/s.\n\n3 runs, 0 assertions, 0 failures, 0 errors, 0 skips\n",
+  "mocha-fail": "\n\n  s\n    \u2714 one\n    \u2714 two\n    \u2714 three\n    1) four\n\n\n  3 passing (2ms)\n  1 failing\n\n  1) s\n       four:\n\n      AssertionError [ERR_ASSERTION]: 1 == 2\n      + expected - actual\n\n      -1\n      +2\n      \n\n\n\n",
+  "mocha-pass": "\n\n  s\n    \u2714 one\n    \u2714 two\n    \u2714 three\n\n\n  3 passing (2ms)\n\n",
+  "node-spec-fail": "\u2714 one (0.250125ms)\n\u2716 two (0.390125ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 1\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 38.349\n\n\u2716 failing tests:\n\ntest at nt/fail.test.js:2:20\n\u2716 two (0.390125ms)\n  AssertionError [ERR_ASSERTION]: 1 == 2\n    generatedMessage: true,\n    code: 'ERR_ASSERTION',\n    actual: 1,\n    expected: 2,\n    operator: '==',\n    diff: 'simple'\n  }\n",
+  "node-spec-pass": "\u2714 one (0.266542ms)\n\u2714 two (0.054917ms)\n\u2714 three (0.031625ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 38.305792\n",
+  "node-tap-fail": "TAP version 13\n# Subtest: one\nok 1 - one\n  ---\n  duration_ms: 0.253166\n  type: 'test'\n  ...\n# Subtest: two\nnot ok 2 - two\n  ---\n  duration_ms: 0.402791\n  type: 'test'\n  location: '<tmp>/nt/fail.test.js:2:20'\n  failureType: 'testCodeFailure'\n  error: '1 == 2'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 2\n  actual: 1\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (<tmp>/nt/fail.test.js:2:39)\n    Test.runInAsyncScope (node:async_hooks:228:14)\n    Test.run (node:internal/test_runner/test:1118:25)\n    Test.processPendingSubtests (node:internal/test_runner/test:787:18)\n    Test.postRun (node:internal/test_runner/test:1247:19)\n    Test.run (node:internal/test_runner/test:1175:12)\n    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)\n  ...\n1..2\n# tests 2\n# suites 0\n# pass 1\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 39.941625\n",
+  "node-tap-pass": "TAP version 13\n# Subtest: one\nok 1 - one\n  ---\n  duration_ms: 0.269708\n  type: 'test'\n  ...\n# Subtest: two\nok 2 - two\n  ---\n  duration_ms: 0.051875\n  type: 'test'\n  ...\n# Subtest: three\nok 3 - three\n  ---\n  duration_ms: 0.030958\n  type: 'test'\n  ...\n1..3\n# tests 3\n# suites 0\n# pass 3\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 37.709875\n",
+  "phpunit-fail": "PHPUnit 10.5.0 by Sebastian Bergmann and contributors.\n\n..F                                                                 3 / 3 (100%)\n\nTime: 00:00.012, Memory: 8.00 MB\n\nThere was 1 failure:\n\n1) ThingTest::testC\nFailed asserting that 2 matches expected 1.\n\nFAILURES!\nTests: 3, Assertions: 3, Failures: 1.\n",
+  "phpunit-pass": "PHPUnit 10.5.0 by Sebastian Bergmann and contributors.\n\n...                                                                 3 / 3 (100%)\n\nTime: 00:00.012, Memory: 8.00 MB\n\nOK (3 tests, 3 assertions)\n",
+  "playwright-fail": "\nRunning 3 tests using 1 worker\n\n  1) [chromium] \u203a a.spec.ts:3:5 \u203a fails \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\n    Error: expect(received).toBe(expected)\n\n  1 failed\n    [chromium] \u203a a.spec.ts:3:5 \u203a fails \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  2 passed (1.2s)\n",
+  "playwright-flaky": "\nRunning 3 tests using 1 worker\n\n  1 flaky\n    [chromium] \u203a a.spec.ts:3:5 \u203a sometimes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n  2 passed (1.2s)\n",
+  "playwright-pass": "\nRunning 3 tests using 1 worker\n\n  3 passed (1.2s)\n",
+  "pytest-error": "=============================== 1 error in 0.05s ===============================\n",
+  "pytest-fail": "============================= test session starts ==============================\ncollected 3 items\n\ntest_a.py ..F                                                            [100%]\n\n=================================== FAILURES ===================================\n___________________________________ test_c ____________________________________\n\n    def test_c():\n>       assert 1 == 2\nE       assert 1 == 2\n\ntest_a.py:7: AssertionError\n=========================== short test summary info ============================\nFAILED test_a.py::test_c - assert 1 == 2\n========================= 1 failed, 2 passed in 0.12s ==========================\n",
+  "pytest-only-failed": "============================== 1 failed in 0.12s ===============================\n",
+  "pytest-pass": "============================= test session starts ==============================\ncollected 3 items\n\ntest_a.py ...                                                            [100%]\n\n============================== 3 passed in 0.12s ===============================\n",
+  "rspec-fail": "..F\n\nFailures:\n\n  1) Thing works\n     Failure/Error: expect(1).to eq(2)\n\nFinished in 0.01 seconds (files took 0.07 seconds to load)\n3 examples, 1 failure\n\nFailed examples:\n\nrspec ./spec/thing_spec.rb:4 # Thing works\n",
+  "rspec-pass": "...\n\nFinished in 0.00123 seconds (files took 0.07 seconds to load)\n3 examples, 0 failures\n",
+  "unittest-fail": ".F\n======================================================================\nFAIL: test_b (ut_fail.T)\n----------------------------------------------------------------------\nTraceback (most recent call last):\n  File \"<tmp>/ut_fail.py\", line 4, in test_b\n    def test_b(self): self.assertEqual(1,2)\nAssertionError: 1 != 2\n\n----------------------------------------------------------------------\nRan 2 tests in 0.000s\n\nFAILED (failures=1)\n",
+  "unittest-pass": "...\n----------------------------------------------------------------------\nRan 3 tests in 0.000s\n\nOK\n",
+  "vitest-fail": "\n RUN  v2.1.9 <tmp>/vi\n\n \u2713 pass.test.mjs (3 tests) 1ms\n \u276f fail.test.mjs (1 test | 1 failed) 5ms\n   \u00d7 four 4ms\n     \u2192 expected 1 to be 2 // Object.is equality\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n\n FAIL  fail.test.mjs > four\nAssertionError: expected 1 to be 2 // Object.is equality\n\n- Expected\n+ Received\n\n- 2\n+ 1\n\n \u276f fail.test.mjs:1:118\n\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/1]\u23af\n\n Test Files  1 failed | 1 passed (2)\n      Tests  1 failed | 3 passed (4)\n   Start at  23:15:01\n   Duration  190ms (transform 14ms, setup 0ms, collect 12ms, tests 6ms, environment 0ms, prepare 79ms)\n\n",
+  "vitest-pass": "\n RUN  v2.1.9 <tmp>/vi\n\n \u2713 pass.test.mjs (3 tests) 1ms\n\n Test Files  1 passed (1)\n      Tests  3 passed (3)\n   Start at  23:15:01\n   Duration  207ms (transform 10ms, setup 0ms, collect 6ms, tests 1ms, environment 0ms, prepare 52ms)\n\n"
+};
+const RUNNER_SOURCE = { 'node-spec': 'run', 'node-tap': 'run', mocha: 'run', jest: 'run', vitest: 'run', cargo: 'run', unittest: 'run', minitest: 'run',
+  pytest: 'documentation', go: 'documentation', rspec: 'documentation', phpunit: 'documentation', deno: 'documentation', playwright: 'documentation' };
+
+test('the second fix: every runner\'s failing summary refuses and its passing one passes with the right count', async () => {
+  const runOf = async (text) => {
+    const root = makeRepo({ 'src/styles/home.css': HOME, 'print.js': `process.stdout.write(${JSON.stringify(text)});\n` }, { testScript: 'node print.js' });
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+    return check(root, '--run-tests', 'src/styles/home.css');
+  };
+  const wrong = [];
+  for (const [name, text] of Object.entries(RUNNER_OUTPUT)) {
+    const runner = name.startsWith('node-') ? name.split('-').slice(0, 2).join('-') : name.split('-')[0];
+    assert.ok(RUNNER_SOURCE[runner], `${name}: its source is named`);
+    const res = await runOf(text);
+    if (name.endsWith('-pass')) {
+      if (res.verdict !== 'hotfix' || res.tests !== '3 tests passed.') wrong.push(`${name} (${RUNNER_SOURCE[runner]}): ${res.verdict} ${res.tests || res.text}`);
+    } else {
+      // A failure is named a failure, and a run that skipped a test says so: never "no test ran" by luck.
+      const want = /flaky/.test(name) ? /tests? (?:was|were) skipped/ : /the existing tests fail/;
+      if (res.verdict !== 'refused' || !want.test(res.text)) wrong.push(`${name} (${RUNNER_SOURCE[runner]}): ${res.verdict} ${res.text}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});

@@ -1633,41 +1633,71 @@ function firstFailingTest(output, root) {
   return file || name || 'the test command reported a failure';
 }
 
-/**
- * The counters of a failure (`fail`, `failed`, `failures`, `error`, `errors`) and of a test
- * that ran nothing (`skipped`, `ignored`, `todo`, `pending`, `flaky`, `xfailed`, `xpassed`,
- * `deselected`, `cancelled`, `filtered out`), in either order: `3 failed`, `# fail 3`,
- * `failed: 3`.
- */
-const FAIL_COUNTER = /(\d+)[ \t]+(?:fail|failed|failures|errors?)\b|\b(?:fail|failed|failures|errors?)[ \t]*[:=]?[ \t]*(\d+)(?![\d.])/gi;
-const SKIP_COUNTER = /(\d+)[ \t]+(?:skipped|ignored|todo|pending|flaky|xfailed|xpassed|deselected|cancelled|filtered[ \t]+out)\b|\b(?:skipped|ignored|todo|pending|flaky|xfailed|xpassed|deselected|cancelled)[ \t]*[:=]?[ \t]*(\d+)(?![\d.])/gi;
-/** The pass counter of a summary: `5 passed`, `5 passing`, `# pass 5`, `ℹ pass 5`, `passed: 5`. */
-const PASS_COUNTER = /(\d+)[ \t]+pass(?:ed|ing)\b|(?:^|[ \t])(?:#|\u2139)[ \t]+pass[ \t]+(\d+)|\bpassed[ \t]*:[ \t]*(\d+)/gi;
+/** The words of a summary's counters, by what they count. */
+const PASS_WORDS = new Set(['pass', 'passed', 'passing']);
+const FAIL_WORDS = new Set(['fail', 'failed', 'failing', 'failure', 'failures', 'error', 'errors']);
+const SKIP_WORDS = new Set(['skipped', 'skips', 'ignored', 'todo', 'pending', 'flaky', 'xfailed', 'xpassed', 'deselected', 'cancelled', 'filtered out']);
+/** The words that count every test a summary names (`3 examples, 1 failure`, `Ran 3 tests`, `3 runs`). */
+const TOTAL_WORDS = new Set(['tests', 'test', 'examples', 'example', 'runs', 'run']);
 
-/** A TAP or node:test summary line at a line's start: `# fail 1`, `ℹ skipped 2`, `# todo 0`, `# cancelled 0`. */
-const TAP_SUMMARY = /^(?:#|ℹ)[ \t]+(?:fail|skipped|todo|cancelled)[ \t]+\d+/i;
 /**
- * @param {string} line a trimmed line @returns {boolean} it holds nothing but one counter, as
- * a runner prints its summary over several lines (`1 flaky`, `failed: 2`, `3 passed (2.1s)`)
+ * One piece of a summary: `N word` (`3 passed`, `2 filtered out`) or `Word: N` / `word=N`
+ * (`Failures: 1`, `failures=1`), or null.
+ * @param {string} piece @returns {({n: number, word: string}|null)}
  */
-function counterAlone(line) {
-  const words = line.replace(/ \([^()]*\)$/, '').split(/[ \t:]+/).filter(Boolean);
-  if (words.length === 3 && /^\d+$/.test(words[0])) return /^[a-z]+$/i.test(words[1]) && words[2].toLowerCase() === 'out';
-  return words.length === 2 && ((/^\d+$/.test(words[0]) && /^[a-z]+$/i.test(words[1])) || (/^[a-z]+$/i.test(words[0]) && /^\d+$/.test(words[1])));
+function counterOf(piece) {
+  const words = piece.trim().split(/[ \t]+/);
+  if (words.length >= 2 && words.length <= 3 && /^\d+$/.test(words[0]) && words.slice(1).every((w) => /^[a-z]+$/i.test(w))) {
+    return { n: Number(words[0]), word: words.slice(1).join(' ').toLowerCase() };
+  }
+  const named = piece.trim().split(/[ \t]*[:=][ \t]*/);
+  if (named.length === 2 && /^[a-z]+$/i.test(named[0]) && /^\d+$/.test(named[1])) return { n: Number(named[1]), word: named[0].toLowerCase() };
+  return null;
 }
 
 /**
- * Rule 8 — a passing run's whole output, read once more (the re-check of 2026-10-10, narrowed
- * the same day): a run passes only when no SUMMARY in it reports a failure or a test that ran
- * nothing, and the count shown is the sum of the pass counts of every summary. Two summaries
- * come from two runners in one command (`node --test a; node --test b`, whose exit code is the
- * second's). A summary line is a line that holds a pass counter (`2 passed, 1 error`), a TAP
- * or node:test summary line at its start (`# fail 1`), or a line that holds one counter and
- * nothing else (`  1 flaky`); only there are failure and skip counters read. `FAILED` counts
- * at a line's start (`FAILED tests/x.py::test_a`) or after `test result:`. So what a project's
- * own tests print about the failure paths they test ("Step 14 VERIFY FAILED for …", "Security
- * scan FAILED: 1 critical") refuses nothing. Not read: a line that reports one passing test
- * (`✔ …`, `ok 3 - …`); a summary of test files or suites adds no passes. One pass over the lines.
+ * The counters of one line, when the line is a SUMMARY: after leading and trailing `=`, `-`,
+ * `*`, `_` and spaces, a leading label (`Tests:`, `Test Files `, `test result: ok.`), a status
+ * word (`ok |`, `OK (`, `FAILED (`), a trailing timing (`in 0.12s`, `(12ms)`, `finished in
+ * 0.00s`, `(4)`) and a last full stop are taken off, what is left is counters only, joined by
+ * commas, semicolons or `|`. Or null: the line is no summary.
+ * @param {string} line a trimmed line @returns {({counters: Array<{n: number, word: string}>, label: string}|null)}
+ */
+function summaryOf(line) {
+  const core = line.replace(/^[=\-*_ \t]+|[=\-*_ \t]+$/g, '');
+  const labelled = /^([A-Za-z][A-Za-z ]*?)(?::|[ \t]{2,})[ \t]*(?=\d|ok\b|FAILED\b)/.exec(core);
+  for (const [label, text] of [...(labelled ? [[labelled[1].toLowerCase(), core.slice(labelled[0].length)]] : []), ['', core]]) {
+    const pieces = withoutTiming(text.replace(/^(?:ok|FAILED)[ \t]*[.|][ \t]*/i, '').replace(/^(?:OK|FAILED)[ \t]*\((.*)\)$/, '$1'))
+      .split(/[,;|]/).map((piece) => piece.trim()).filter(Boolean);
+    const counters = pieces.map(counterOf);
+    if (pieces.length > 0 && counters.every(Boolean)) return { counters: /** @type {Array<{n: number, word: string}>} */ (counters), label };
+  }
+  return null;
+}
+
+/** @param {string} text @returns {string} the text without a trailing `(…)`, `in 0.12s` or `finished in 0.00s`, and without a last full stop */
+function withoutTiming(text) {
+  let rest = text.trim();
+  if (rest.endsWith(')') && rest.lastIndexOf('(') >= 0) rest = rest.slice(0, rest.lastIndexOf('(')).trim();
+  const at = rest.lastIndexOf(' in ');
+  if (at >= 0 && /^[\d.]+ ?m?s$/.test(rest.slice(at + 4).trim())) rest = rest.slice(0, at).replace(/[ \t]*finished$/i, '').replace(/[;,|][ \t]*$/, '').trim();
+  return rest.replace(/\.$/, '');
+}
+
+/**
+ * Rule 8 — a passing run's whole output, read once more (the re-check of 2026-10-10; narrowed,
+ * then widened toward refusal the same day, the second fix in this area: if a further check
+ * finds a way through here, this reading comes out and the check relies on exit codes alone).
+ * A run passes only when no SUMMARY in it reports a failure or a test that ran nothing, and no
+ * line starts with `FAIL`, `FAILED` or `FAILURES!` (go, pytest, phpunit, deno) or reads
+ * `--- FAIL:` (go) or `test result: FAILED` (cargo). A summary is a TAP or node:test summary
+ * line (`# fail 1`, `ℹ pass 3`) or a line of counters only ({@link summaryOf}). The count shown
+ * is the sum of every summary's passes: its pass counter, or else its total less its failures
+ * and skips (`3 examples, 0 failures`, `Ran 3 tests`), and one for each `--- PASS:` line of
+ * go. A summary of test files or suites refuses on a failure and adds no passes. Not read: a
+ * line that reports one passing test (`✔ …`, `✓ …`, `ok 3 - …`). So what a project's own tests
+ * print about the failure paths they test ("Step 14 VERIFY FAILED for …") refuses nothing.
+ * One pass over the lines.
  * @param {string} output standard output and standard error of every command that ran
  * @returns {{failed: boolean, skipped: number, passed: number}}
  */
@@ -1675,22 +1705,26 @@ function readRunOutput(output) {
   let failed = false;
   let skipped = 0;
   let passed = 0;
-  const sum = (re, line) => {
-    let n = 0;
-    re.lastIndex = 0;
-    for (let m = re.exec(line); m !== null; m = re.exec(line)) n += Number(m[1] || m[2] || m[3] || 0);
-    return n;
-  };
   for (const raw of output.replace(ANSI, '').split(/\r?\n/)) {
     const line = raw.trim();
-    if (/^(?:✔|ok[ \t]+\d+[ \t]+-)/.test(line)) continue; // one passing test, by its name
-    if (/^FAILED\b|test result:[ \t]*FAILED\b/.test(line)) failed = true;
-    const passes = sum(PASS_COUNTER, line);
-    if (passes === 0 && !TAP_SUMMARY.test(line) && !counterAlone(line)) continue;
-    if (sum(FAIL_COUNTER, line) > 0) failed = true;
-    if (/^(?:Test Files|Test Suites)\b/i.test(line)) continue;
-    skipped += sum(SKIP_COUNTER, line);
-    passed += passes;
+    if (/^(?:✔|✓|ok[ \t]+\d+[ \t]+-)/.test(line)) continue; // one passing test, by its name
+    if (/^(?:FAIL|FAILED)\b|^FAILURES!|^--- FAIL\b|test result:[ \t]*FAILED\b/.test(line)) failed = true;
+    if (/^--- PASS\b/.test(line)) passed += 1;
+    if (/^--- SKIP\b/.test(line)) skipped += 1;
+    const tap = /^(?:#|ℹ)[ \t]+(pass|fail|skipped|todo|cancelled)[ \t]+(\d+)$/i.exec(line);
+    const ran = /^Ran[ \t]+(\d+)[ \t]+tests?[ \t]+in[ \t]/.exec(line);
+    const summary = tap ? { counters: [{ n: Number(tap[2]), word: tap[1].toLowerCase() }], label: '' }
+      : ran ? { counters: [{ n: Number(ran[1]), word: 'tests' }], label: '' } : summaryOf(line);
+    if (summary === null) continue;
+    let pass = 0;
+    let total = 0;
+    let lost = 0;
+    for (const { n, word } of summary.counters) {
+      if (FAIL_WORDS.has(word)) { if (n > 0) failed = true; lost += n; } else if (SKIP_WORDS.has(word)) { skipped += n; lost += n; } else if (PASS_WORDS.has(word)) pass += n;
+      else if (TOTAL_WORDS.has(word)) total += n;
+    }
+    if (/\b(?:files|suites)$/.test(summary.label)) continue; // test files or suites: their failure counts, their passes do not
+    passed += pass > 0 ? pass : Math.max(total - lost, 0);
   }
   return { failed, skipped, passed };
 }
