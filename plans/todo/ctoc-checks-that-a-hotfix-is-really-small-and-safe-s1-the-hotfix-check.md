@@ -5370,6 +5370,26 @@ The design idea for it: the project itself declares which pages are display page
 **The differential test** now holds stylesheets only. On the default seed: 27,083 edits,
 1,622 passed (5.99%), 0 disagreements; the minimum is 5.39%.
 
+**The reading of a run's output, narrowed and then fixed** (the coordinator, 2026-10-10).
+`35133851`: `FAILED` counts only at a line's start or after `test result:`, and counters are read
+only on summary lines, so this repository's own lines about the failure paths it tests ("Step
+14 VERIFY FAILED for …", "Security scan FAILED: 1 critical") refuse nothing. The automated
+review of `35133851` found it open (pytest `1 failed in 0.12s` and `1 error`, mocha `1
+failing`, go `--- FAIL:` and `FAIL`, rspec `1 failure`, phpunit `FAILURES!`); `b782776c` reads
+a summary in every runner's form (a line of counters only, once its frame, label, status word
+and timing are off), counts `failing` and `failure` as failures, and refuses `FAIL`, `FAILED` or
+`FAILURES!` as a line's first word. One table holds a failing and a passing summary of
+fourteen runners: node:test spec and TAP, mocha, jest, vitest, cargo, unittest and minitest
+run on the build machine; pytest, go, rspec, phpunit, deno and playwright from their
+documented formats. This is the second fix in this area: if a further check finds a way
+through, the reading of the output comes out and the check relies on exit codes alone, with
+that limit recorded. Known limit: a project's test script can hide a failure on purpose (by
+filtering its own output, say); the script is committed project code that a hotfix never
+changes, and the check trusts its exit code and its printed summaries. The run on this
+repository's own suite (a scratch clone of `b782776c`, one colour changed): `hotfix`, "13090
+tests passed.", 191 seconds: the suite's 13,079 tests and 11 checks one test file runs
+itself and sums in a summary line of its own ("=== Results: 11 passed, 0 failed ===").
+
 ## Execution Plan (Steps 8-16)
 
 ### Step 8: TEST
