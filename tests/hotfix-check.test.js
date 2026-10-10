@@ -1859,7 +1859,7 @@ test('round 4: components and code elements in HTML, custom properties; Vue, JSX
 // that ends inside an unfinished construct, or holds one the scanner cannot follow, makes
 // the change unreadable. [path, base content, new content, the clause, or null for `checking`]
 test('round 4: every scanner fails closed on an unfinished or unreadable construct', async () => {
-  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
+  const open = (f) => `I could not read the change (${f} leaves a string, a comment, a bracket or a block open)`;
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const shapes = [
@@ -2060,7 +2060,7 @@ test('round 5: host elements, the element stack, stylesheet names, custom proper
     [9, 'src/styles/beside.css', ':root { --color-a: red; }\na { color: red; }\n', ':root { --color-a: red; }\na { color: blue; }\n', null],
     // A custom property whose declaration this reader does not vouch for (a comment before its colon) is refused too.
     row(9, 'src/styles/comment-name.css', ':root { --color-a /* x */ : @; }\n', ['red', 'blue'], un('src/styles/comment-name.css')),
-    row(9, 'src/styles/string-open.css', 'a { color: @; }\nb { content: "x', ['red', 'blue'], 'I could not read the change (src/styles/string-open.css leaves a tag, quote, comment, block, fence or span open)'),
+    row(9, 'src/styles/string-open.css', 'a { color: @; }\nb { content: "x', ['red', 'blue'], 'I could not read the change (src/styles/string-open.css leaves a string, a comment, a bracket or a block open)'),
     row(9, 'src/styles/ruleset.css', ':root { --color-a: { color: @ } }\n', ['red', 'blue'], lost('src/styles/ruleset.css'))
   ];
   const base = {};
@@ -2397,7 +2397,7 @@ test('round 9: names that are dependencies, the build or settings; the wording r
 test('round 9: stylesheets — brackets, statements outside the subset, escapes, and custom properties', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
-  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
+  const open = (f) => `I could not read the change (${f} leaves a string, a comment, a bracket or a block open)`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const colour = ['red', 'blue'];
   let count = 0;
@@ -2677,7 +2677,7 @@ test('round 9: the copy is removed whatever the tests leave in it, and a removal
 
 test('round 9: every guard fails closed — a file its reader cannot parse is refused, a fault in any rule stops the check, and nothing falls back to a looser reading', async (t) => {
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
-  const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
+  const open = (f) => `I could not read the change (${f} leaves a string, a comment, a bracket or a block open)`;
 
   await t.test('per format: something the reader cannot parse, on the old side, the new side or both, never passes', async () => {
     // [format, path, before, after, clause]. Where both sides hold the same unparsable piece and

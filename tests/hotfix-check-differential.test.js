@@ -1172,11 +1172,13 @@ const NEVER_PASSES = {
 /** The kinds of edit of which the check must pass some, per language. */
 const MUST_PASS = { html: EDITS.slice(0, 3), css: ['a colour replaced'] };
 /**
- * The share of the generated edits the check must pass, per language: about half of the
- * share measured (the numbers are beside each test), so that a rule which
- * starts to refuse far more than it did fails here.
+ * The share of the generated edits the check must pass, per language: 90% of the share
+ * measured on the default seed and size on 2026-10-10, after the tenth round's last change to
+ * a reader (HTML 6,092 of 104,044 edits, 5.855%; CSS 1,714 of 27,083, 6.329%), so that a rule
+ * which starts to refuse a tenth more than it did fails here. (Until then the minimum was
+ * about half the measured share.)
  */
-const PASS_FLOOR = { html: 0.03, css: 0.03 };
+const PASS_FLOOR = { html: 0.0527, css: 0.0569 };
 
 function run(kind, count) {
   const started = Date.now();
@@ -1242,21 +1244,22 @@ function assertRun(t, kind, count) {
   const { stats, share, summary, report, byEdit, missing } = run(kind, count);
   t.diagnostic(summary);
   assert.equal(report.length, 0, `${summary}\nThe check passed edits a real parser reads as something else:\n${report.join('\n')}`);
-  assert.ok(share > PASS_FLOOR[kind], `the check must pass more than ${(100 * PASS_FLOOR[kind]).toFixed(1)}% of the generated edits: ${summary}`);
+  assert.ok(share > PASS_FLOOR[kind], `the check must pass more than ${(100 * PASS_FLOOR[kind]).toFixed(2)}% of the generated edits: ${summary}`);
   for (const name of NEVER_PASSES[kind]) assert.equal(byEdit.get(name)[1], 0, `no edit of the kind "${name}" may pass: ${summary}`);
   for (const name of MUST_PASS[kind]) assert.ok(byEdit.get(name)[1] > 0, `the check must pass edits of the kind "${name}": ${summary}`);
   // A small run cannot hold every ingredient; the default size and the soak must.
   if (stats.cases >= 10000) assert.deepEqual(missing, [], `the check passed no edit in a document with: ${missing.join(', ')}`);
 }
 
-// Measured on 2026-10-10, seed 20261009, default size: 104,044 edits, 6,126 passed (5.9%).
+// Measured on 2026-10-10, seed 20261009, default size: 104,044 edits, 6,092 passed (5.9%).
 test('HTML: every edit the check passes is a change to plain visible text for the HTML parser', (t) => {
   assertRun(t, 'html', HTML_CASES);
 });
 
-// Measured on 2026-10-10, seed 20261009, default size: 27,083 edits, 3,327 passed (12.3%). Beyond
-// this test, 120,000 passed edits were read by Chromium 156's own CSS parser (the plan's
-// Execution Record): in each, colour values of one rule changed, or nothing did.
+// Measured on 2026-10-10, seed 20261009, default size: 27,083 edits, 1,714 passed (6.3%). (The
+// ninth round's reader passed 12.3%: custom properties named for a colour and the colour
+// functions written with spaces passed then.) Beyond this test, 120,000 edits the ninth round's
+// reader passed were read by Chromium 156's own CSS parser (the plan's Execution Record).
 test('CSS: every stylesheet edit the check passes changes exactly one colour for postcss', (t) => {
   assertRun(t, 'css', CSS_CASES);
 });

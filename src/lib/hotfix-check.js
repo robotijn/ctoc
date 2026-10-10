@@ -63,8 +63,10 @@
  *                                          work (`.claude/`, `.ctoc/`, `.cursor/`, `.windsurf/`,
  *                                          `.clinerules/`, `.roo/`, `.kiro/`, `.junie/`, `.amazonq/`,
  *                                          `.continue/`, `agents/`, `skills/`, `commands/`, `plans/`,
- *                                          `prompts/`, `output-styles/`, GitHub's assistant folders),
- *                                          nor in a build folder (`.github/`, `.changeset/`, ...).
+ *                                          `prompts/`, `output-styles/`, GitHub's assistant folders,
+ *                                          any folder or file name that holds `prompt`), nor in a
+ *                                          build folder (`.github/`, `.changeset/`, ...), nor in any
+ *                                          other dot-folder.
  *                                          EACH KIND IS JUDGED WHOLE, one scanner per side:
  *                                          HTML by a token stream after the HTML tokenizer, in a
  *                                          STRICT SUBSET in which the reader agrees with a browser's
@@ -104,21 +106,27 @@
  *                                          EVERY SCANNER FAILS CLOSED: a side that ends inside an
  *                                          unfinished construct, or holds one its scanner cannot
  *                                          follow, makes the change unreadable
- *   5  not in a sensitive area           — 33 whole words, also in the plural, in the path from
- *                                          the repository top (auth, login, ...; in a stylesheet's
- *                                          own file name `tokens` alone is no such word), the path
- *                                          asked as written, with compatibility letters as plain
- *                                          ones, and with marks and unseen characters dropped, each
- *                                          form split at every character that is no letter, and each
- *                                          camel-case sub-word read too (`AuthPanel` is `auth`,
- *                                          `APIKey` is `key`, `Author` is not); CTOC's own secret-file guard,
- *                                          and in CTOC's own repository its protected paths; the test,
- *                                          governing, build and database folders are read from
- *                                          the top too
+ *   5  not in a sensitive area           — 34 words (auth, login, ..., and `security`) in the path
+ *                                          from the repository top, the path asked as written, with
+ *                                          compatibility letters as plain ones, and with marks and
+ *                                          unseen characters dropped, each form split at every
+ *                                          character that is no letter. A word of three letters or
+ *                                          more counts ANYWHERE inside a part (`oauth`, `apikey`,
+ *                                          `deployment`), `ci` as a whole part; each camel-case
+ *                                          sub-word is read too, as a word or its plural (`runCI`);
+ *                                          a part that is exactly `author` or `authors` is not
+ *                                          `auth`, and in a stylesheet's own file name a part that
+ *                                          is exactly `tokens` is no such word; CTOC's own
+ *                                          secret-file guard, and in CTOC's own repository its
+ *                                          protected paths, asked in every form and in lower case;
+ *                                          the test, governing, build and database folders are
+ *                                          read from the top too
  *   6  no risk marker in wording         — no number of any kind, currency, %, address (a bare
  *                                          host and a scheme among them), e-mail, code, and no
  *                                          character nobody sees; markup text is read as written and
- *                                          as its references spell it
+ *                                          as its references spell it. (Rule 4 has already refused
+ *                                          a changed text with a character nobody sees, or with a
+ *                                          word that mixes Latin letters with Cyrillic or Greek.)
  *   3  size                              — at most 20 changed lines in at most 3 files
  *   8  the existing tests pass           — only in the `--run-tests` call, in a copy
  * Rule 7 and the kind of each file (rule 4: where it is placed by its name and its place) run
@@ -130,26 +138,45 @@
  * still run last.
  *
  * A TRANSFORM ONLY ADDS REASONS TO REFUSE (the coordinator's point at review, 2026-10-09).
- * The program that later reads a file sees its raw bytes, so every place where the check
- * folds, strips, decodes or skips before it decides is listed here with what keeps it on the
- * refusing side:
+ * The program that later reads a file sees its raw bytes, so EVERY place where the check
+ * folds, strips, decodes, splits or skips before it decides is listed here with what keeps it
+ * on the refusing side:
  *   the bytes read as UTF-8                 a zero byte or bytes that are no UTF-8 refuse (rule 1);
  *                                           a page or stylesheet that names another character set
  *                                           refuses
  *   a byte-order mark skipped               only when it stands on both sides
  *   `\r\n` read as `\n`                     the same ending on every line of both sides, and as many
  *                                           carriage returns
+ *   a carriage return at a line's end       the same count on both sides, so none comes or goes
+ *   left out of the changed-line count      uncounted
+ *   a named file's `\` read as `/`          only to find the file; the name check then refuses a
+ *                                           judged name that holds a backslash
  *   names compared without letter case      a table that refuses gains matches; the one table that
  *                                           lets a file qualify (its extension) is compared so by
  *                                           the eighth round's decision, as file systems compare
  *   a path folded (NFKC; marks and unseen   every rule that refuses asks the path as written and in
  *   characters dropped)                     each folded form, and refuses when one says so; the kind
  *                                           must be the same in every form ({@link PATH_FORMS})
- *   a character reference decoded           rule 6 reads the text as written and as decoded; only a
- *                                           short list of plain references may stand in changed text
+ *   a path split at every character that    only the rules that refuse read the parts (a sensitive
+ *   is no letter, and at capitals; each     word, CTOC's protected paths); a part and each sub-word
+ *   part in lower case                      are both asked, and either refuses
+ *   a character reference decoded           rule 6 and the two-scripts rule read the text as written
+ *                                           and as decoded; only a short list of plain references
+ *                                           may stand in changed text
+ *   HTML names in ASCII lower case          as the HTML parser compares them; no other letter folds
+ *   white space at a changed text's start   compared exactly where a browser moves it elsewhere
+ *                                           (before the body, directly inside a table)
  *   CSS comments, strings, `url(…)` and     structure only: the two files are compared on their own
- *   escapes blanked; a value trimmed        text, every character outside a colour identical
+ *   escapes blanked (an escape in           text, every character outside a colour identical; a
+ *   hexadecimal with its digits and one     stylesheet that holds one of the control characters
+ *   white space)                            written in their place cannot be followed
+ *   a CSS value trimmed, and `!important`   only to ask whether a colour is its declaration's whole
+ *   taken off its end                       value; the files are still compared on their own text
  *   CSS keywords in ASCII lower case        as a browser compares them; no other letter folds
+ *   colour codes taken out of the test      only to name the first failing test and to read the
+ *   run's output                            counters; a count that cannot be read is no pass
+ *   control characters replaced in what     the sentence and `detail` only; nothing is decided on the
+ *   is shown                                cleaned text
  *
  * NO CODE OF THE REPOSITORY'S RUNS. The check's temporary folder (`mkdtemp` under the
  * system's temporary folder) and its empty `no-hooks` folder are made before the first git
@@ -193,7 +220,8 @@
  * files), that leads back into the repository refuses when other uncommitted work lies
  * under it. The project's tools are then detected in the copy and the project's whole
  * suite runs there (never a selection of it: the decision at review of 2026-10-09), through
- * the quality agent and under its time limit, with the working directory set to the copy
+ * the quality agent and under its time limit, at which the test command's whole process
+ * tree is ended, with the working directory set to the copy
  * and the quality agent's progress lines kept off the menu's JSON.
  * Removal, on every path of both calls, after the working directory is restored: every
  * link unlinked by itself (one already gone, or whose folder is gone, counts as removed),
@@ -229,6 +257,7 @@
  *   test-edited          it changes a test (<file>)
  *   tests-fail           the existing tests fail (<first failing test>)
  *   no-test-ran          no test ran, so nothing confirms the change
+ *                        <n> tests were skipped, so nothing confirms the change
  * The `<why>` of "I could not read the change" is one of: git is not installed; this
  * folder is not a git repository; this folder lies outside the repository git reports;
  * this folder has no commit to compare with; <file> is outside this project; <file> holds
@@ -1811,8 +1840,8 @@ function cssStatements(blank) {
 /**
  * Rule 4 (colour) — one stylesheet, read once: the text with strings, comments and `url(…)`
  * blanked, its statements, and for each statement the declaration it is. The one place that
- * decides what a declaration is (the colour tokens, the custom properties and the reads of a
- * custom property all ask it), and where a statement outside the strict subset is met.
+ * decides what a declaration is (the colour tokens and the custom properties ask it), and
+ * where a statement outside the strict subset is met.
  * @param {string} text line feeds only
  * @returns {{blank: string, statements: CssStatement[]}}
  */
@@ -2039,7 +2068,7 @@ function ruleContent(f) {
   const judged = readKind(f);
   if (!scanFault) return judged;
   if (scanFault === 'subset') return { clause: inexactClause(f.display), cause: 'unreadable' };
-  const why = scanFault === 'open' ? 'leaves a tag, quote, comment, block, fence or span open' : 'holds something I cannot follow';
+  const why = scanFault === 'open' ? 'leaves a string, a comment, a bracket or a block open' : 'holds something I cannot follow';
   return { clause: `I could not read the change (${f.display} ${why})`, cause: 'unreadable' };
 }
 
@@ -2612,8 +2641,8 @@ const ENDING_SIGNALS = /** @type {const} */ (['SIGINT', 'SIGTERM', 'SIGHUP']);
  * While the copy exists, a SIGINT, SIGTERM or SIGHUP first removes it (the same synchronous
  * {@link removeCopy}), then removes these handlers and raises the signal again, so the
  * process still ends the way it was told to. A signal that arrives while a test runs is
- * handled when that run returns: `spawnSync` blocks the process, and Node cannot end the
- * test's own process group from here (the plan's Risks).
+ * handled when that run returns: `spawnSync` blocks the process. (At the run's own time limit
+ * the quality agent ends the test command's whole process tree: `wholeTree`.)
  * @param {Context} ctx
  * @returns {() => void} removes the handlers
  */
