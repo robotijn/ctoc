@@ -47,30 +47,24 @@
  *                                          working file, every file text
  *   2  same files, same names            — nothing added, removed, renamed, re-moded, linked
  *   7  no test is edited                 — fix the code, not the tests
- *   4  only kinds that qualify           — documentation (Markdown, and plain text under a
- *                                          documentation name), visible text in
- *                                          plain HTML, message catalogue values (JSON, YAML,
- *                                          properties), colour values in plain CSS; these are the
- *                                          formats the check reads exactly (the owner's decision of
- *                                          2026-10-09), and a Vue, Svelte, JSX, TSX, MDX,
- *                                          reStructuredText, Sass, Less or gettext file is a kind it
- *                                          does not recognise; never in a place that governs the work
- *                                          (`CLAUDE.md`, `CLAUDE.local.md`, `AGENTS.md`,
- *                                          `GEMINI.md`, `CONVENTIONS.md`, `IRON_LOOP.md`,
- *                                          `SKILL.md`, `MEMORY.md`, GitHub's assistant
- *                                          files, `.cursor/`, `.windsurf/`, `.clinerules/`,
- *                                          `.roo/`, `.kiro/`, `.junie/`, `.amazonq/`,
- *                                          `.continue/`, the governing folders, `prompts/` and
- *                                          `output-styles/` among them, and every file a `CLAUDE.md`
- *                                          or `AGENTS.md` of the last commit links to), never in a
- *                                          build folder (`.github/` but its Markdown outside
- *                                          `workflows/`, `.changeset/`, ...); `robots.txt` and
- *                                          its kind are settings; a `.txt` named like
- *                                          `requirements` is a dependency list, and any other
- *                                          `.txt` without a documentation name (`README`,
- *                                          `CHANGELOG`, `NOTES`, ...) is not recognised; a legal
- *                                          text (`LICENSE`, `COPYING`, `NOTICE`, ...) never
- *                                          qualifies and is named as a sensitive area.
+ *   4  only kinds that qualify           — TWO KINDS (the session coordinator's decision of
+ *                                          2026-10-10, the tenth round; until then also Markdown and
+ *                                          plain-text prose, catalogue files and custom properties
+ *                                          named for a colour, in which every blocking finding of
+ *                                          two review rounds sat): visible text in a plain HTML page
+ *                                          (`.html`, `.htm`), and a colour value in a standard colour
+ *                                          property of a plain stylesheet (`.css`). Every other file
+ *                                          gets the clause of the first other kind it matches (a
+ *                                          dependency list, stored data, the build, a setting, program
+ *                                          code), or is a kind the check does not recognise: a
+ *                                          Markdown or text file, a Vue, Svelte, JSX, TSX, MDX,
+ *                                          reStructuredText, Sass, Less or gettext file. A page or
+ *                                          stylesheet never qualifies in a place that governs the
+ *                                          work (`.claude/`, `.ctoc/`, `.cursor/`, `.windsurf/`,
+ *                                          `.clinerules/`, `.roo/`, `.kiro/`, `.junie/`, `.amazonq/`,
+ *                                          `.continue/`, `agents/`, `skills/`, `commands/`, `plans/`,
+ *                                          `prompts/`, `output-styles/`, GitHub's assistant folders),
+ *                                          nor in a build folder (`.github/`, `.changeset/`, ...).
  *                                          EACH KIND IS JUDGED WHOLE, one scanner per side:
  *                                          HTML by a token stream after the HTML tokenizer, in a
  *                                          STRICT SUBSET in which the reader agrees with a browser's
@@ -105,28 +99,8 @@
  *                                          semicolon ends no statement inside brackets; a statement
  *                                          that is no declaration, at-rule or rule head refuses the
  *                                          file), a colour only as the whole value of a real colour
- *                                          property on its line, and a change to a custom property
- *                                          a setting unless the property is named for a colour,
- *                                          holds exactly one colour before and after, and is read
- *                                          in its file by colour properties only;
- *                                          Markdown and plain text as PURE PROSE (the decision at
- *                                          review of 2026-10-09: Markdown is not one language, and
- *                                          no reader agrees with every renderer on structure): only
- *                                          the words of plain prose lines may change (a colon,
- *                                          parentheses and list items of plain prose among them), in
- *                                          a paragraph bounded by empty lines, outside front matter,
- *                                          code fences and whatever follows raw HTML, in a file that
- *                                          holds no raw start tag, with nothing else in the file
- *                                          changed (held to markdown-it in four configurations by
- *                                          the same differential test); a message catalogue is one
- *                                          only under a catalogue folder with a language tag or a
- *                                          wording bundle's name, never under a dependency, build or
- *                                          settings name, and each format has ONE reader of the whole
- *                                          file: JSON by `JSON.parse`, the file being exactly what
- *                                          `JSON.stringify` writes; YAML and properties in a strict
- *                                          subset (YAML held to js-yaml by the differential test);
- *                                          a changed value is read as the program reads it AND as it
- *                                          is written, and as a browser reads an address.
+ *                                          property on its line, and a changed custom property a
+ *                                          setting, whatever it is named and whatever it holds.
  *                                          EVERY SCANNER FAILS CLOSED: a side that ends inside an
  *                                          unfinished construct, or holds one its scanner cannot
  *                                          follow, makes the change unreadable
@@ -144,9 +118,7 @@
  *   6  no risk marker in wording         — no number of any kind, currency, %, address (a bare
  *                                          host and a scheme among them), e-mail, code, and no
  *                                          character nobody sees; markup text is read as written and
- *                                          as its references spell it; in documentation, in the
- *                                          changed words only, and there also no word of 7 to 40
- *                                          hexadecimal digits
+ *                                          as its references spell it
  *   3  size                              — at most 20 changed lines in at most 3 files
  *   8  the existing tests pass           — only in the `--run-tests` call, in a copy
  * Rule 7 and the kind of each file (rule 4: where it is placed by its name and its place) run
@@ -164,29 +136,20 @@
  *   the bytes read as UTF-8                 a zero byte or bytes that are no UTF-8 refuse (rule 1);
  *                                           a page or stylesheet that names another character set
  *                                           refuses
- *   a byte-order mark skipped               only for markup and stylesheets, and only when it
- *                                           stands on both sides; in a catalogue it refuses
+ *   a byte-order mark skipped               only when it stands on both sides
  *   `\r\n` read as `\n`                     the same ending on every line of both sides, and as many
- *                                           carriage returns; Markdown compares each line's ending
- *   names compared without letter case      a table that refuses gains matches; the tables that let
- *                                           a file qualify (extension, catalogue folder, language
- *                                           tag, bundle and documentation name) are compared so by
+ *                                           carriage returns
+ *   names compared without letter case      a table that refuses gains matches; the one table that
+ *                                           lets a file qualify (its extension) is compared so by
  *                                           the eighth round's decision, as file systems compare
  *   a path folded (NFKC; marks and unseen   every rule that refuses asks the path as written and in
  *   characters dropped)                     each folded form, and refuses when one says so; the kind
  *                                           must be the same in every form ({@link PATH_FORMS})
- *   a link target percent-decoded           adds a spelling of a governing file, never removes one
- *   a catalogue value decoded               the wording rule runs on the decoded value and on the
- *                                           value as written ({@link catalogueRuns})
- *   a value read as an address              tested as it is and as an address; either refuses
- *   placeholders taken out before rule 6    the placeholders are the same, in the same order, on
- *                                           both sides, so nothing inside one changes
  *   a character reference decoded           rule 6 reads the text as written and as decoded; only a
  *                                           short list of plain references may stand in changed text
  *   CSS comments, strings, `url(…)` and     structure only: the two files are compared on their own
  *   escapes blanked; a value trimmed        text, every character outside a colour identical
  *   CSS keywords in ASCII lower case        as a browser compares them; no other letter folds
- *   JSON written back by `JSON.stringify`   a comparison that can only refuse
  *
  * NO CODE OF THE REPOSITORY'S RUNS. The check's temporary folder (`mkdtemp` under the
  * system's temporary folder) and its empty `no-hooks` folder are made before the first git
@@ -259,11 +222,8 @@
  *                        — the functional plan's clause for a file whose format the check reads
  *                        but whose change it cannot vouch for, each case under the cause word it
  *                        had before: `unrecognised` for text inside a component or custom element
- *                        or inside `<svg>` or `<math>`, a Markdown or documentation-named text
- *                        change that is anything but a wording change in pure prose, and a colour
- *                        that is not the whole value of a colour property; `unreadable` for HTML
- *                        outside the strict subset; `setting` for a custom property named for a
- *                        colour whose value is not exactly one colour
+ *                        or inside `<svg>` or `<math>`, and a colour that is not the whole value
+ *                        of a colour property; `unreadable` for HTML outside the strict subset
  *   sensitive-area       <file> sits in an area named <word>, and such areas are never a hotfix
  *   risk-marker          the wording in <file> contains a number, a price, a web address or an e-mail address
  *   test-edited          it changes a test (<file>)
@@ -319,7 +279,6 @@ const USAGE = 'Use: hotfix check [--run-tests] [<file> ...]';
 const SENTENCE_HEAD = 'I did not treat this as a hotfix because ';
 const SENTENCE_TAIL = '; it goes through a normal plan, and your edits stay in place, not committed.';
 const NO_TEST_RAN = Object.freeze({ clause: 'no test ran, so nothing confirms the change', cause: 'no-test-ran' });
-const DOC_ONLY = 'The project has no test command, and the change is documentation only.';
 
 /** Git's own environment variables that would point it at another repository or index. */
 const GIT_REDIRECTS = ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY',
@@ -331,63 +290,18 @@ const GOVERNING_FOLDERS = new Set(['.claude', '.ctoc', '.cursor', '.windsurf', '
   '.amazonq', '.continue', 'agents', 'skills', 'commands', 'plans', 'prompts', 'output-styles']);
 /** The folders of GitHub's assistant under `.github/`, whose files govern whatever their names. */
 const GITHUB_GOVERNING = new Set(['instructions', 'prompts', 'chatmodes']);
-/** The endings of instruction, rule, prompt and chat-mode files, wherever they sit. */
-const GOVERNING_ENDINGS = ['.mdc', '.instructions.md', '.prompt.md', '.chatmode.md'];
-
-/**
- * The instruction files coding assistants read, by class: they apply per folder, so their
- * names count at any depth. `AGENTS.md`, `CONVENTIONS.md`, `copilot-instructions.md`,
- * `.cursorrules`, `.windsurfrules`, `IRON_LOOP.md`, `SKILL.md`, `MEMORY.md` (the decision at
- * review of 2026-10-09), any `CLAUDE*.md` or `GEMINI*.md`, and any name ending in `.mdc`,
- * `.instructions.md`, `.prompt.md` or `.chatmode.md`.
- * @param {string} lower the base name, lower case @returns {boolean}
- */
-function governingName(lower) {
-  return ['agents.md', 'conventions.md', 'copilot-instructions.md', '.cursorrules', '.windsurfrules', 'iron_loop.md', 'skill.md', 'memory.md'].includes(lower)
-    || ((lower.startsWith('claude') || lower.startsWith('gemini')) && lower.endsWith('.md'))
-    || GOVERNING_ENDINGS.some((x) => lower.endsWith(x));
-}
 /*
- * THE FORMATS THAT ARE READ (the owner's decision of 2026-10-09). Only the formats the check
- * can read exactly qualify: plain HTML, colours in plain CSS, catalogue wording in JSON,
- * YAML and Java properties files, and prose in Markdown and plain text. Vue, Svelte, JSX and
- * TSX, MDX, reStructuredText, Sass, Less and gettext files are no longer read: each needs
- * its own compiler to say what a change does, a hand-written reader disagreed with that
- * compiler round after round, and so such a file is a kind the check does not recognise and
- * goes through a normal plan.
+ * THE FORMATS THAT ARE READ. Only two kinds qualify (the owner's decision of 2026-10-09: the
+ * check keeps only what it can read exactly; the session coordinator's decision of
+ * 2026-10-10, the tenth round: the kinds in which every blocking finding of the eighth and
+ * ninth rounds sat are taken out): visible text in a plain HTML page, and a colour value in
+ * a standard colour property of a plain stylesheet. A Markdown or plain-text file, a
+ * catalogue file (JSON, YAML, properties), and a Vue, Svelte, JSX, TSX, MDX,
+ * reStructuredText, Sass, Less or gettext file is read by no reader here: it gets the
+ * clause of the first other kind it matches, or "I do not recognise", and goes through a
+ * normal plan.
  */
-/** Markdown, and plain text (which qualifies only under a documentation name: {@link documentationText}). */
-const DOC_EXT = new Set(['.md', '.txt']);
 const MARKUP_EXT = new Set(['.html', '.htm']);
-const CATALOGUE_EXT = new Set(['.json', '.yaml', '.yml', '.properties']);
-const CATALOGUE_FOLDERS = new Set(['locales', 'locale', 'i18n', 'lang', 'translations', 'messages']);
-/**
- * @param {string} s @returns {boolean} a language tag: two or three letters, optionally with
- * one more part behind `-` or `_`, a region (two letters or three digits) or a script (four
- * letters): `en`, `en-US`, `pt_BR`, `zh-Hans`
- */
-function languageTag(s) {
-  const [language, part, more] = s.split(/[-_]/);
-  return more === undefined && /^[a-z]{2,3}$/i.test(language) && (part === undefined || /^[a-z]{2}$|^[a-z]{4}$|^\d{3}$/i.test(part));
-}
-/** The names of wording bundles, which may carry a language tag behind `_` (`messages_fr`). */
-const WORDING_BUNDLES = new Set(['messages', 'strings', 'translations', 'labels', 'texts']);
-/**
- * Rule 4 — a catalogue file by its place and its name (the decision at review of 2026-10-09):
- * it lies under a catalogue folder, and its name without the extension, or a folder between
- * the catalogue folder and the file, is a language tag ({@link languageTag}), or its name is
- * a wording bundle's ({@link WORDING_BUNDLES}), alone or with a tag behind `_`. A catalogue
- * folder alone makes no catalogue: `i18n/routes.json` and `locales/settings.yml` are settings.
- * @param {string} stem the base name without its extension @param {string[]} folders the folders above the file, lower case
- * @returns {boolean}
- */
-function catalogueFile(stem, folders) {
-  const at = folders.findIndex((p) => CATALOGUE_FOLDERS.has(p));
-  if (at < 0) return false;
-  if (languageTag(stem) || folders.slice(at + 1).some(languageTag)) return true;
-  const cut = stem.indexOf('_');
-  return WORDING_BUNDLES.has((cut < 0 ? stem : stem.slice(0, cut)).toLowerCase()) && (cut < 0 || languageTag(stem.slice(cut + 1)));
-}
 const TEST_FOLDERS = new Set(['test', 'tests', '__tests__', 'spec']);
 /** Dependency lists and lock files, by name in lower case; every `*.lock` is one too. */
 const DEPENDENCY_NAMES = new Set(['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock',
@@ -395,7 +309,7 @@ const DEPENDENCY_NAMES = new Set(['package.json', 'package-lock.json', 'npm-shri
   'go.mod', 'go.sum', 'cargo.toml', 'cargo.lock', 'gemfile', 'gemfile.lock', 'composer.json',
   'composer.lock', 'pom.xml']);
 const DATABASE_FOLDERS = new Set(['migrations', 'migration', 'migrate']);
-/** Build lists that end in `.txt` and so are never documentation (compared in lower case). */
+/** Build lists that end in `.txt` (compared in lower case). */
 const BUILD_TEXT_NAMES = new Set(['cmakelists.txt', 'runtime.txt', 'packages.txt', 'apt.txt', 'version.txt']);
 /** Build files by name, in lower case; `dockerfile`, `dockerfile.*` and `docker-compose*.yml` are named in {@link namedKind}. */
 const BUILD_NAMES = new Set(['makefile', 'jenkinsfile', 'procfile', 'vagrantfile', '.gitlab-ci.yml', 'compose.yml', 'compose.yaml']);
@@ -403,10 +317,10 @@ const BUILD_NAMES = new Set(['makefile', 'jenkinsfile', 'procfile', 'vagrantfile
 const BUILD_CONFIG = /^(webpack|vite|rollup|esbuild|babel|tsup|turbo)\.config\./;
 /**
  * Rule 4 — what a file is BY ITS NAME ALONE, in lower case, wherever it lies: a dependency
- * list or lock file, a build file, or a settings file. Decided before any qualifying kind
- * (the decision at review of 2026-10-09: `locales/package.json`, `messages/docker-compose.yml`
- * and `i18n/tsconfig.json` are no catalogues), and the one place that decides it: the table
- * of the other kinds in {@link kindOf} asks this function too.
+ * list or lock file, a build file, or a settings file. Decided before any qualifying kind,
+ * and the one place that decides it: the table of the other kinds in {@link kindOf} asks
+ * this function too. (A settings name that ends in `.json`, `.yml`, `.yaml` or `.properties`
+ * needs no row here: its extension says so, {@link SETTINGS_EXT}.)
  * @param {string} lowerBase the base name, lower case @param {string} ext its extension, lower case
  * @param {string[]} topFolders the folders above the file from the repository's top, lower case
  * @returns {('dependencies'|'build'|'setting'|null)}
@@ -417,37 +331,13 @@ function namedKind(lowerBase, ext, topFolders) {
   if (lowerBase === 'dockerfile' || lowerBase.startsWith('dockerfile.') || BUILD_NAMES.has(lowerBase) || BUILD_TEXT_NAMES.has(lowerBase)
     || (lowerBase.startsWith('docker-compose') && (ext === '.yml' || ext === '.yaml')) || ext === '.gradle' || lowerBase.endsWith('.gradle.kts')
     || BUILD_CONFIG.test(lowerBase)) return 'build';
-  if (SETTINGS_TEXT_NAMES.has(lowerBase) || lowerBase === '.env' || lowerBase.startsWith('.env.') || lowerBase === 'jsconfig.json'
-    || (lowerBase.startsWith('tsconfig') && ext === '.json') || lowerBase.endsWith('.config.json')
-    || (lowerBase.startsWith('application') && (ext === '.properties' || ext === '.yml' || ext === '.yaml'))) return 'setting';
+  if (SETTINGS_TEXT_NAMES.has(lowerBase) || lowerBase === '.env' || lowerBase.startsWith('.env.')) return 'setting';
   return null;
 }
-/** Folders whose every file is about building or shipping; their documentation too (`.changeset/` notes ship with a release). */
+/** Folders whose every file is about building or shipping. */
 const BUILD_FOLDERS = new Set(['.github', '.gitlab', '.circleci', '.buildkite', '.changeset']);
 /** Text files that crawlers, advertisers, security researchers and language models read as settings. */
 const SETTINGS_TEXT_NAMES = new Set(['robots.txt', 'ads.txt', 'app-ads.txt', 'security.txt', 'llms.txt']);
-/** The documentation names under which plain text qualifies ({@link documentationText}). */
-const DOC_TEXT_NAMES = new Set(['readme', 'changelog', 'changes', 'news', 'history', 'authors', 'contributors', 'notes', 'install', 'humans']);
-/**
- * Plain text qualifies only under a documentation name (the decision at review of
- * 2026-10-09), in any letter case, optionally with a language part: `README.txt`,
- * `README.en.txt`, `README.pt-BR.txt` (a language tag, as one reader says for a catalogue and
- * for this: {@link languageTag}). Every other `.txt` is a kind the check does not
- * recognise: a list of dependencies, a template with placeholders, a list of exclusions,
- * build options.
- * @param {string} lower the base name, lower case @returns {boolean}
- */
-function documentationText(lower) {
-  const parts = lower.split('.');
-  if (parts.length < 2 || parts.length > 3 || parts[parts.length - 1] !== 'txt' || !DOC_TEXT_NAMES.has(parts[0])) return false;
-  return parts.length === 2 || languageTag(parts[1]); // the one reader of a language part, as for a catalogue
-}
-/**
- * Legal texts never qualify, `.md` or `.txt` (the decision at review of 2026-10-09): for each
- * start of a file name, in lower case, the sensitive word the refusal names. The functional
- * plan's clause for a sensitive area fits, and its words `license` and `legal` are these.
- */
-const LEGAL_NAMES = [['license', 'license'], ['licence', 'license'], ['copying', 'legal'], ['notice', 'legal'], ['patents', 'legal'], ['legal', 'legal']];
 const SETTINGS_EXT = new Set(['.json', '.yaml', '.yml', '.toml', '.ini', '.conf', '.cfg', '.properties',
   '.xml', '.plist']);
 const CODE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.py', '.rb', '.go', '.rs', '.java',
@@ -481,9 +371,8 @@ const NAMED_COLOURS = new Set(('aliceblue antiquewhite aqua aquamarine azure bei
   + 'whitesmoke yellow yellowgreen transparent').split(' '));
 
 /*
- * THE WORDING RULE (rule 6; widened by the decisions at review of 2026-10-09). One pattern
- * for every kind: a changed text run of a page, a changed catalogue value and, in
- * documentation, the changed words hold none of
+ * THE WORDING RULE (rule 6; widened by the decisions at review of 2026-10-09). A changed
+ * text run of a page holds none of
  *   - a number character of any script and any kind (`\p{N}`: a decimal digit, a Roman
  *     numeral character, a superscript, a circled digit, a fraction), a currency sign, `%`,
  *     `@`, `<`, `>`, `{`, `}`, `$` or a backtick;
@@ -495,19 +384,8 @@ const NAMED_COLOURS = new Set(('aliceblue antiquewhite aqua aquamarine azure bei
  * KNOWN LIMIT: a Roman numeral written in letters (`VIII`) is a word to every rule.
  */
 const RISK_MARKER = /[\p{N}\p{Sc}%<>{}$`@]|:\/\/|www\.|(?<=[\p{L}\p{N}])\.\p{L}{2,}/iu;
-/** A scheme: a letter or a digit, a colon, then anything but white space (`mailto:x`, `javascript:go()`); one pattern for rule 6 and for the catalogue reader. */
+/** A scheme: a letter or a digit, a colon, then anything but white space (`mailto:x`, `javascript:go()`). */
 const SCHEME = /(?<=[\p{L}\p{N}]):\S/u;
-/** A catalogue value that starts like a path: `/`, `//` or `\`. */
-const PATH_START = /^[/\\]/;
-/**
- * A bare YAML or properties value that a program reads as a switch, as nothing or as a
- * number that holds no digit, never as wording; and, as a YAML key, a word a YAML reader may
- * read as another type. `y` and `n` are among them (the decision at review of 2026-10-09): a
- * reader of the older YAML (go-yaml 2) takes them for a switch, js-yaml for a letter.
- */
-/** A key no catalogue holds: a program that merges catalogues writes it onto every object it has. */
-const MACHINERY_KEY = '__proto__';
-const BARE_SCALAR = /^(?:true|false|yes|no|on|off|y|n|null|~|[-+]?\.inf|\.nan)$/i;
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
 /** A character a single-quoted path in the commit command cannot carry, or slice 2's reader refuses. */
 const UNCARRIABLE = /['"$\\`\u0000-\u001f\u007f-\u009f]/;
@@ -533,11 +411,10 @@ const ANSI = /\u001b\[[0-9;:<=>?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|
  * @property {(string|null)} [oldText]
  * @property {(string|null)} [newText]
  * @property {Hunk[]} [hunks]
- * @property {boolean} [linked] an instruction file of the last commit links to it
  * @property {string} [kind] the qualifying kind rule 4 placed it in
  * @property {string[]} [runs] the old and new wording rule 6 reads
  */
-/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string, top?: string, governed?: Set<string>}} Change `governed`: the files the last commit's instruction files link to ({@link instructionLinks}); a change read from a repository always carries it */
+/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string, top?: string}} Change */
 /**
  * The check's own state for one call: the repository it reads, and everything rule 8
  * made, so that {@link removeCopy} can take it away on every path.
@@ -552,6 +429,11 @@ const ANSI = /\u001b\[[0-9;:<=>?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|
  * @property {string[]} links every link made in the copy
  */
 /** @typedef {{clause: string, cause: string, detail?: string}} Refusal */
+
+/** @param {string} display @returns {Refusal} the file is of no kind the check reads, or its change is none it reads as wording or a colour */
+const unrecognisedRefusal = (display) => ({ clause: `I do not recognise ${display} as wording or a colour`, cause: 'unrecognised' });
+/** @param {string} display @returns {Refusal} */
+const settingRefusal = (display) => ({ clause: `it changes a setting in ${display}, and settings changes are a common cause of outages`, cause: 'setting' });
 
 /** A rule-1 failure: the change could not be read, for a reason the owner can act on. */
 class Unreadable extends Error {
@@ -774,123 +656,6 @@ function copyIndex(ctx) {
   safeFs.cpSync(index, ctx.repoIndex, { preserveTimestamps: true });
 }
 
-/** The instruction files whose links name more files that govern the work, by name in lower case, at any depth. */
-const LINKING_NAMES = new Set(['claude.md', 'agents.md']);
-/** @param {string} rel a path from the repository's top @returns {string} the path as two spellings of one file compare equal: composed, lower case */
-const foldPath = (rel) => rel.normalize('NFC').toLowerCase();
-/** @param {string} rel @returns {string[]} the path in every form it is asked in ({@link PATH_FORMS}), each folded ({@link foldPath}) */
-const pathKeys = (rel) => PATH_FORMS.map((form) => foldPath(form(rel)));
-
-/**
- * Every destination a Markdown link, an image or a link definition in the text may name:
- * what stands behind `](` and behind `[label]:`, between angle brackets on one line, or up
- * to the next white space or the closing bracket that balances. More than a renderer
- * follows (a code span counts, and a destination with brackets is also taken to its first
- * closing bracket): a file named here is treated as governing, so reading too much is the
- * safe side. A destination ends where the next `](` starts (`[![badge](a.png)](b.md)` names
- * both), so every character is read once.
- * @param {string} text @returns {string[]}
- */
-function linkTargets(text) {
-  const out = [];
-  const starts = /\]\(\s*|^ {0,3}\[[^\]\n]*\]:[ \t]*/gm;
-  while (starts.exec(text) !== null) {
-    const from = starts.lastIndex;
-    let i = from;
-    if (text[i] === '<') {
-      i++;
-      while (i < text.length && text[i] !== '>' && text[i] !== '<' && text[i] !== '\n') i++;
-      if (text[i] === '>') out.push(text.slice(from + 1, i));
-      continue;
-    }
-    let open = 0;
-    let first = -1;
-    while (i < text.length && !isSpace(text[i]) && !(text[i] === ']' && text[i + 1] === '(')) {
-      if (text[i] === '(') open++;
-      else if (text[i] === ')') {
-        if (first === -1) first = i;
-        if (open === 0) break;
-        open--;
-      }
-      i++;
-    }
-    for (const end of new Set([first, i])) if (end > from) out.push(text.slice(from, end));
-  }
-  return out;
-}
-
-/**
- * @param {string} text a link's destination @returns {string} the destination with every run
- * of `%XX` bytes read as the characters it spells; a run that spells no UTF-8 (`50%done`
- * holds none, `%FF` is none) stays as it is written, as a browser leaves it
- */
-function percentDecoded(text) {
-  return text.replace(/(?:%[0-9A-Fa-f][0-9A-Fa-f])+/g, (run) => {
-    try {
-      return decodeURIComponent(run);
-    } catch {
-      return run;
-    }
-  });
-}
-
-/**
- * Rule 4, the files that govern the work by being linked (the decision at review of
- * 2026-10-09): every file a relative Markdown link in a `CLAUDE.md` or an `AGENTS.md` of
- * the LAST COMMIT names, at any depth, each link read from its file's folder (a leading `/`
- * from the repository's top), with and without what stands behind a `#` or a `?`, and with
- * `%20` read as the character it spells. The working folder's copies are never read: a
- * link removed there still counts. An instruction file that is a link stands for the file
- * it points to, which governs too and whose links are read from both folders. A committed
- * instruction file that cannot be read (bytes that are no text, a link that leaves the
- * repository or leads to no regular file) refuses the change: its links cannot be listed.
- * KNOWN LIMITS: a link to a folder governs no file in it, and a path written without a
- * link (in a code span, behind `@`) is not read.
- * @param {Context} ctx
- * @returns {Set<string>} the linked files, each in every form a path is asked in ({@link pathKeys})
- */
-function instructionLinks(ctx) {
-  const top = /** @type {string} */ (ctx.top);
-  const head = /** @type {string} */ (ctx.head);
-  /** @param {string} line one `ls-tree` entry */
-  const entryOf = (line) => {
-    const tab = line.indexOf('\t');
-    const [mode, , id] = line.slice(0, tab).split(' ');
-    return { mode, id, rel: line.slice(tab + 1) };
-  };
-  /** @type {Set<string>} */
-  const governed = new Set();
-  for (const line of gitOut(ctx, top, ['ls-tree', '-r', '-z', '--full-tree', head]).toString('utf8').split('\0')) {
-    if (line === '') continue;
-    let e = entryOf(line);
-    if (!LINKING_NAMES.has(path.posix.basename(e.rel).toLowerCase())) continue;
-    const name = e.rel;
-    const folders = [path.posix.dirname(name)];
-    if (e.mode === '120000') {
-      const target = path.posix.normalize(path.posix.join(folders[0], gitOut(ctx, top, ['cat-file', 'blob', e.id]).toString('utf8')));
-      const found = target.startsWith('..') || target.startsWith('/') ? ''
-        : gitOut(ctx, top, ['ls-tree', '-z', '--full-tree', head, '--', target]).toString('utf8').split('\0')[0];
-      e = found === '' ? e : entryOf(found);
-      for (const key of pathKeys(e.rel)) governed.add(key);
-      folders.push(path.posix.dirname(e.rel));
-    }
-    if (e.mode !== '100644' && e.mode !== '100755') throw new Unreadable(`${clean(name)} is a link the check cannot follow`);
-    const text = asText(gitOut(ctx, top, ['cat-file', 'blob', e.id]), clean(name));
-    for (const written of linkTargets(text)) {
-      if (/^[A-Za-z][A-Za-z0-9+.-]*:|^\/\/|^#/.test(written)) continue; // an address elsewhere, or a place in this file
-      const spellings = new Set([written, written.split(/[#?]/)[0]]);
-      for (const spelling of [...spellings]) spellings.add(percentDecoded(spelling));
-      for (const spelling of spellings) {
-        for (const folder of spelling.startsWith('/') ? ['.'] : folders) {
-          const rel = path.posix.normalize(path.posix.join(folder, spelling.replace(/^\/+/, '')));
-          if (rel !== '.' && !rel.startsWith('..')) for (const key of pathKeys(rel)) governed.add(key);
-        }
-      }
-    }
-  }
-  return governed;
-}
-
 /**
  * Rule 1 — read the change: which files, their old and new text, and their changed-line
  * groups; in the `--run-tests` call also each file's first hash, taken before any rule
@@ -965,13 +730,12 @@ function readChange(root, named, ctx, runTests) {
   const hidden = files.find((f) => marked.has(f.topRel));
   if (hidden) throw new Unreadable(`${hidden.display} is marked in git's index as unchanged or skipped`);
 
-  const governed = instructionLinks(ctx);
   // An added or a deleted path is refused by rule 2 whatever it holds, so nothing is staged
   // for such a change (the decision at review of 2026-10-09): `add --all` writes every file
   // it stages into the repository's object store, and a call that names no file would write
   // every untracked file there. Only the count of changed lines is still read, for the log.
   if (files.some((f) => f.status === 'A' || f.status === 'D')) {
-    return { files, lineCount: unstagedLineCount(ctx, files), root: realRoot, rootFromTop, top, governed };
+    return { files, lineCount: unstagedLineCount(ctx, files), root: realRoot, rootFromTop, top };
   }
 
   // The judged bytes are exactly what `git add` stages: a temporary index holding the last
@@ -1009,7 +773,7 @@ function readChange(root, named, ctx, runTests) {
     f.hunks = groups.get(f.topRel) || [];
     for (const h of f.hunks) lineCount += h.removed.length + h.added.length;
   }
-  return { files, lineCount, root: realRoot, rootFromTop, top, governed };
+  return { files, lineCount, root: realRoot, rootFromTop, top };
 }
 
 /**
@@ -1054,25 +818,24 @@ function unstagedLineCount(ctx, files) {
 }
 
 /**
- * The file's name, its extension (lower case), and the folders above it (lower case): from
- * the project root (`folders`) and from the repository's top (`topFolders`). The folder
- * rules that refuse (tests, governing, build, database) read `topFolders`, so a project
- * inside `tests/e2e/` or `services/payment/` is judged by where it really sits.
+ * The file's name, its extension (lower case), and the folders above it from the
+ * repository's top (lower case). The folder rules that refuse (tests, governing, build,
+ * database) read them from the top, so a project inside `tests/e2e/` or `services/payment/`
+ * is judged by where it really sits.
  * @param {{display: string, topRel: string}} f
- * @returns {{base: string, ext: string, folders: string[], topFolders: string[]}}
+ * @returns {{base: string, ext: string, topFolders: string[]}}
  */
 function nameParts(f) {
   const parts = f.display.split('/');
   const base = parts[parts.length - 1];
-  const lower = (list) => list.slice(0, -1).map((p) => p.toLowerCase());
-  return { base, ext: path.posix.extname(base).toLowerCase(), folders: lower(parts), topFolders: lower(f.topRel.split('/')) };
+  return { base, ext: path.posix.extname(base).toLowerCase(), topFolders: f.topRel.split('/').slice(0, -1).map((p) => p.toLowerCase()) };
 }
 
 /** Rule 2 — same files, same names: no add, delete, rename, mode change, type change or link. */
 function ruleSameFiles(f) {
   if (f.status === 'A' || f.status === 'D') return { clause: `it adds, removes or renames ${f.display}`, cause: 'adds-removes-renames' };
   if (f.status !== 'M' || f.oldMode !== f.newMode || f.oldMode === '120000' || f.oldMode === '160000') {
-    return { clause: `I do not recognise ${f.display} as wording or a colour`, cause: 'unrecognised' };
+    return unrecognisedRefusal(f.display);
   }
   return null;
 }
@@ -1085,7 +848,7 @@ const lettersOf = (text) => text.normalize('NFKD').replace(/[\p{Cf}\p{M}]/gu, ''
  * names in ways this check cannot know: one drops a zero-width character, another keeps it.
  * So every rule about a path asks it as written, with compatibility letters taken for plain
  * ones (NFKC), and as its letters read ({@link lettersOf}). A rule that REFUSES (a test, a
- * governing name or folder, a linked file, a dependency, build or settings name, a sensitive
+ * governing folder, a dependency, build or settings name, a sensitive
  * word) refuses when any form says so; the rule that lets a file QUALIFY (its kind) needs the
  * same kind from every form. Dropping a mark alone would join `auth` and `login` around a
  * zero-width space into one word that is no sensitive word, which is why the path as written
@@ -1115,20 +878,7 @@ const withoutCarriageReturns = (s) => lineFeeds(s).replace(/\r$/, '');
  */
 function ruleTextsDiffer(f) {
   if (f.hunks.length > 0 || withoutCarriageReturns(f.oldText) === withoutCarriageReturns(f.newText)) return null;
-  return { clause: `I do not recognise ${f.display} as wording or a colour`, cause: 'unrecognised' };
-}
-
-/**
- * The length of the common start (`p`) and of the common end (`s`) of two lines; the two
- * never overlap.
- * @param {string} o @param {string} n @returns {{p: number, s: number}}
- */
-function commonEnds(o, n) {
-  let p = 0;
-  while (p < o.length && p < n.length && o[p] === n[p]) p++;
-  let s = 0;
-  while (s < o.length - p && s < n.length - p && o[o.length - 1 - s] === n[n.length - 1 - s]) s++;
-  return { p, s };
+  return unrecognisedRefusal(f.display);
 }
 
 /*
@@ -1188,8 +938,8 @@ function commonEnds(o, n) {
  * EVERY SCANNER FAILS CLOSED. A scanner that ends inside an unfinished construct (a string,
  * a stylesheet comment or block) reports `open`; one that meets a
  * construct it cannot follow where it expects structure (a string running into a line
- * break; a `}` with nothing open; a custom property whose value opens a block; a catalogue
- * line that starts no entry) reports `lost`; the markup scanner reports `subset` for
+ * break; a `}` with nothing open; a custom property whose value opens a block) reports
+ * `lost`; the markup scanner reports `subset` for
  * anything outside its strict subset. Rule 4 resets the report before it judges a file and
  * refuses the change when either side reported one: a scanner that lost its place never
  * falls through to text.
@@ -1871,377 +1621,6 @@ function* linePairs(hunks) {
   }
 }
 
-/** YAML's double-quoted escapes, by the character after the backslash. */
-const YAML_ESCAPES = { 0: '\0', a: '\x07', b: '\b', t: '\t', '\t': '\t', n: '\n', v: '\v', f: '\f', r: '\r', e: '\x1b',
-  ' ': ' ', '"': '"', '/': '/', '\\': '\\', N: '\x85', _: '\xa0', L: '\u2028', P: '\u2029' };
-/** The properties escapes; a backslash before any other character is that character. */
-const PROPERTIES_ESCAPES = { t: '\t', n: '\n', r: '\r', f: '\f' };
-
-/**
- * Decode one backslash-escaped value, or null for an escape the format does not know.
- * @param {string} raw
- * @param {Record<string, string>} simple the one-character escapes
- * @param {Record<string, number>} hex fixed-length hexadecimal escapes, by letter
- * @param {boolean} keep keep any other escaped character as itself (properties files)
- * @returns {string|null}
- */
-function unescapeValue(raw, simple, hex, keep) {
-  let out = '';
-  for (let i = 0; i < raw.length; i++) {
-    if (raw[i] !== '\\') { out += raw[i]; continue; }
-    const e = raw[++i];
-    if (e === undefined) return null;
-    if (hex[e]) {
-      const digits = raw.slice(i + 1, i + 1 + hex[e]);
-      if (!/^[0-9A-Fa-f]+$/.test(digits) || digits.length !== hex[e]) return null;
-      out += String.fromCodePoint(Math.min(parseInt(digits, 16), 0x10ffff));
-      i += hex[e];
-    } else if (Object.prototype.hasOwnProperty.call(simple, e)) {
-      out += simple[e];
-    } else if (keep) {
-      out += e;
-    } else {
-      return null;
-    }
-  }
-  return out;
-}
-
-/**
- * @param {string} s @returns {string} the text without tabs and line breaks, and without
- * control characters and spaces at either end — what a browser keeps of an address
- */
-function asAddress(s) {
-  const t = s.replace(/[\t\n\r]/g, '');
-  let a = 0;
-  let b = t.length;
-  while (a < b && t.charCodeAt(a) <= 0x20) a++;
-  while (b > a && t.charCodeAt(b - 1) <= 0x20) b--;
-  return t.slice(a, b);
-}
-
-/*
- * MESSAGE CATALOGUES (rule 4; the decisions at review of 2026-10-09). Each format has ONE
- * reader, and it reads the whole file on both sides: a line is never read alone, because
- * what a line means is decided by the lines around it (a block scalar, a quoted value that
- * runs on, a duplicate key further down). Each reader accepts a STRICT SUBSET of its format,
- * in which every reader of that format agrees, and a file with anything outside it "holds
- * something I cannot follow" ({@link fault}). The two sides must then be the same file but
- * for string values, and each changed value must read as wording ({@link catalogueRuns}).
- *   JSON        `JSON.parse`, and nothing written by hand. The file must be exactly what
- *               `JSON.stringify` writes of the parsed value with the file's own indentation,
- *               so a duplicate key (the parse keeps one), a number written otherwise, an
- *               escape nobody needs and keys JavaScript reorders all fail the comparison; a
- *               comment or a trailing comma fails the parse.
- *   YAML        blank lines, comments, `key: value`, `key:` and `- value` lines, with plain
- *               keys and plain or quoted values that end on their line; held to js-yaml by the
- *               differential test ({@link yamlEntries}).
- *   properties  blank lines, comments and `key=value` lines; a continued line anywhere is
- *               outside it ({@link propertiesEntries}).
- */
-
-/**
- * The placeholders a message carries, in every form the catalogues of the common frameworks
- * use: `{{name}}`, `%{name}`, `{name}`, `%1$s`, `%s` (also `d`, `i`, `f`, `@`), `$name` and
- * `:name`. A colon counts only where no letter or digit stands before it (`Note:this` is no
- * placeholder).
- */
-const PLACEHOLDER = /\{\{[^{}]*\}\}|%\{[^{}]*\}|\{[^{}]*\}|%\d+\$[sdif@]|%[sdif@]|\$[A-Za-z_]\w*|(?<![\p{L}\p{N}]):[A-Za-z_]\w*/gu;
-/** @param {string} value @returns {string} its placeholders in the order they stand, as one comparable string */
-const placeholders = (value) => (value.match(PLACEHOLDER) || []).join('\u0000');
-
-/**
- * Rule 4 (message catalogue) — the changed values of a catalogue read as wording, or null.
- * Each pair holds the old and the new value twice: as the program reads them (decoded), and
- * as they are written in the file (the coordinator's point at review, 2026-10-09: the program
- * that reads the file sees what is written, and a decoder of another kind decodes otherwise,
- * so the rule holds for both or refuses); and whether they were written without quotes. In
- * each form both sides carry the same placeholders in the same order; each value is read as
- * it is and as a browser reads an address ({@link asAddress}) and needs a letter outside its
- * placeholders, no start like a path (`/`, `//`, `\`), no scheme anywhere ({@link SCHEME}),
- * and, written without quotes in YAML or a properties file, it is no switch
- * ({@link BARE_SCALAR}). A change that changes no value is none. Returns what rule 6 reads:
- * every form of the old and the new value of each pair, without their placeholders.
- * @param {Array<[string, string, boolean, string, string]>} changed @returns {(string[]|null)}
- */
-function catalogueRuns(changed) {
-  const runs = [];
-  for (const [before, after, bare, writtenBefore, writtenAfter] of changed) {
-    if (before === after) return null;
-    for (const [a, b] of [[before, after], [writtenBefore, writtenAfter]]) {
-      if (placeholders(a) !== placeholders(b)) return null;
-      for (const value of [a, b]) {
-        for (const v of [value, asAddress(value)]) {
-          if (!/\p{L}/u.test(v.replace(PLACEHOLDER, '')) || PATH_START.test(v) || SCHEME.test(v) || (bare && BARE_SCALAR.test(v))) return null;
-          runs.push(v.replace(PLACEHOLDER, ''));
-        }
-      }
-    }
-  }
-  return changed.length > 0 ? runs : null;
-}
-
-/**
- * Rule 4 (message catalogue, JSON) — one side as `JSON.parse` reads it, when the file is
- * exactly what `JSON.stringify` writes of that value with the file's own indentation (the
- * white space that starts its second line), with or without one last line break; or null: a
- * file `JSON.parse` refuses, one written in another form, one with no indentation (its one
- * line would hold every string of the catalogue, and a change to all of them would count as
- * two changed lines), or one with a key that holds `__proto__` ({@link MACHINERY_KEY}; the
- * parse itself reports every key, no text is read by hand). Only a syntax error of the parse
- * is caught; any other fault stops the check. WHY NO SEPARATE SCAN FOR A KEY THAT OCCURS
- * TWICE: `JSON.stringify` never writes one object's key twice, so a file that is exactly what
- * it writes holds none; the parse keeps the last of two, the written form is then one entry
- * shorter than the file, and the comparison refuses.
- * @param {string} text line feeds only
- * @returns {({value: unknown, form: string}|null)} `form`: the indentation and whether a line break ends the file
- */
-function jsonSide(text) {
-  let value;
-  let machinery = false;
-  try {
-    value = JSON.parse(text, (key, held) => {
-      if (key.includes(MACHINERY_KEY)) machinery = true;
-      return held;
-    });
-  } catch (err) {
-    if (err instanceof SyntaxError) return null;
-    throw err;
-  }
-  const indent = /\n([ \t]+)/.exec(text);
-  if (indent === null || machinery) return null;
-  const written = JSON.stringify(value, null, indent[1]);
-  if (text !== written && text !== `${written}\n`) return null;
-  return { value, form: `${indent[1]}${text.length - written.length}` };
-}
-
-/**
- * Rule 4 (message catalogue, JSON) — the string values that differ between two parsed
- * catalogues, or null when anything else does: the two must hold the same keys in the same
- * order, lists of the same length, and the same value everywhere but in strings. Walked with
- * a stack of its own, so a deeply nested file cannot exhaust the call stack.
- * @param {unknown} oldValue @param {unknown} newValue @returns {(Array<[string, string, boolean, string, string]>|null)}
- */
-function jsonChanges(oldValue, newValue) {
-  /** @type {Array<[string, string, boolean, string, string]>} */
-  const changed = [];
-  /** @type {Array<[any, any]>} */
-  const pending = [[oldValue, newValue]];
-  while (pending.length > 0) {
-    const [a, b] = /** @type {[any, any]} */ (pending.pop());
-    if (typeof a === 'string' && typeof b === 'string') {
-      // As written: the file is what `JSON.stringify` writes, so that is this string between its quotes.
-      if (a !== b) changed.push([a, b, false, JSON.stringify(a).slice(1, -1), JSON.stringify(b).slice(1, -1)]);
-    } else if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
-      if (a !== b) return null;
-    } else {
-      const keys = Object.keys(a);
-      const others = Object.keys(b);
-      if (Array.isArray(a) !== Array.isArray(b) || keys.length !== others.length) return null;
-      for (let k = 0; k < keys.length; k++) {
-        if (keys[k] !== others[k]) return null;
-        pending.push([a[keys[k]], b[keys[k]]]);
-      }
-    }
-  }
-  return changed;
-}
-
-/** A plain YAML key and its colon: a word that starts with a letter or `_`, then letters, digits, `_`, `.` and `-`. */
-const YAML_KEY = /^( *)([A-Za-z_][\w.-]*):(?: +|$)/;
-/** A YAML list item's marker. */
-const YAML_ITEM = /^( *)- +/;
-/** What no line of a YAML catalogue holds: a control character but the line feed (a tab and a carriage return on its own among them), a line or paragraph separator. */
-const YAML_UNSEEN = /(?!\n)[\p{Cc}\u2028\u2029\ufffe\uffff]/u;
-
-/**
- * Rule 4 (message catalogue, YAML) — one scalar that ends on its line: double-quoted (YAML's
- * escapes decoded), single-quoted (`''` is `'`), or plain. A plain scalar starts with none of
- * YAML's indicators (a tag `!`, an anchor `&`, an alias `*`, a flow collection `[` or `{`, a
- * block scalar `|` or `>`, a complex key `?`, and `-`, `:`, `,`, `#`, `@`, a backtick, `%`,
- * `]`, `}`), holds no ` #` (a comment) and no `: ` (a mapping), does not end in `:`, and is
- * neither `=` nor `<<`.
- * @param {string} raw the text behind the key or the item marker, with no white space at its end
- * @returns {({text: string, written: string, quote: string}|null)} the scalar as a reader decodes it and as it is written between its quotes; null: no such scalar
- */
-function yamlScalar(raw) {
-  if (raw[0] === '"') {
-    const text = /^"(?:[^"\\]|\\.)*"$/.test(raw) ? unescapeValue(raw.slice(1, -1), YAML_ESCAPES, { x: 2, u: 4, U: 8 }, false) : null;
-    return text === null ? null : { text, written: raw.slice(1, -1), quote: '"' };
-  }
-  if (raw[0] === "'") return /^'(?:[^']|'')*'$/.test(raw) ? { text: raw.slice(1, -1).replace(/''/g, "'"), written: raw.slice(1, -1), quote: "'" } : null;
-  if ('!&*[]{}|>?-:,#@`%'.includes(raw[0]) || raw.includes(' #') || raw.includes(': ') || raw.endsWith(':')) return null;
-  if (raw === '=' || raw === '<<') return null; // a value and a merge to a reader of the older YAML (PyYAML loads no such file), a string to js-yaml
-  return { text: raw, written: raw, quote: '' };
-}
-
-/**
- * @typedef {Object} CatalogueLine one line of a YAML or properties catalogue
- * @property {string} line the line as written
- * @property {string} [head] for a line that carries a value: everything before the value
- * @property {string} [text] the value as the program reads it
- * @property {string} [written] the value as it is written, between its quotes
- * @property {string} [quote] how a YAML value is quoted: `"`, `'` or not at all
- * @property {number} [tail] how much white space ends the line
- */
-
-/**
- * Rule 4 (message catalogue, YAML) — the lines of a YAML catalogue in the strict subset, or
- * null when the file holds anything outside it (the decision at review of 2026-10-09). The
- * subset: an optional `---` as the first line; blank lines; comment lines; `key: value`,
- * `key:` and `- value` lines, the key a plain word ({@link YAML_KEY}) that is none of YAML's
- * switches ({@link BARE_SCALAR}) and holds no `__proto__` ({@link MACHINERY_KEY}), the value one scalar that ends on its line
- * ({@link yamlScalar}). So the file holds no tag, anchor, alias, flow collection, block
- * scalar, scalar over several lines, document marker after the first line, tab, complex key
- * or quoted key. The indentation must be a mapping's or a list's: a line stands as deep as
- * the lines of the mapping or list it belongs to; only the line right under a `key:` may
- * stand deeper (a list may also stand as deep as its key); and no key occurs twice in one
- * mapping. js-yaml reads such a file as this reader does: the differential test holds it to
- * that.
- * @param {string} text line feeds only
- * @returns {(CatalogueLine[]|null)}
- */
-function yamlEntries(text) {
-  if (YAML_UNSEEN.test(text)) return null;
-  /** @type {CatalogueLine[]} */
-  const out = [];
-  /** @type {Array<{indent: number, list: boolean, keys: Set<string>}>} the open mappings and lists, the innermost last */
-  const open = [];
-  let parent = -1; // the indentation of a `key:` line right above, or -1
-  let started = false; // the document's first mapping or list is open
-  const lines = text.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^ *$/.test(line) || /^ *#/.test(line) || (i === 0 && line === '---')) {
-      out.push({ line });
-      continue;
-    }
-    const written = line.trimEnd();
-    const key = YAML_KEY.exec(written);
-    const item = key ? null : YAML_ITEM.exec(written);
-    const mark = key || item;
-    if (mark === null || (key && (BARE_SCALAR.test(key[2]) || key[2].includes(MACHINERY_KEY)))) return null;
-    const indent = mark[1].length;
-    const raw = written.slice(mark[0].length);
-    const value = raw === '' ? null : yamlScalar(raw);
-    if (raw === '' ? item !== null : value === null) return null; // an item with nothing behind it, or no scalar that ends on its line
-    if (parent >= 0 && (indent > parent || (indent === parent && item !== null))) {
-      open.push({ indent, list: item !== null, keys: new Set() }); // the mapping or list of the `key:` right above
-    } else {
-      while (open.length > 0 && open[open.length - 1].indent > indent) open.pop();
-      // A list that stands as deep as its key ends where the next key of that mapping stands.
-      if (key && open.length > 1 && open[open.length - 1].list && open[open.length - 1].indent === indent && !open[open.length - 2].list
-        && open[open.length - 2].indent === indent) open.pop();
-      if (!started) open.push({ indent, list: item !== null, keys: new Set() }); // the first line of the document
-    }
-    started = true;
-    const top = open[open.length - 1];
-    if (top === undefined || top.indent !== indent || top.list !== (item !== null)) return null;
-    if (key) {
-      if (top.keys.has(key[2])) return null;
-      top.keys.add(key[2]);
-    }
-    parent = key && value === null ? indent : -1;
-    out.push(value === null ? { line, head: written }
-      : { line, head: mark[0], text: value.text, written: value.written, quote: value.quote, tail: line.length - written.length });
-  }
-  return out;
-}
-
-/**
- * Rule 4 (message catalogue, properties) — the lines of a Java properties file in the strict
- * subset, or null when a line ends in a backslash (a line continued on the next, or an
- * escaped backslash that another reader takes for one), the file holds a carriage return
- * on its own (a line break to Java), or a key holds `__proto__` ({@link MACHINERY_KEY}). A line is blank, a comment (`#` or `!`), or an entry.
- * The key ends at the first unescaped `=`, `:` or white space, as Java reads it. A line
- * CARRIES A VALUE only when its key holds no backslash and `=` or `:` follows it, behind
- * white space at most: where white space alone ends the key, or the key holds an escaped
- * separator, a reader that splits at the first `=` takes another key than Java does, so such
- * a line may stand in the file but may not change.
- * @param {string} text line feeds only
- * @returns {(CatalogueLine[]|null)}
- */
-function propertiesEntries(text) {
-  if (text.includes('\r')) return null;
-  /** @type {CatalogueLine[]} */
-  const out = [];
-  const space = (c) => c === ' ' || c === '\t' || c === '\f';
-  for (const line of text.split('\n')) {
-    if (line.endsWith('\\')) return null;
-    let at = 0;
-    while (space(line[at])) at++;
-    const start = at;
-    if (at === line.length || line[at] === '#' || line[at] === '!') {
-      out.push({ line });
-      continue;
-    }
-    while (at < line.length && !space(line[at]) && line[at] !== '=' && line[at] !== ':') at += line[at] === '\\' ? 2 : 1;
-    const key = line.slice(start, at);
-    if (key.includes(MACHINERY_KEY)) return null;
-    while (space(line[at])) at++;
-    if (key.includes('\\') || (line[at] !== '=' && line[at] !== ':')) {
-      out.push({ line });
-      continue;
-    }
-    at++;
-    while (space(line[at])) at++;
-    const value = unescapeValue(line.slice(at), PROPERTIES_ESCAPES, { u: 4 }, true);
-    out.push(value === null ? { line } : { line, head: line.slice(0, at), text: value, written: line.slice(at), quote: '', tail: 0 });
-  }
-  return out;
-}
-
-/**
- * Rule 4 (message catalogue, YAML and properties) — the values that differ between the two
- * sides, or null when anything else does: the same number of lines, and every line that
- * differs carries a value on both sides, behind the same key and marker, in the same quotes
- * and before the same white space.
- * @param {CatalogueLine[]} a @param {CatalogueLine[]} b @returns {(Array<[string, string, boolean, string, string]>|null)}
- */
-function lineChanges(a, b) {
-  if (a.length !== b.length) return null;
-  /** @type {Array<[string, string, boolean, string, string]>} */
-  const changed = [];
-  for (let i = 0; i < a.length; i++) {
-    const x = a[i];
-    const y = b[i];
-    if (x.line === y.line) continue;
-    if (x.text === undefined || y.text === undefined || x.written === undefined || y.written === undefined
-      || x.head !== y.head || x.quote !== y.quote || x.tail !== y.tail) return null;
-    changed.push([x.text, y.text, x.quote === '', x.written, y.written]);
-  }
-  return changed;
-}
-
-/**
- * Rule 4 (message catalogue) — the wording a catalogue change alters, read by the one reader
- * of the file's format on both whole sides; null when the change is anything but a change to
- * string values that read as wording. A side its reader cannot follow is a fault
- * ({@link fault}): the answer is then never a pass.
- * @param {string} oldText @param {string} newText line feeds only
- * @param {string} ext `.json`, `.yaml`, `.yml` or `.properties`
- * @returns {(string[]|null)}
- */
-function catalogueChange(oldText, newText, ext) {
-  // No byte-order mark (the decision at review of 2026-10-09): `JSON.parse` refuses one, Java
-  // reads it into the first key, and Ruby's YAML reader then reads the first entry only.
-  if (oldText[0] === '\uFEFF' || newText[0] === '\uFEFF') return fault('lost');
-  let changed;
-  if (ext === '.json') {
-    const a = jsonSide(oldText);
-    const b = jsonSide(newText);
-    if (a === null || b === null) return fault('lost');
-    changed = a.form === b.form ? jsonChanges(a.value, b.value) : null;
-  } else {
-    const read = ext === '.properties' ? propertiesEntries : yamlEntries;
-    const a = read(oldText);
-    const b = read(newText);
-    if (a === null || b === null) return fault('lost');
-    changed = lineChanges(a, b);
-  }
-  return changed === null ? null : catalogueRuns(changed);
-}
-
 /** What a blanked stylesheet holds in place of a comment: white space to its structure, and no part of a value that is one colour. */
 const CSS_COMMENT = '\u0002';
 /** What a blanked stylesheet holds in place of a string, an unquoted `url(…)` and an escaped character: something, and no structure. */
@@ -2443,11 +1822,10 @@ function escapedStatement(blank, st) {
  * the token's own line. `whole`: the token is the declaration's whole value (an `!important`
  * after it aside). `escaped`: its statement holds a backslash. A colour function is read
  * only in its written forms ({@link colourFunction}). One forward pass.
- * @param {string} text
+ * @param {{blank: string, statements: CssStatement[]}} read the stylesheet as {@link readCss} read it
  * @returns {Array<{t: string, i: number, j: number, prop: (string|null), whole: boolean, escaped: boolean}>}
  */
-function colourSlots(text) {
-  const { blank, statements } = readCss(text);
+function colourSlots({ blank, statements }) {
   const re = /#[0-9A-Fa-f]+|(?:rgba?|hsla?)\([^()]*\)|[A-Za-z]+/g;
   const out = [];
   let si = 0;
@@ -2541,87 +1919,17 @@ const colourMayStand = (prop) => prop !== null && !prop.startsWith('--')
   && (/(?:^|-)color$/i.test(prop) || COLOUR_SHORTHANDS.has(asciiLower(prop)));
 
 /**
- * Rule 4 (colour) — every custom property declaration of a whole stylesheet, in order: its
- * name, its value as written (comments and strings included, trimmed) and where that value
- * stands; and `read`, the custom properties that something in the file names other than
- * their own declaration and a `var()` in the value of a real colour property. A script reads
- * a custom property (`getComputedStyle`), so a change to one is a setting unless it is a
- * colour by {@link colourNamedEdit}; and what an animation name, a width, another custom
- * property, a style query (`@container style(--x: red)`) or an `@property` rule reads is no
- * colour, whatever it is named. A custom property whose value opens a block (`--x: { … }`)
- * cannot be followed ({@link readCss}). KNOWN LIMIT: only this file is read; a `var()` in
- * another stylesheet, or a script, is not seen.
- * @param {string} text
- * @returns {{list: Array<{name: string, value: string, from: number, to: number}>, read: Set<string>}}
+ * Rule 4 (colour) — every custom property declaration of a stylesheet as one comparable
+ * text: its name and its value as written, in order. CUSTOM PROPERTIES NEVER QUALIFY (the
+ * session coordinator's decision of 2026-10-10): a script, an animation name, a width or a
+ * style query may read one, whatever it is named, so a change that alters this text is a
+ * setting, and no reader here asks what a custom property holds.
+ * @param {string} text @param {{statements: CssStatement[]}} read the stylesheet as {@link readCss} read it
+ * @returns {string}
  */
-function customProperties(text) {
-  const { blank, statements } = readCss(text);
-  const list = [];
-  for (const st of statements) {
-    if (st.decl === null || !st.decl.name.startsWith('--')) continue;
-    const raw = text.slice(st.decl.valueAt, st.end);
-    const from = st.decl.valueAt + raw.length - raw.trimStart().length;
-    list.push({ name: st.decl.name, value: raw.trim(), from, to: from + raw.trim().length });
-  }
-  /** @type {Set<string>} */
-  const read = new Set();
-  const names = /(?<![\w-])--[\w-]+/g;
-  let si = 0;
-  let m;
-  while ((m = names.exec(blank)) !== null) {
-    const i = m.index;
-    while (statements[si].end < i) si++;
-    const d = statements[si].decl;
-    if (d !== null && d.at === i) continue; // the declaration's own name
-    let k = i;
-    while (k > 0 && isSpace(blank[k - 1])) k--;
-    const inVar = asciiLower(blank.slice(Math.max(k - 4, 0), k)) === 'var(' && !/[\w-]/.test(blank[k - 5] || '');
-    if (!(inVar && d !== null && d.valueAt <= i && colourMayStand(d.name))) read.add(m[0]);
-  }
-  return { list, read };
-}
-
-/**
- * Rule 4 (colour) — a change to custom properties that is a colour change (the session's
- * decision of 2026-10-09, on the owner's instruction): the same properties in the same
- * order, and every one whose value changed has `color` or `colour` in its name, holds
- * exactly one colour before and after ({@link oneColour}), and is read, in this file on
- * either side, by nothing but colour properties ({@link customProperties}; the decision at
- * review of 2026-10-09). Returns the two stylesheets with each such value replaced by one
- * same colour, for the rest of the comparison (every other character must still be
- * identical, or a colour in a real colour property); or `inexact`: a property named for a
- * colour changed, and its value is not exactly one colour before and after; or null: any
- * other custom-property change is a setting.
- * @param {string} o @param {string} n @returns {([string, string]|'inexact'|null)}
- */
-function colourNamedEdit(o, n) {
-  const before = customProperties(o);
-  const after = customProperties(n);
-  const a = before.list;
-  const b = after.list;
-  if (a.length !== b.length) return null;
-  const changed = [];
-  let inexact = false;
-  for (let k = 0; k < a.length; k++) {
-    if (a[k].name !== b[k].name) return null;
-    if (a[k].value === b[k].value) continue;
-    if (!/colou?r/i.test(a[k].name) || before.read.has(a[k].name) || after.read.has(a[k].name)) return null;
-    if (!oneColour(a[k].value) || !oneColour(b[k].value)) inexact = true;
-    changed.push(k);
-  }
-  if (inexact) return 'inexact';
-  const levelled = (text, list) => {
-    const parts = [];
-    let at = 0;
-    for (const k of changed) {
-      parts.push(text.slice(at, list[k].from));
-      at = list[k].to;
-    }
-    parts.push(text.slice(at));
-    return parts.join('red');
-  };
-  return [levelled(o, a), levelled(n, b)];
-}
+const customDeclarations = (text, { statements }) => statements
+  .filter((st) => st.decl !== null && st.decl.name.startsWith('--'))
+  .map((st) => text.slice(/** @type {{at: number}} */ (st.decl).at, st.end)).join('\u0000');
 
 /** @param {string} text @param {Array<{i: number, j: number}>} toks @returns {string} the text with each token replaced by one marker, built in one pass */
 function masked(text, toks) {
@@ -2646,11 +1954,13 @@ function masked(text, toks) {
  * is a `url(`). `inexact`: a changed colour stands in a real colour property on both
  * sides but is not its whole value (`border: 1px solid red`), which the functional plan
  * refuses as a change the check cannot read exactly. Linear in the files' length.
- * @param {string} o @param {string} n @returns {(boolean|'inexact')}
+ * @param {string} o @param {string} n the two stylesheets
+ * @param {{blank: string, statements: CssStatement[]}} oldRead @param {{blank: string, statements: CssStatement[]}} newRead each as {@link readCss} read it
+ * @returns {(boolean|'inexact')}
  */
-function colourEdit(o, n) {
-  const a = colourSlots(o);
-  const b = colourSlots(n);
+function colourEdit(o, n, oldRead, newRead) {
+  const a = colourSlots(oldRead);
+  const b = colourSlots(newRead);
   if (a.length !== b.length || masked(o, a) !== masked(n, b)) return false;
   let changed = 0;
   let inexact = false;
@@ -2679,313 +1989,11 @@ function emptyLiterals(line) {
   return out;
 }
 
-/*
- * MARKDOWN AND PLAIN TEXT: PURE PROSE (rule 4; the decision at review of 2026-10-09, under the
- * owner's decision that the check keeps only what it can read exactly). Markdown is not one
- * language: a security run pushed 249,644 edits the check passed through other renderers
- * found on the machine (markdown-it in other configurations, marked, micromark with GitHub's
- * extensions, pandoc, Python-Markdown), and thousands changed a link, an attribute or code
- * under at least one of them. No reader can agree with all of them on structure. So this
- * check reads no structure at all: a `.md` or `.txt` edit qualifies only as a wording change
- * in pure prose, defined so that every renderer shows the same thing.
- *   1  A PLAIN PROSE LINE has 0 to 3 leading spaces, holds no white space but the space,
- *      starts with a letter or an opening quotation mark, and consists of letters, combining
- *      marks, decimal digits, spaces and `, . ; : ? ! ' " - ( )`, the typographic quotes, the
- *      two dashes and the ellipsis. Each of `. , ; ? !` stands before a space, a closing
- *      quote, a closing parenthesis or the end of the line (so no `example.com`), and `-` only
- *      between two letters. A changed line keeps its leading and its trailing spaces (two
- *      trailing spaces are a line break).
- *      WIDENED IN THE NINTH ROUND (the decisions at review of 2026-10-09, each step taken only
- *      because the differential test stayed at zero disagreements with it): (a) a COLON that
- *      follows a letter, a digit, a closing quote or a closing parenthesis and stands before a
- *      space or the end of the line, everywhere but in the file's first paragraph, where a
- *      metadata reader takes `Key: value` lines; (b) PARENTHESES: the paragraph still holds no
- *      `[`, `]`, `<`, `>` and no backtick, so no link and no tag can form; (c) LIST ITEMS: a
- *      line that starts with an item's prefix ({@link ITEM_PREFIX}) and goes on as plain
- *      prose, the prefix identical on both sides.
- *   2  A PLAIN PARAGRAPH is the run of non-blank lines around a changed line; every line of it
- *      is a plain prose line or a list item of plain prose, on both sides, and an empty line
- *      or the file's start or end bounds it (a line of spaces or of other white space is not
- *      empty: {@link isBlank}). The brief for (c) would let another item's line bound the run
- *      too; the run stays bounded by empty lines only, because renderers do not agree on what
- *      ends an item (a `2.` under a bullet, a `1)`, a list right under a paragraph), and with
- *      every line of the run plain, whichever way a renderer divides it only words change.
- *   3  POSITION. The paragraph does not lie inside front matter or a metadata block, inside a
- *      code fence, or below raw HTML ({@link proseHeld}), and the file holds no raw start tag
- *      anywhere ({@link RAW_START}).
- *   4  CHANGED WORDS. Rule 6 reads them, and also refuses a word of 7 to 40 hexadecimal
- *      digits, which sites link as a commit id ({@link HEX_WORD}).
- *   5  NOTHING ELSE in the file changes: no line comes or goes, no line ending and no
- *      byte-order mark changes.
- * HELD TO REAL RENDERERS: `tests/hotfix-check-differential.test.js` renders every edit this
- * reader passes with markdown-it in four configurations and requires the same tree but for
- * the text of paragraphs. What that test, Python-Markdown 3.9 and pandoc 3.11 (both run on
- * the build machine, 2026-10-09) showed beyond the decision's own words is marked "found"
- * below; each is on the refusing side.
- */
-/** A plain prose line, by its characters (since the ninth round a colon and parentheses among them). */
-const PLAIN_LINE = /^ {0,3}[\p{L}"'\u201c\u2018][\p{L}\p{M}\p{Nd} ,.;:?!'"()\u201c\u201d\u2018\u2019\u2013\u2014\u2026-]*$/u;
-/**
- * What a plain prose line does not hold: sentence punctuation before anything but a space, a
- * closing quote, a closing parenthesis or the end of the line; a hyphen that does not stand
- * between two letters; a colon that does not follow a letter, a digit, a closing quote or a
- * closing parenthesis, or does not stand before a space or the end of the line (so no scheme,
- * no time of day, no emoticon and no `: ` at a line start).
- */
-const PLAIN_BREAK = /[.,;?!](?![ "'\u201d\u2019)]|$)|(?<!\p{L})-|-(?!\p{L})|(?<![\p{L}\p{Nd}"'\u201d\u2019)]):|:(?! |$)/u;
-/**
- * A list item's prefix (the ninth round): 0 to 3 spaces, a bullet (`-`, `*`, `+`) or one to
- * nine digits and `.` or `)`, then 1 to 4 spaces; the item's text follows, and must be plain
- * prose. Five spaces after the marker start code, and a marker with nothing after it may
- * underline the line above into a heading, so neither is a prefix.
- */
-const ITEM_PREFIX = /^ {0,3}(?:[-*+]|\d{1,9}[.)]) {1,4}(?! )/;
-/**
- * The raw start tags (the decision at review of 2026-10-09): a file that holds one of them
- * anywhere, in any letter case, is refused whole. What follows such a start is raw text to
- * some renderer whatever seems to close it, above the changed paragraph or below it (found,
- * Python-Markdown: a `<script>` in a block quote below the paragraph, its end tag outside the
- * quote, came out in four different ways by the length of the paragraph above).
- */
-const RAW_START = /<(?:script|style|pre|textarea|xmp|plaintext|title|noscript|iframe|!--|!\[CDATA\[|\?)/i;
-/** Found (pandoc): a first word that is one letter or a Roman numeral, with a full stop, starts a list. */
-const LIST_WORD = /^(?:\p{L}|[ivxlcdm]+)\.(?: |$)/iu;
-/**
- * A first word that starts code where Markdown is built as MDX: `import Chart from "chart"`
- * and `export default Layout` are plain prose lines by their characters. The decision
- * removed the guards for MDX; this one costs a line and is kept (the executor, 2026-10-09).
- */
-const CODE_WORD = /^(?:import|export) /;
-/** A line whose first characters, after any white space, are three or more backticks or tildes. */
-const FENCE_LIKE = /^(\s*)(`{3,}|~{3,})(.*)$/su;
-/** What may follow an opening fence: one word at most (Python-Markdown reads no fence with two). */
-const FENCE_WORD = /^\.?[A-Za-z0-9_#.+-]*$/;
-/** A `<` before a letter, `!` or `/`: where a renderer may start a tag or a declaration (`<?` and `<!--` refuse the file: {@link RAW_START}). */
-const TAG_START = /<[A-Za-z!/]/;
-/** A word of 7 to 40 hexadecimal digits: sites link such a word as a commit id. */
-const HEX_WORD = /(?<![\p{L}\p{N}])[0-9a-f]{7,40}(?![\p{L}\p{N}])/iu;
-/**
- * @param {string} line @returns {boolean} an empty line. A line of spaces is not one (the
- * decision at review of 2026-10-09; until then it was): one renderer (marked 4.3.0, found in
- * the ninth round's sample of passed edits) reads on over a line of spaces to a `---` or
- * `===` below it and makes a heading of the whole, so such a line is a line of its paragraph,
- * and no plain one.
- */
-const isBlank = (line) => line === '';
-
-/**
- * @param {string} text
- * @returns {{lines: string[], ends: string[]}} the lines, split at line feeds, and each
- * line's ending: a line feed, a carriage return and a line feed, or none (the last line)
- */
-function proseLines(text) {
-  const lines = [];
-  const ends = [];
-  let at = 0;
-  for (let nl = text.indexOf('\n'); nl >= 0; nl = text.indexOf('\n', at)) {
-    const cr = nl > at && text[nl - 1] === '\r';
-    lines.push(text.slice(at, cr ? nl - 1 : nl));
-    ends.push(cr ? '\r\n' : '\n');
-    at = nl + 1;
-  }
-  lines.push(text.slice(at));
-  ends.push('');
-  return { lines, ends };
-}
-
-/**
- * @param {string} line @returns {boolean} the line may open front matter or a metadata block:
- * three or more `-`, or `+++`, optionally with a word right after (`---js`). Found (pandoc):
- * groups of dashes with spaces between open a table the same way. Read by hand, one pass.
- */
-function metaOpener(line) {
-  let end = line.length;
-  while (end > 0 && (line[end - 1] === ' ' || line[end - 1] === '\t')) end--;
-  let k = 3;
-  if (line.startsWith('---')) while (k < end && (line[k] === '-' || line[k] === ' ')) k++;
-  else if (!line.startsWith('+++')) return false;
-  return /^[A-Za-z0-9]*$/.test(line.slice(k, end));
-}
-
-/**
- * @param {string} line @param {boolean} unsure a line above, in the same run of lines, left
- * a backtick or a backslash unpaired
- * @returns {{raw: boolean, unsure: boolean}} `raw`: the line holds a `<` before a letter,
- * `!` or `/` outside every code span that opens and closes on this line (a run of
- * backticks up to the next run of the same length, with no `|` between: a table cell ends
- * there). `unsure`: the line leaves a run of backticks unpaired, or holds a backslash, on
- * which readers disagree (found, Python-Markdown: `\<script>` is a tag there); from there
- * on nothing is taken for a code span. One pass.
- */
-function rawOutsideSpans(line, unsure) {
-  let i = 0;
-  while (i < line.length) {
-    const c = line[i];
-    if (c === '<' && TAG_START.test(line.slice(i, i + 2))) return { raw: true, unsure };
-    if (c === '\\') unsure = true;
-    if (c !== '`' || unsure) { i++; continue; }
-    let run = i + 1;
-    while (line[run] === '`') run++;
-    let close = -1;
-    for (let k = line.indexOf('`', run); k >= 0 && close < 0; k = line.indexOf('`', k)) {
-      let e = k + 1;
-      while (line[e] === '`') e++;
-      if (e - k === run - i) close = e;
-      k = e;
-    }
-    if (close < 0 || line.slice(run, close).includes('|')) unsure = true;
-    i = close < 0 || unsure ? run : close;
-  }
-  return { raw: false, unsure };
-}
-
-/**
- * Rule 4 (documentation), position — for each line, whether prose there cannot be vouched
- * for; or null: the file holds a fence-like line that renderers read differently, and is
- * refused whole. One pass, three things followed:
- *   FRONT MATTER OR A METADATA BLOCK, from a line that may open one ({@link metaOpener}) and
- *   is directly followed by a non-blank line, to the next line that is exactly `---` or
- *   `...` (after `+++`: `+++`); with no such line, the rest of the file. A closing line that
- *   is itself directly followed by a non-blank line opens the next block (pandoc reads the
- *   text after it as a table or as more metadata when the first block was none to it).
- *   A CODE FENCE: a line of three or more backticks or tildes, with one word after it at
- *   most, opens one; a line of as many of the same character, followed only by spaces,
- *   closes it; a fence never closed makes the rest of the file code. Ambiguous, and refusing
- *   the file: other white space on the line; any indentation (four spaces by the decision;
- *   one to three found: a list item above may hold the fence and end before it closes); a
- *   backtick or a second word after the opening fence; a closing fence longer than the
- *   opening one (found, Python-Markdown reads neither as that fence); a fence right under a
- *   line that ends in `]:` (found: it is that definition's destination); a fence inside a
- *   metadata block (a reader that hides the block does not see it).
- *   RAW HTML ABOVE. A file that holds one of the twelve raw starts anywhere is refused
- *   before this is asked ({@link RAW_START}). Of every other tag: a closer can be escaped by
- *   the Markdown around it, a block quote or list item can end before it, and any element
- *   left open holds the paragraphs below it. So every `<` before a letter, `!` or `/` holds
- *   every line from there on, front matter included. One shape is closed for every renderer
- *   and holds nothing: a tag inside a code span on one line ({@link rawOutsideSpans}; until
- *   the ninth round a comment alone on its line was a second one, and a `<!--` anywhere now
- *   refuses the file). A tag inside a code fence holds what follows like any other
- *   (found, Python-Markdown without its fenced-code extension: a renderer that knows no
- *   fences reads the fence's lines as Markdown, runs a `<script>` there, and lets a block
- *   tag left open hold the rest of the file).
- * @param {string[]} lines @returns {(boolean[]|null)}
- */
-function proseHeld(lines) {
-  const held = new Array(lines.length).fill(false);
-  /** @type {(string[]|null)} the lines that close the open metadata block */
-  let meta = null;
-  /** @type {(string|null)} the run of backticks or tildes that opened the open fence */
-  let fence = null;
-  let raw = false;
-  let unsure = false;
-  for (let i = 0; i < lines.length; i++) {
-    // A byte-order mark before the first line is no part of it; next to a fence it is other white space.
-    const line = i === 0 && lines[0][0] === '\ufeff' ? lines[0].slice(1) : lines[i];
-    const like = FENCE_LIKE.exec(line);
-    if (like) {
-      const [, lead, run, rest] = like;
-      const word = rest.trim();
-      if (meta !== null || lead !== '' || line !== lines[i] || /[^\S ]/.test(line) || !FENCE_WORD.test(word)
-        || (i > 0 && /\]:[ \t]*$/.test(lines[i - 1]))) return null;
-      if (fence === null) fence = run;
-      else if (run[0] === fence[0] && word === '') {
-        if (run.length > fence.length) return null;
-        if (run.length === fence.length) fence = null;
-      }
-      held[i] = true;
-      unsure = false;
-      continue;
-    }
-    const closes = meta !== null && meta.includes(line);
-    if (meta !== null || fence !== null) held[i] = true;
-    if (closes) meta = null;
-    if (meta === null && fence === null && metaOpener(line) && i + 1 < lines.length && !isBlank(lines[i + 1])) {
-      meta = line[0] === '+' ? ['+++'] : ['---', '...'];
-      held[i] = true;
-    }
-    if (isBlank(line)) unsure = false;
-    if (!raw && fence !== null) raw = TAG_START.test(line);
-    else if (!raw) ({ raw, unsure } = rawOutsideSpans(line, unsure));
-    if (raw) held[i] = true;
-  }
-  return held;
-}
-
-/**
- * Rule 4 (documentation) — the words a Markdown or plain-text change alters, or null when
- * it is anything but a wording change in pure prose (the rule above). The two sides are
- * compared line by line: the same lines with the same endings, none added or removed; no carriage return
- * on its own (found: to a Markdown reader it ends a line, to the count of lines here it does
- * not) and no raw start tag anywhere ({@link RAW_START}); every changed line in a plain
- * paragraph, on both sides, outside what {@link proseHeld} holds; each line of the paragraph
- * plain prose behind its item prefix, if it has one ({@link ITEM_PREFIX}); the paragraph's
- * first line not indented unless it is an item (found: a list item above holds an indented
- * paragraph) and starting with no code word ({@link CODE_WORD}); no list word
- * ({@link LIST_WORD}) at the start of the first line's text, nor, in a paragraph that holds
- * an item, of any line's text (pandoc reads `a.` there as a marker of a list inside the
- * item); no colon in the file's first paragraph; and a changed line's item prefix the same on
- * both sides. The words are the changed part of each changed line, widened to whole words,
- * for rule 6. Linear in the two texts.
- * @param {string} oldText @param {string} newText @returns {(string[]|null)}
- */
-function proseChange(oldText, newText) {
-  if (/\r(?!\n)/.test(oldText) || /\r(?!\n)/.test(newText) || RAW_START.test(oldText) || RAW_START.test(newText)) return null;
-  const sides = [proseLines(oldText), proseLines(newText)];
-  const [o, n] = sides;
-  const count = o.lines.length;
-  /** Where the file's first paragraph starts, on each side: a metadata reader takes `Key: value` lines there. */
-  const lead = sides.map(({ lines }) => lines.findIndex((line) => !isBlank(line)));
-  /** @param {string} line @returns {string} its item prefix, or none */
-  const prefix = (line) => { const m = ITEM_PREFIX.exec(line); return m ? m[0] : ''; };
-  // The same endings line for line; a line that comes or goes moves the file's last ending, so this holds the number of lines too.
-  if (o.ends.some((end, i) => end !== n.ends[i])) return null;
-  const held = [proseHeld(o.lines), proseHeld(n.lines)];
-  if (held[0] === null || held[1] === null) return null;
-  const runs = [];
-  let done = -1; // the last line of the last paragraph judged
-  for (let i = 0; i < count; i++) {
-    const a = o.lines[i];
-    const b = n.lines[i];
-    if (a === b) continue;
-    if (i > done) {
-      let first = i;
-      while (first > 0 && !isBlank(o.lines[first - 1]) && !isBlank(n.lines[first - 1])) first--;
-      done = i;
-      while (done + 1 < count && !isBlank(o.lines[done + 1]) && !isBlank(n.lines[done + 1])) done++;
-      for (let side = 0; side < 2; side++) {
-        const lines = sides[side].lines;
-        const texts = [];
-        let items = false;
-        for (let k = first; k <= done; k++) {
-          const at = prefix(lines[k]).length;
-          items = items || at > 0;
-          texts.push(lines[k].slice(at));
-        }
-        if ((lines[first][0] === ' ' && prefix(lines[first]) === '') || CODE_WORD.test(lines[first])) return null;
-        for (let k = first; k <= done; k++) {
-          const text = texts[k - first];
-          if (/** @type {boolean[]} */ (held[side])[k] || !PLAIN_LINE.test(text) || PLAIN_BREAK.test(text)
-            || ((k === first || items) && LIST_WORD.test(text.trimStart())) || (first === lead[side] && text.includes(':'))) return null;
-        }
-      }
-    }
-    if (prefix(a) !== prefix(b)) return null;
-    const { p, s } = commonEnds(a, b);
-    const spaces = (line, from, step) => { let k = from; while (line[k] === ' ') k += step; return Math.abs(k - from); };
-    if (spaces(a, 0, 1) !== spaces(b, 0, 1) || spaces(a, a.length - 1, -1) !== spaces(b, b.length - 1, -1)) return null;
-    let start = p;
-    while (start > 0 && a[start - 1] !== ' ') start--;
-    const wordEnd = (line) => { let e = line.length - s; while (e < line.length && line[e] !== ' ') e++; return e; };
-    runs.push(a.slice(start, wordEnd(a)), b.slice(start, wordEnd(b)));
-  }
-  return runs;
-}
-
 /**
  * The functional plan's clause for a file whose format the check reads but whose change it
  * cannot vouch for: text inside a component or custom element, text inside `<svg>` or
- * `<math>`, HTML outside the strict subset, a Markdown or plain-text change that is anything
- * but a wording change in pure prose, a colour that is not the whole value of a colour property.
+ * `<math>`, HTML outside the strict subset, a colour that is not the whole value of a colour
+ * property.
  * @param {string} display @returns {string}
  */
 const inexactClause = (display) => `it changes ${display} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
@@ -3023,7 +2031,7 @@ function kindOf(f) {
     const r = kindAs(f, { display: form(f.display), topRel: form(f.topRel) });
     if ('clause' in r) return r;
     // A name that is one kind as written and another once folded is no kind this check vouches for.
-    if (kind !== null && r.kind !== kind) return { clause: `I do not recognise ${f.display} as wording or a colour`, cause: 'unrecognised' };
+    if (kind !== null && r.kind !== kind) return unrecognisedRefusal(f.display);
     kind = r.kind;
   }
   return { kind: /** @type {string} */ (kind) };
@@ -3036,47 +2044,31 @@ function kindOf(f) {
  * @returns {{kind: string}|{clause: string, cause: string}}
  */
 function kindAs(f, spelt) {
-  const { base, ext, folders, topFolders } = nameParts(spelt);
+  const { base, ext, topFolders } = nameParts(spelt);
   const d = f.display;
   const lowerBase = base.toLowerCase();
-  const unrecognised = { clause: `I do not recognise ${d} as wording or a colour`, cause: 'unrecognised' };
-  const setting = { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
+  const unrecognised = unrecognisedRefusal(d);
   const build = { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
   const named = namedKind(lowerBase, ext, topFolders);
-  const governing = governingName(lowerBase) || f.linked === true
-    || topFolders.some((p, i) => GOVERNING_FOLDERS.has(p) || (p === '.github' && GITHUB_GOVERNING.has(topFolders[i + 1])));
-  // Markdown under `.github/` outside `.github/workflows/` is the one documentation a
-  // dot-folder may hold; every other dot-folder may be some tool's instructions.
-  const githubDoc = (p, i) => p === '.github' && ext === '.md' && topFolders[i + 1] !== 'workflows';
-  const dotFolder = topFolders.some((p, i) => p.startsWith('.') && p !== '.' && p !== '..' && !githubDoc(p, i));
-  const legal = DOC_EXT.has(ext) ? LEGAL_NAMES.find(([start]) => lowerBase.startsWith(start)) : undefined;
-  // Markdown under `.github/` is documentation (a contributing guide, an issue template),
-  // except under `.github/workflows/`; everything else under a build folder is the build.
-  const buildFolder = topFolders.some((p, i) => BUILD_FOLDERS.has(p) && !githubDoc(p, i));
+  const governing = topFolders.some((p, i) => GOVERNING_FOLDERS.has(p) || (p === '.github' && GITHUB_GOVERNING.has(topFolders[i + 1])));
+  const buildFolder = topFolders.some((p) => BUILD_FOLDERS.has(p));
 
-  // A legal text never qualifies, whatever its change: the functional plan's clause for a sensitive area.
-  if (legal) return { clause: `${d} sits in an area named ${legal[1]}, and such areas are never a hotfix`, cause: 'sensitive-area' };
   let kind = null;
-  // A dependency, build or settings name is none of the four kinds, whatever its extension
-  // and its folder. Plain text is documentation only under a documentation name; a catalogue
-  // is one only under a language tag or a wording bundle's name ({@link catalogueFile}).
+  // A dependency, build or settings name is neither kind, whatever its extension and its folder.
   if (named === null) {
-    if (ext === '.md' || documentationText(lowerBase)) kind = 'documentation';
-    else if (MARKUP_EXT.has(ext)) kind = 'markup';
-    else if (CATALOGUE_EXT.has(ext) && catalogueFile(base.slice(0, base.length - ext.length), folders)) kind = 'catalogue';
+    if (MARKUP_EXT.has(ext)) kind = 'markup';
     else if (ext === '.css') kind = 'colour';
   }
   if (kind !== null && governing) return unrecognised;
   // A side emptied, or filled from empty, holds the content of a removal or an addition.
   if (kind !== null && (f.oldText === '') !== (f.newText === '')) return unrecognised;
   if (kind !== null && buildFolder) return build;
-  if (kind === 'documentation' && dotFolder) return unrecognised;
   if (kind !== null) return { kind };
 
   if (named === 'dependencies') return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
   if (ext === '.sql' || topFolders.some((p) => DATABASE_FOLDERS.has(p))) return { clause: `it changes stored data in ${d}`, cause: 'stored-data' };
   if (named === 'build' || buildFolder) return build;
-  if (named === 'setting' || SETTINGS_EXT.has(ext)) return setting;
+  if (named === 'setting' || SETTINGS_EXT.has(ext)) return settingRefusal(d);
   if (CODE_EXT.has(ext)) {
     const onlyText = equalHunks(f.hunks) && [...linePairs(f.hunks)].every((p) => emptyLiterals(p.o) === emptyLiterals(p.n));
     return onlyText
@@ -3094,17 +2086,10 @@ function kindAs(f, spelt) {
  * @returns {{runs: string[]}|{clause: string, cause: string}}
  */
 function readKind(f) {
-  const { ext } = nameParts(f);
   const d = f.display;
   const kind = f.kind;
-  const unrecognised = { clause: `I do not recognise ${d} as wording or a colour`, cause: 'unrecognised' };
-  const setting = { clause: `it changes a setting in ${d}, and settings changes are a common cause of outages`, cause: 'setting' };
+  const unrecognised = unrecognisedRefusal(d);
   const inexact = { clause: inexactClause(d), cause: 'unrecognised' };
-  if (kind === 'documentation') {
-    // Rule 2 has already refused a file with a missing side, so both texts are present.
-    const runs = proseChange(/** @type {string} */ (f.oldText), /** @type {string} */ (f.newText));
-    return runs && runs.length > 0 ? { runs } : inexact; // a file with no changed word is no pass of nothing
-  }
   // A byte-order mark stands on both sides or on neither, and the number of carriage returns
   // stays (the decision at review of 2026-10-09): the diff the size is counted from ignores a
   // carriage return at a line's end, so neither may come or go unseen. A reader takes one
@@ -3128,24 +2113,15 @@ function readKind(f) {
     // Rule 6 reads each changed text as written and as its character references spell it.
     return texts.runs ? { runs: [...texts.runs, ...texts.runs.map(referencesRead)] } : texts.inexact ? inexact : unrecognised;
   }
-  if (kind === 'catalogue') {
-    if (!equalHunks(f.hunks)) return unrecognised;
-    const runs = catalogueChange(lineFeeds(oldText), lineFeeds(newText), ext);
-    return runs ? { runs } : unrecognised;
-  }
   if (kind !== 'colour') throw new Error(`no reader for the kind ${kind}`); // never a fall-back to another reader
   const o = body(oldText);
   const n = body(newText);
-  // A custom property's change is a setting, unless the property is named for a colour and
-  // holds exactly one colour before and after (any other value of such a property cannot be
-  // read exactly); those values are then levelled, and what is left must be identical or a
-  // colour that is the whole value of a real colour property.
-  const levelled = colourNamedEdit(o, n);
-  if (levelled === 'inexact') return { clause: inexactClause(d), cause: 'setting' };
-  if (!levelled) return setting;
+  const oldRead = readCss(o);
+  const newRead = readCss(n);
+  // A changed custom property is a setting, whatever it is named and whatever it holds.
+  if (customDeclarations(o, oldRead) !== customDeclarations(n, newRead)) return settingRefusal(d);
   if (!equalHunks(f.hunks)) return unrecognised;
-  const [a, b] = levelled;
-  const edit = a === b ? o !== n : colourEdit(a, b);
+  const edit = colourEdit(o, n, oldRead, newRead);
   return edit === true ? { runs: [] } : edit === 'inexact' ? inexact : unrecognised;
 }
 
@@ -3200,13 +2176,12 @@ function ruleSensitiveArea(f, ctoc) {
 }
 
 /**
- * Rule 6 — the old and new wording of markup, catalogue and documentation files carries no
- * risk marker ({@link RISK_MARKER}), no scheme ({@link SCHEME}) and no character a reader
- * does not see ({@link UNSEEN_CHARACTER}); in documentation the changed words
- * ({@link proseChange}) also hold no word of 7 to 40 hexadecimal digits ({@link HEX_WORD}).
+ * Rule 6 — the old and new wording of a page carries no risk marker ({@link RISK_MARKER}),
+ * no scheme ({@link SCHEME}) and no character a reader does not see
+ * ({@link UNSEEN_CHARACTER}). A stylesheet's change holds no wording.
  */
 function ruleRiskMarker(f) {
-  const marked = (r) => RISK_MARKER.test(r) || SCHEME.test(r) || UNSEEN_CHARACTER.test(r) || (f.kind === 'documentation' && HEX_WORD.test(r));
+  const marked = (r) => RISK_MARKER.test(r) || SCHEME.test(r) || UNSEEN_CHARACTER.test(r);
   return f.runs.some(marked)
     ? { clause: `the wording in ${f.display} contains a number, a price, a web address or an e-mail address`, cause: 'risk-marker' }
     : null;
@@ -3230,12 +2205,7 @@ function ruleRefusal(change) {
       if (r) return r;
     }
   }
-  // A change read from a repository names what the instruction files link to; one that does
-  // not was read by nothing this check knows, and is never judged without the list.
-  const governed = change.governed;
-  if (change.top && !(governed instanceof Set)) throw new Error('the change carries no list of the files the instruction files link to');
   for (const f of change.files) {
-    f.linked = governed instanceof Set && pathKeys(f.topRel).some((key) => governed.has(key));
     const r = kindOf(f);
     if ('clause' in r) return r;
     f.kind = r.kind;
@@ -3488,9 +2458,7 @@ async function ruleTestsInCopy(change, ctx) {
     if (second.get(f.topRel) !== f.stagedId) throw new Unreadable(`${f.display} changed while it was being checked`);
   }
 
-  if (run === null) {
-    return change.files.every((f) => f.kind === 'documentation') ? { tests: DOC_ONLY } : NO_TEST_RAN;
-  }
+  if (run === null) return NO_TEST_RAN;
   if (run.passed === true && run.passCount > 0) return { tests: `${run.passCount} ${run.passCount === 1 ? 'test' : 'tests'} passed.` };
   // A run that never started, could not be read, or whose command was refused before it ran
   // (shell structure in a tracked quality setting) is "no test ran", never a failing test.

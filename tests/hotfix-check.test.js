@@ -30,26 +30,31 @@ const STATUS_LINE = 'Checking the hotfix against the existing tests.';
 const USAGE = 'Use: hotfix check [--run-tests] [<file> ...]';
 const LOG = path.join('.ctoc', 'logs', 'hotfix-checks.jsonl');
 const NO_TEST = 'no test ran, so nothing confirms the change';
-const DOC_ONLY = 'The project has no test command, and the change is documentation only.';
 
 const refusal = (clause) => `I did not treat this as a hotfix because ${clause}; `
   + 'it goes through a normal plan, and your edits stay in place, not committed.';
 const unreadable = (why) => refusal(`I could not read the change (${why})`);
 // The owner's decision of 2026-10-09 (answer "a"): the hotfix check keeps only the formats
-// it can read exactly (plain HTML, colours in plain CSS, catalogue wording in JSON, YAML and
-// properties files, prose in Markdown and plain text), because five rounds of security
-// attacks kept finding new ways to get a behaviour change committed as a hotfix, the last
-// ones where a hand-written reader disagrees with the real compiler. Every case of a
-// removed format is kept, grouped at the end of its table, and asserts this clause.
+// it can read exactly, because five rounds of security attacks kept finding new ways to get
+// a behaviour change committed as a hotfix, the last ones where a hand-written reader
+// disagrees with the real compiler. Since the tenth round (the session coordinator's
+// decision of 2026-10-10) those formats are two: plain HTML pages and colours in plain CSS.
+// Every case of a format removed on 2026-10-09 (Vue, Svelte, JSX, reStructuredText, Sass,
+// Less, gettext) is kept, grouped at the end of its table, and asserts this clause; the cases
+// of the kinds removed on 2026-10-10 (Markdown and plain-text prose, catalogue files, custom
+// properties) are deleted, group by group, each with its reason in the plan's record ("Fix
+// round 10"), and one table at the end of this file holds every removed extension.
 const gone = (f) => `I do not recognise ${f} as wording or a colour`;
 // The functional plan's clause (amended 2026-10-09) for a file whose format the check reads
 // but whose change it cannot vouch for: text inside a component or custom element or inside
-// `<svg>` or `<math>`, HTML outside the strict subset, a Markdown heading whose anchor
-// changes, a colour that is not the whole value of a colour property. Rows that asserted
+// `<svg>` or `<math>`, HTML outside the strict subset, a colour that is not the whole value
+// of a colour property. Rows that asserted
 // "not recognised", "could not read (… cannot follow / … open)" or the settings clause for
 // one of these cases assert this clause since the sixth round: the wording the functional
 // plan now specifies, on a refusal that stays a refusal.
 const inexact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
+
+const SETTING = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
 
 const HOME = '<!doctype html>\n<html>\n<body>\n<button>Save</button>\n</body>\n</html>\n';
 const HOME_STORE = HOME.replace('<button>Save</button>', '<button>Store</button>');
@@ -331,11 +336,10 @@ test('case 2: a button colour change passes; the commit names only the styleshee
   assertPass(await check(root, '--run-tests', 'src/styles/button.css'), ['src/styles/button.css']);
 });
 
-test('case 3: a catalogue value with the same key and placeholder passes', async () => {
+test('case 3: a catalogue value is no wording the check reads (since the tenth round): refused as a setting', async () => {
   const root = testedProject({ 'locales/en.json': '{\n  "save": "Save {count} items",\n  "cancel": "Cancel"\n}\n' });
   fs.writeFileSync(path.join(root, 'locales/en.json'), '{\n  "save": "Store {count} items",\n  "cancel": "Cancel"\n}\n');
-  assertChecking(await check(root, 'locales/en.json'), ['locales/en.json']);
-  assertPass(await check(root, '--run-tests', 'locales/en.json'), ['locales/en.json']);
+  for (const args of [['locales/en.json'], ['--run-tests', 'locales/en.json']]) await refusedUntouched(root, args, SETTING('locales/en.json'));
 });
 
 test('case 4: other uncommitted work is neither judged nor committed', async () => {
@@ -390,20 +394,20 @@ test('case 9: a sensitive area is refused even for wording', async () => {
 });
 
 test('case 10: more than 20 changed lines is refused with the counts', async () => {
-  const lines = (word, n) => Array.from({ length: n }, (_, i) => `${word} line ${String.fromCharCode(97 + i)}`).join('\n') + '\n';
-  const root = testedProject({ 'docs/one.md': lines('Old', 7), 'docs/two.md': lines('Old', 6) });
+  const lines = (word, n) => Array.from({ length: n }, (_, i) => `<p>${word} line ${String.fromCharCode(97 + i)}</p>`).join('\n') + '\n';
+  const root = testedProject({ 'src/pages/one.html': lines('Old', 7), 'src/pages/two.html': lines('Old', 6) });
   // 13 lines reworded line for line in two files: 26 changed lines.
-  fs.writeFileSync(path.join(root, 'docs/one.md'), lines('New', 7));
-  fs.writeFileSync(path.join(root, 'docs/two.md'), lines('New', 6));
-  await refusedUntouched(root, ['docs/one.md', 'docs/two.md'],
+  fs.writeFileSync(path.join(root, 'src/pages/one.html'), lines('New', 7));
+  fs.writeFileSync(path.join(root, 'src/pages/two.html'), lines('New', 6));
+  await refusedUntouched(root, ['src/pages/one.html', 'src/pages/two.html'],
     'it changes 26 lines in 2 files and a hotfix is at most 20 lines in at most 3 files');
-  // The functional plan's own numbers, 13 lines removed and 12 added (25 lines in 2 files). The
-  // eighth round's reader refuses a Markdown file that gains or loses a line, and it answered
-  // before the size rule, so this change read "cannot read exactly". Since the ninth round (the
-  // decision at review of 2026-10-09) the size rule runs once the kind of every file is known
-  // and before any reader reads a file's content, so the scenario gets its own clause again.
-  fs.writeFileSync(path.join(root, 'docs/one.md'), lines('New', 6));
-  await refusedUntouched(root, ['docs/one.md', 'docs/two.md'],
+  // The functional plan's own numbers, 13 lines removed and 12 added (25 lines in 2 files). A
+  // page that gains or loses a line is refused by its reader; the size rule runs once the
+  // kind of every file is known and before any reader reads a file's content (the decision
+  // at review of 2026-10-09), so the scenario gets its own clause. (Until the tenth round the
+  // two files were Markdown; a Markdown file is no kind the check reads any more.)
+  fs.writeFileSync(path.join(root, 'src/pages/one.html'), lines('New', 6));
+  await refusedUntouched(root, ['src/pages/one.html', 'src/pages/two.html'],
     'it changes 25 lines in 2 files and a hotfix is at most 20 lines in at most 3 files');
 });
 
@@ -470,13 +474,10 @@ test('case 16: an unrecognised file kind is refused', async () => {
   await refusedUntouched(root, ['docs/diagram.svg'], 'I do not recognise docs/diagram.svg as wording or a colour');
 });
 
-test('case 17: documentation passes from the test call without a test command; markup does not', async () => {
+test('case 17: without a test command nothing passes: a page reads "no test ran", and a README is no kind the check reads', async () => {
   const root = makeRepo({ 'README.md': '# Fixture\n\nThis is the old wording.\n', 'src/pages/home.html': HOME });
   fs.writeFileSync(path.join(root, 'README.md'), '# Fixture\n\nThis is the new wording.\n');
-  assertChecking(await check(root, 'README.md'), ['README.md']);
-  const doc = await check(root, '--run-tests', 'README.md');
-  assertPass(doc, ['README.md']);
-  assert.equal(doc.tests, DOC_ONLY);
+  for (const args of [['README.md'], ['--run-tests', 'README.md']]) await refusedUntouched(root, args, gone('README.md'));
 
   fs.writeFileSync(path.join(root, 'README.md'), '# Fixture\n\nThis is the old wording.\n');
   fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
@@ -500,8 +501,7 @@ test('case 19: Windows line endings do not count as changed lines', async () => 
   edited[3] = 'Line d of the handbook.';
   const page = (rows) => rows.map((l) => `<p>${l}</p>`);
   // A page with Windows line endings on both sides, and one word changed: 2 changed lines.
-  const root = testedProject({ 'src/pages/guide.html': page(base).join('\r\n') + '\r\n', 'src/pages/unix.html': page(base).join('\n') + '\n',
-    'docs/guide.md': base.join('\n') + '\n' });
+  const root = testedProject({ 'src/pages/guide.html': page(base).join('\r\n') + '\r\n', 'src/pages/unix.html': page(base).join('\n') + '\n' });
   fs.writeFileSync(path.join(root, 'src/pages/guide.html'), page(edited).join('\r\n') + '\r\n');
   assertChecking(await check(root, 'src/pages/guide.html'), ['src/pages/guide.html']);
   assertPass(await check(root, '--run-tests', 'src/pages/guide.html'), ['src/pages/guide.html']);
@@ -518,14 +518,6 @@ test('case 19: Windows line endings do not count as changed lines', async () => 
   fs.writeFileSync(path.join(root, 'src/pages/unix.html'), page(edited).join('\r\n') + '\r\n');
   await refusedUntouched(root, ['src/pages/unix.html'], 'I do not recognise src/pages/unix.html as wording or a colour');
   assert.equal(logLines(root)[1].lines, 2);
-  // The same change to a Markdown file passed until the eighth round. Since the decision at
-  // review of 2026-10-09 nothing but the words of a plain paragraph may change in a Markdown
-  // file, and a changed line ending is no word: the functional plan's sentence, and still
-  // only 2 changed lines counted.
-  fs.writeFileSync(path.join(root, 'src/pages/unix.html'), page(base).join('\n') + '\n');
-  fs.writeFileSync(path.join(root, 'docs/guide.md'), edited.join('\r\n') + '\r\n');
-  await refusedUntouched(root, ['docs/guide.md'], inexact('docs/guide.md'));
-  assert.equal(logLines(root)[2].lines, 2);
 });
 
 test('case 20: a path written with backslashes gives the same answers', async () => {
@@ -760,37 +752,38 @@ test('case 34: a fault inside the check is "the check stopped", its message in d
 });
 
 test('case 35: git settings in the repository change no answer', async (t) => {
-  // A plain paragraph of eight lines (until the eighth round its first line was a heading, which
-  // a paragraph of pure prose cannot hold).
-  const guide = ['Guide', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', ''].join('\n');
-  const edit = (root) => fs.writeFileSync(path.join(root, 'docs/guide.md'),
+  // A page of eight lines, two of them reworded: 4 changed lines.
+  const guide = ['Guide', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'].map((l) => `<p>${l}</p>`).join('\n') + '\n';
+  const GUIDE_TEST = nodeTest('has a guide', "  assert.ok(read('src/pages/guide.html').includes('Guide'));");
+  const edit = (root) => fs.writeFileSync(path.join(root, 'src/pages/guide.html'),
     guide.replace('one', 'uno').replace('four', 'cuatro'));
   const both = async (root, args) => ({
     first: await check(root, ...args), second: await check(root, '--run-tests', ...args), log: withoutTime(logLines(root))
   });
   const settings = [['diff.noprefix', 'true'], ['diff.mnemonicPrefix', 'true'], ['diff.interHunkContext', '10'],
     ['diff.algorithm', 'histogram'], ['diff.relative', 'true'], ['diff.context', '5'], ['color.diff', 'always']];
-  const plain = makeRepo({ 'docs/guide.md': guide });
-  const set = makeRepo({ 'docs/guide.md': guide }, { config: settings });
+  const files = { 'src/pages/guide.html': guide, 'tests/guide.test.js': GUIDE_TEST };
+  const plain = makeRepo(files, { testScript: SCRIPT });
+  const set = makeRepo(files, { testScript: SCRIPT, config: settings });
   edit(plain);
   edit(set);
   await t.test('(a) the diff settings', async () => {
-      const reference = await both(plain, ['docs/guide.md']);
+      const reference = await both(plain, ['src/pages/guide.html']);
       assert.equal(reference.log[reference.log.length - 1].lines, 4);
-      assert.deepEqual(await both(set, ['docs/guide.md']), reference);
+      assert.deepEqual(await both(set, ['src/pages/guide.html']), reference);
       assert.equal(reference.second.verdict, 'hotfix', JSON.stringify(reference.second));
   });
   await t.test('(b) diff.autoRefreshIndex=false beside a file whose modification time moved', async () => {
       const make = (config) => {
-        const root = makeRepo({ 'docs/guide.md': guide, 'docs/other.md': 'Other.\n' }, { config });
+        const root = makeRepo({ ...files, 'src/pages/other.html': '<p>Other.</p>\n' }, { testScript: SCRIPT, config });
         edit(root);
         const later = new Date(Date.now() + 60000);
-        fs.utimesSync(path.join(root, 'docs/other.md'), later, later);
+        fs.utimesSync(path.join(root, 'src/pages/other.html'), later, later);
         return root;
       };
       const refB = await both(make([]), []);
       assert.deepEqual(await both(make([['diff.autoRefreshIndex', 'false']]), []), refB);
-      assertPass(refB.second, ['docs/guide.md']);
+      assertPass(refB.second, ['src/pages/guide.html']);
   });
 });
 
@@ -816,39 +809,37 @@ test('case 38: a test runner that is not installed is "no test ran"', async () =
 });
 
 test('case 39: a log above 1 MiB is rotated by renaming', async () => {
-  const root = makeRepo({ 'README.md': 'Old wording.\n' });
+  const root = testedProject();
   const old = Buffer.from(`${'x'.repeat(1024 * 1024)}\n`);
   assert.equal(old.length, 1024 * 1024 + 1);
   fs.mkdirSync(path.join(root, '.ctoc', 'logs'), { recursive: true });
   fs.writeFileSync(path.join(root, LOG), old);
-  fs.writeFileSync(path.join(root, 'README.md'), 'New wording.\n');
-  await check(root, 'README.md');
-  const res = await check(root, '--run-tests', 'README.md');
+  const { second } = await buttonWording(root);
   assert.ok(fs.existsSync(path.join(root, `${LOG}.1`)) && fs.readFileSync(path.join(root, `${LOG}.1`)).equals(old),
     'the old log is kept whole under .1');
   const lines = logLines(root);
   assert.equal(lines.length, 1);
   assert.equal(lines[0].verdict, 'hotfix');
-  assertPass(res, ['README.md']);
+  assertPass(second, ['src/pages/home.html']);
 });
 
 test('case 40: a log that is a hard link is never written', async () => {
   const outside = path.join(tmpDir('hotfix-outside-'), 'outside.txt');
   const bytes = Buffer.from(`${'y'.repeat(1024 * 1024)}\n`);
   fs.writeFileSync(outside, bytes);
-  const reference = makeRepo({ 'README.md': 'Old wording.\n' });
-  const root = makeRepo({ 'README.md': 'Old wording.\n' });
+  const reference = testedProject();
+  const root = testedProject();
   fs.mkdirSync(path.join(root, '.ctoc', 'logs'), { recursive: true });
   fs.linkSync(outside, path.join(root, LOG));
   const answers = [];
   for (const r of [reference, root]) {
-    fs.writeFileSync(path.join(r, 'README.md'), 'New wording.\n');
-    answers.push([await check(r, 'README.md'), await check(r, '--run-tests', 'README.md')]);
+    const { first, second } = await buttonWording(r);
+    answers.push([first, second]);
   }
   assert.ok(fs.readFileSync(outside).equals(bytes), 'the linked file is unchanged');
   assert.equal(fs.existsSync(path.join(root, `${LOG}.1`)), false);
   assert.deepEqual(answers[1], answers[0]);
-  assertPass(answers[1][1], ['README.md']);
+  assertPass(answers[1][1], ['src/pages/home.html']);
 });
 
 test('case 41: the log is never written through a symbolic link', async () => {
@@ -863,13 +854,13 @@ test('case 41: the log is never written through a symbolic link', async () => {
     (root) => { fs.mkdirSync(path.join(root, '.ctoc', 'logs'), { recursive: true }); fs.symlinkSync(path.join(outside, 'created.txt'), path.join(root, LOG)); }
   ];
   const both = async (root) => {
-    fs.writeFileSync(path.join(root, 'README.md'), 'New wording.\n');
-    return [await check(root, 'README.md'), await check(root, '--run-tests', 'README.md')];
+    const { first, second } = await buttonWording(root);
+    return [first, second];
   };
-  const reference = await both(makeRepo({ 'README.md': 'Old wording.\n' }));
+  const reference = await both(testedProject());
   assert.equal(reference[1].verdict, 'hotfix', JSON.stringify(reference[1]));
   for (const plant of variants) {
-    const root = makeRepo({ 'README.md': 'Old wording.\n' });
+    const root = testedProject();
     let planted = true;
     try { plant(root); } catch { planted = false; } // a platform that cannot make links has no such attack
     assert.deepEqual(await both(root), reference);
@@ -952,14 +943,14 @@ test('case 44: a change that does not apply cleanly to a fresh copy is refused a
   const probe = probeDir();
   const shout = path.join(tmpDir('hotfix-filter-'), 'shout.js');
   fs.writeFileSync(shout, "let s = '';\nprocess.stdin.on('data', (d) => { s += d; });\nprocess.stdin.on('end', () => process.stdout.write(s.toUpperCase()));\n");
-  const root = makeRepo({ 'docs/guide.md': 'Read this guide first.\n', '.gitattributes': 'docs/*.md filter=shout\n',
+  const root = makeRepo({ 'site/guide.html': '<p>Read this guide first.</p>\n', '.gitattributes': 'site/*.html filter=shout\n',
     'src/pages/home.html': HOME, 'tests/home.test.js': PASSING_TEST }, { testScript: SCRIPT });
   const fwd = (p) => p.split(path.sep).join('/');
   git(root, ['config', 'filter.shout.smudge', `"${fwd(NODE)}" "${fwd(shout)}"`]);
-  fs.writeFileSync(path.join(root, 'docs/guide.md'), 'Read this handbook first.\n');
+  fs.writeFileSync(path.join(root, 'site/guide.html'), '<p>Read this handbook first.</p>\n');
   const before = worktrees(root);
-  assertChecking(await check(root, 'docs/guide.md'), ['docs/guide.md']);
-  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'docs/guide.md'));
+  assertChecking(await check(root, 'site/guide.html'), ['site/guide.html']);
+  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'site/guide.html'));
   assert.equal(res.text, unreadable('the change does not apply cleanly to a fresh copy of the last commit'), JSON.stringify(res));
   assert.equal(typeof res.detail, 'string');
   assert.ok(res.detail.length > 0 && !res.detail.includes('\n'), res.detail);
@@ -1179,11 +1170,11 @@ test('case 51: other uncommitted work behind an editable Python install is refus
 
 test('case 52: a judged file under a linked package passes, and the test ran in the copy', async () => {
   const probe = probeDir();
-  const root = workspaceProject('greet', 'greet', { 'packages/greet/README.md': 'Greets you.\n' });
-  fs.writeFileSync(path.join(root, 'packages/greet/README.md'), 'Welcomes you.\n');
-  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'packages/greet/README.md'));
+  const root = workspaceProject('greet', 'greet', { 'packages/greet/page.html': '<p>Greets you.</p>\n' });
+  fs.writeFileSync(path.join(root, 'packages/greet/page.html'), '<p>Welcomes you.</p>\n');
+  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'packages/greet/page.html'));
   assert.notEqual(probeRead(probe), root, 'the tests ran in a copy');
-  assertPass(res, ['packages/greet/README.md']);
+  assertPass(res, ['packages/greet/page.html']);
 });
 
 test('case 53: a link whose parent lies outside the copy stops the check before any test runs', async () => {
@@ -1226,10 +1217,11 @@ test('a file that is not valid UTF-8 is not text', async () => {
 
 test('a name with spaces, a star and letters beyond ASCII passes, and commit.add stages exactly it', async () => {
   // A star cannot stand in a Windows file name; there the name keeps its space and letters.
-  const name = process.platform === 'win32' ? 'docs/a plan é.md' : 'docs/a plan é *.md';
-  const root = makeRepo({ [name]: 'Old wording.\n', 'docs/a plan é x.md': 'Other.\n' });
-  fs.writeFileSync(path.join(root, ...name.split('/')), 'New wording.\n');
-  fs.writeFileSync(path.join(root, 'docs', 'a plan é x.md'), 'Other, changed.\n');
+  const name = process.platform === 'win32' ? 'docs/a plan é.html' : 'docs/a plan é *.html';
+  const root = makeRepo({ [name]: '<p>Old wording.</p>\n', 'docs/a plan é x.html': '<p>Other.</p>\n',
+    'tests/any.test.js': nodeTest('runs', '  assert.ok(true);') }, { testScript: SCRIPT });
+  fs.writeFileSync(path.join(root, ...name.split('/')), '<p>New wording.</p>\n');
+  fs.writeFileSync(path.join(root, 'docs', 'a plan é x.html'), '<p>Other, changed.</p>\n');
   assertChecking(await check(root, name), [name]);
   const res = await check(root, '--run-tests', name);
   assertPass(res, [name]);
@@ -1295,7 +1287,6 @@ test('the whole suite runs in the copy, whatever the test files are named', asyn
 
 test('edge shapes of every kind give the exact verdict', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
-  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   // [path, base content, new content, expected clause, or null for the pass of the test call]
   const shapes = [
     ['src/pages/lead.html', 'Welcome <b>home</b>\n', 'Hello <b>home</b>\n', un('src/pages/lead.html')],
@@ -1307,23 +1298,6 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['src/pages/tail.html', '<p>Save<\n', '<p>Store<\n', inexact('src/pages/tail.html')],
     ['src/pages/heart.html', '<p>Save <3</p>\n', '<p>Store <3</p>\n', un('src/pages/heart.html')],
     ['src/pages/grow.html', '<p>a</p>\n', '<p>a</p>\n<p>b</p>\n', un('src/pages/grow.html')],
-    // Since the ninth round (the decisions at review of 2026-10-09) a file is a catalogue only
-    // under a language tag or a wording bundle's name, so the catalogue rows whose names were
-    // neither moved into a language folder (`en/`); a catalogue is read whole, in a strict
-    // subset of its format, and a file outside that subset "holds something I cannot follow"
-    // where it was "not recognised" (a continued line, text after a quoted value, an anchor,
-    // a comment after a value); and a list line `- value` is wording now.
-    ['locales/num.json', '{\n  "count": 1,\n  "x": "y"\n}\n', '{\n  "count": 2,\n  "x": "y"\n}\n', un('locales/num.json')],
-    ['locales/en/grow.json', '{\n  "a": "b"\n}\n', '{\n  "a": "b",\n  "c": "d"\n}\n', un('locales/en/grow.json')],
-    ['lang/en/cont.properties', 'a=Save \\\n  more\n', 'a=Store \\\n  more\n', lost('lang/en/cont.properties')],
-    ['lang/en/comment.properties', '# Save\na=b\n', '# Store\na=b\n', un('lang/en/comment.properties')],
-    ['i18n/en/list.yaml', '- Save\n', '- Store\n', NO_TEST],
-    ['i18n/en/blank.yaml', 'title: Old\n', 'title:   \n', un('i18n/en/blank.yaml')],
-    ['i18n/dq.yaml', 'save: "Save" now\n', 'save: "Store" now\n', lost('i18n/dq.yaml')],
-    ['i18n/sq.yaml', "save: 'Save'\n", "save: 'Store'\n", NO_TEST],
-    ['i18n/en/sqbad.yaml', "save: 'Save' x\n", "save: 'Store' x\n", lost('i18n/en/sqbad.yaml')],
-    ['i18n/en/anchor.yaml', 'save: &a Save\n', 'save: &a Store\n', lost('i18n/en/anchor.yaml')],
-    ['i18n/en/hash.yaml', 'save: Save # c\n', 'save: Store # c\n', lost('i18n/en/hash.yaml')],
     ['src/styles/start.css', 'a {\n  color:\nred;\n}\n', 'a {\n  color:\nblue;\n}\n', un('src/styles/start.css')],
     ['src/styles/two.css', 'a { border: 1px solid red; color: blue; }\n', 'a { border: 1px solid red; color: green; }\n', NO_TEST],
     ['src/styles/grow.css', 'a { color: red; }\n', 'a { color: red; }\nb { color: red; }\n', un('src/styles/grow.css')],
@@ -1339,24 +1313,14 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['tools/webpack.config.js', 'module.exports = {};\n', 'module.exports = { a: 1 };\n', 'it changes how the project is built or shipped in tools/webpack.config.js'],
     ['docs/CLAUDE.md', 'Old rule.\n', 'New rule.\n', un('docs/CLAUDE.md')],
     ['skills/x/helper.js', 'f(1);\n', 'f(2);\n', 'it changes program logic in skills/x/helper.js, and only wording and colours qualify'],
-    // Since the eighth round (the decision at review of 2026-10-09) nothing but the words of a
-    // plain paragraph may change in a Markdown file: a change of line endings alone, which
-    // passed, gets the functional plan's sentence (its log line still counts no changed line,
-    // asserted below), and so do the two front-matter rows further down.
-    ['docs/endings.md', 'One.\nTwo.\n', 'One.\r\nTwo.\r\n', inexact('docs/endings.md')],
-    // The security check's second round: front matter after a byte-order mark is still
-    // settings, an escaped scheme is still an address, and a `value` inside another
-    // attribute's value is no `value` attribute. A stray `}` in a tag was harmless; since the
-    // sixth round (the session's decision of 2026-10-09: the strict HTML subset) a brace
-    // anywhere inside a tag puts the file outside the subset, so this former pass refuses.
+    // A change of line endings alone is no changed line (its log line counts none, asserted
+    // below), and no wording: the number of carriage returns stays as it is in a page.
+    ['src/pages/endings.html', '<p>One.</p>\n<p>Two.</p>\n', '<p>One.</p>\r\n<p>Two.</p>\r\n', un('src/pages/endings.html')],
+    // The security check's second round: a `value` inside another attribute's value is no
+    // `value` attribute. A stray `}` in a tag was harmless; since the sixth round (the
+    // session's decision of 2026-10-09: the strict HTML subset) a brace anywhere inside a tag
+    // puts the file outside the subset, so this former pass refuses.
     ['src/pages/stray.html', '<p data-x=}>Save</p>\n', '<p data-x=}>Store</p>\n', inexact('src/pages/stray.html')],
-    // An unclosed first-line `---` was no front matter; since every scanner fails closed
-    // (2026-10-09) it is a front matter left open, and the change is unreadable.
-    ['docs/rule.md', '---\nOld text.\n', '---\nNew text.\n', inexact('docs/rule.md')],
-    ['docs/bom.md', '\uFEFF---\ntitle: a\n---\nBody.\n', '\uFEFF---\ntitle: b\n---\nBody.\n', inexact('docs/bom.md')],
-    // (An escape JSON.stringify would not write is outside the form the JSON reader follows
-    // since the ninth round: the file is refused before the value is read as an address.)
-    ['locales/esc.json', '{\n  "help": "Help"\n}\n', '{\n  "help": "\\u006aavascript:alert()"\n}\n', lost('locales/esc.json')],
     ['src/pages/opt.html', '<option title="no value here">Red</option>\n', '<option title="no value here">Blue</option>\n', un('src/pages/opt.html')],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
@@ -1380,42 +1344,40 @@ test('edge shapes of every kind give the exact verdict', async () => {
     else assert.equal(res.text, refusal(expected), `${p}: ${JSON.stringify(res)}`);
     fs.writeFileSync(path.join(root, ...p.split('/')), b);
   }
-  fs.writeFileSync(path.join(root, 'docs/endings.md'), 'One more.\nTwo.\n');
-  fs.writeFileSync(path.join(root, 'i18n/sq.yaml'), "save: 'Store'\n");
-  const twoFiles = await check(root, '--run-tests', 'i18n/sq.yaml', 'docs/endings.md');
-  assert.equal(twoFiles.text, refusal(NO_TEST), 'files named out of order are judged in path order');
-  fs.writeFileSync(path.join(root, 'docs/endings.md'), 'One.\nTwo.\n');
-  fs.writeFileSync(path.join(root, 'docs/second.md'), 'Second.\n');
+  // Files named out of order are judged in path order: both qualify, and with no test command no test ran.
+  writeFiles(root, { 'src/pages/second.html': '<p>Second.</p>\n' });
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'second']);
-  fs.writeFileSync(path.join(root, 'docs/second.md'), 'Second, changed.\n');
-  fs.writeFileSync(path.join(root, 'docs/endings.md'), 'One, changed.\nTwo.\n');
-  assertPass(await check(root, '--run-tests', 'docs/second.md', 'docs/endings.md'), ['docs/endings.md', 'docs/second.md']);
-  fs.writeFileSync(path.join(root, 'docs/second.md'), 'Second.\n');
-  fs.writeFileSync(path.join(root, 'docs/endings.md'), 'One.\nTwo.\n');
-  fs.writeFileSync(path.join(root, 'i18n/sq.yaml'), "save: 'Save'\n");
+  fs.writeFileSync(path.join(root, 'src/pages/second.html'), '<p>Second, changed.</p>\n');
+  fs.writeFileSync(path.join(root, 'src/pages/endings.html'), '<p>One, changed.</p>\n<p>Two.</p>\n');
+  const twoFiles = await check(root, 'src/pages/second.html', 'src/pages/endings.html');
+  assertChecking(twoFiles, ['src/pages/endings.html', 'src/pages/second.html']);
+  assert.equal((await check(root, '--run-tests', 'src/pages/second.html', 'src/pages/endings.html')).text, refusal(NO_TEST));
+  fs.writeFileSync(path.join(root, 'src/pages/second.html'), '<p>Second.</p>\n');
+  fs.writeFileSync(path.join(root, 'src/pages/endings.html'), '<p>One.</p>\n<p>Two.</p>\n');
   writeFiles(root, { 'src/pages/nonl.html': '<p>new</p>' });
   assert.equal((await check(root, 'src/pages/nonl.html')).text, refusal('it adds, removes or renames src/pages/nonl.html'));
   const lines = logLines(root);
   assert.equal(lines[lines.length - 1].lines, 1, 'a new file without a final newline counts its one line');
-  const endings = shapes.findIndex((x) => x[0] === 'docs/endings.md');
+  const endings = shapes.findIndex((x) => x[0] === 'src/pages/endings.html');
   assert.deepEqual([lines[endings].verdict, lines[endings].lines], ['refused', 0], 'line endings alone are no changed line');
-  assert.equal(lines.filter((l) => l.verdict === 'hotfix').length, shapes.filter((x) => x[3] === null).length + 1,
-    'one line per pass: each passing shape, and the two-file pass');
+  assert.equal(lines.filter((l) => l.verdict === 'hotfix').length, 0, 'with no test command nothing passes');
   // git lists changed files before new ones; the check still judges in path order.
-  fs.writeFileSync(path.join(root, 'docs/endings.md'), 'One, changed.\nTwo.\n');
-  writeFiles(root, { 'docs/aaa.md': 'New.\n' });
-  assert.equal((await check(root, 'docs/endings.md', 'docs/aaa.md')).text, refusal('it adds, removes or renames docs/aaa.md'));
+  fs.rmSync(path.join(root, 'src/pages/nonl.html'));
+  fs.writeFileSync(path.join(root, 'src/pages/endings.html'), '<p>One, changed.</p>\n<p>Two.</p>\n');
+  writeFiles(root, { 'src/pages/aaa.html': '<p>New.</p>\n' });
+  assert.equal((await check(root, 'src/pages/endings.html', 'src/pages/aaa.html')).text, refusal('it adds, removes or renames src/pages/aaa.html'));
 });
 
 test('a project in a sub-folder of the repository judges only its own files, shown from its own root', async () => {
-  const repo = makeRepo({ 'app/README.md': 'Old app wording.\n', 'other/README.md': 'Old other wording.\n' });
-  fs.writeFileSync(path.join(repo, 'app/README.md'), 'New app wording.\n');
-  fs.writeFileSync(path.join(repo, 'other/README.md'), 'New other wording.\n');
+  const repo = makeRepo({ 'app/page.html': '<p>Old app wording.</p>\n', 'other/page.html': '<p>Old other wording.</p>\n',
+    'app/package.json': packageJson(SCRIPT), 'app/tests/page.test.js': nodeTest('has a page', "  assert.ok(read('page.html').includes('<p>'));") });
+  fs.writeFileSync(path.join(repo, 'app/page.html'), '<p>New app wording.</p>\n');
+  fs.writeFileSync(path.join(repo, 'other/page.html'), '<p>New other wording.</p>\n');
   const app = path.join(repo, 'app');
-  assertChecking(await check(app), ['README.md']);
-  assertPass(await check(app, '--run-tests'), ['README.md']);
-  assertPass(await check(app, '--run-tests', 'README.md'), ['README.md']);
+  assertChecking(await check(app), ['page.html']);
+  assertPass(await check(app, '--run-tests'), ['page.html']);
+  assertPass(await check(app, '--run-tests', 'page.html'), ['page.html']);
 });
 
 test('a test location that is not a readable file address is shown as written', async () => {
@@ -1429,18 +1391,18 @@ test('a test location that is not a readable file address is shown as written', 
 });
 
 test('a log folder that cannot be written changes no answer', async () => {
-  const root = makeRepo({ 'README.md': 'Old wording.\n' });
+  const root = testedProject();
   const ctoc = path.join(root, '.ctoc');
   fs.mkdirSync(ctoc);
   fs.chmodSync(ctoc, 0o555);
-  fs.writeFileSync(path.join(root, 'README.md'), 'New wording.\n');
+  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
   let res;
   try {
-    res = await check(root, '--run-tests', 'README.md');
+    res = await check(root, '--run-tests', 'src/pages/home.html');
   } finally {
     fs.chmodSync(ctoc, 0o755);
   }
-  assertPass(res, ['README.md']);
+  assertPass(res, ['src/pages/home.html']);
   // Permissions bind only a non-administrator account on a system that enforces them.
   const enforced = process.platform !== 'win32' && typeof process.getuid === 'function' && process.getuid() !== 0;
   if (enforced) assert.equal(fs.existsSync(path.join(ctoc, 'logs')), false);
@@ -1566,22 +1528,6 @@ test('finding 2a: the first failing test is read from blank lines in linear time
   assert.ok(ratio < 8, `${n} KB of blank lines took ${small.toFixed(1)} ms and ${4 * n} KB took ${four.toFixed(1)} ms`);
 });
 
-test('finding 2b: a catalogue line with trailing spaces is read in linear time', async (t) => {
-  // Since the ninth round the JSON reader is JSON.parse itself (no pattern reads a line any
-  // more), and a file that does not parse "holds something I cannot follow".
-  const base = '{\n  "save": "Save"\n}\n';
-  const root = makeRepo({ 'locales/en.json': base });
-  fs.writeFileSync(path.join(root, 'locales', 'en.json'), `{\n  "save": "Store"${' '.repeat(1000)}x\n}\n`);
-  assert.equal((await check(root, 'locales/en.json')).text, refusal('I could not read the change (locales/en.json holds something I cannot follow)'));
-  const at = (n) => {
-    const change = changeOf('locales/en.json', base, `{\n  "save": "Store"${' '.repeat(1000 * n)}x\n}\n`);
-    return () => assert.equal(ruleRefusal(change).cause, 'unreadable');
-  };
-  const { n, small, big, ratio } = await growth(at, 16, 1600);
-  t.diagnostic(`${n} thousand trailing spaces: ${small.toFixed(1)} ms, ${4 * n} thousand: ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
-  assert.ok(ratio < 8, `${n} thousand trailing spaces took ${small.toFixed(1)} ms and ${4 * n} thousand took ${big.toFixed(1)} ms`);
-});
-
 test('finding 2c: a colour change in a one-line stylesheet is judged in linear time', async (t) => {
   const many = (n) => '.a { color: red; } '.repeat(100 * n);
   const long = (n) => `.a { box-shadow:${' red'.repeat(400 * n)}; }`;
@@ -1636,23 +1582,23 @@ test('finding 8: a named file with control characters is quoted cleaned in every
 });
 
 test('finding 9: a judged file named like an option reaches the test run after --', async () => {
-  const root = makeRepo({ '--x.md': 'Old wording.\n' });
-  fs.writeFileSync(path.join(root, '--x.md'), 'New wording.\n');
-  const first = await check(root, '--', '--x.md');
-  assertChecking(first, ['--x.md']);
-  assert.equal(first.next, "hotfix check --run-tests -- '--x.md'");
+  const root = makeRepo({ '--x.html': '<p>Old wording.</p>\n', 'tests/any.test.js': nodeTest('runs', '  assert.ok(true);') }, { testScript: SCRIPT });
+  fs.writeFileSync(path.join(root, '--x.html'), '<p>New wording.</p>\n');
+  const first = await check(root, '--', '--x.html');
+  assertChecking(first, ['--x.html']);
+  assert.equal(first.next, "hotfix check --run-tests -- '--x.html'");
   const words = shellWords(first.next);
   assert.deepEqual(words.slice(0, 2), ['hotfix', 'check']);
   const second = await check(root, ...words.slice(2));
-  assertPass(second, ['--x.md']);
-  fs.writeFileSync(path.join(root, 'notes.md'), 'Other.\n');
-  git(root, ['add', 'notes.md']);
+  assertPass(second, ['--x.html']);
+  fs.writeFileSync(path.join(root, 'notes.html'), '<p>Other.</p>\n');
+  git(root, ['add', 'notes.html']);
   git(root, ['commit', '-q', '-m', 'notes']);
-  fs.writeFileSync(path.join(root, 'notes.md'), 'Other, changed.\n');
-  const mixed = await check(root, '--', 'notes.md', '--x.md');
-  assert.equal(mixed.next, "hotfix check --run-tests -- '--x.md' 'notes.md'", 'a mixed set carries --');
-  assertPass(await check(root, ...shellWords(mixed.next).slice(2)), ['--x.md', 'notes.md']);
-  assert.equal((await check(root, '--run-tests', '--x.md')).text, `Unknown hotfix command: --x.md. ${USAGE}`,
+  fs.writeFileSync(path.join(root, 'notes.html'), '<p>Other, changed.</p>\n');
+  const mixed = await check(root, '--', 'notes.html', '--x.html');
+  assert.equal(mixed.next, "hotfix check --run-tests -- '--x.html' 'notes.html'", 'a mixed set carries --');
+  assertPass(await check(root, ...shellWords(mixed.next).slice(2)), ['--x.html', 'notes.html']);
+  assert.equal((await check(root, '--run-tests', '--x.html')).text, `Unknown hotfix command: --x.html. ${USAGE}`,
     'without --, a name that looks like an option is still the usage text');
 });
 
@@ -1794,9 +1740,9 @@ test('round 2, finding 3: a project inside a sensitive, test, governing, build o
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   // [the project folder, the file, its old and new content, the clause]
   const shapes = [
-    ['services/payment', 'README.md', 'Old wording.\n', 'New wording.\n', 'README.md sits in an area named payment, and such areas are never a hotfix'],
-    ['tests/e2e', 'README.md', 'Old wording.\n', 'New wording.\n', 'it changes a test (README.md)'],
-    ['agents/x', 'README.md', 'Old wording.\n', 'New wording.\n', un('README.md')],
+    ['services/payment', 'index.html', '<p>Old wording.</p>\n', '<p>New wording.</p>\n', 'index.html sits in an area named payment, and such areas are never a hotfix'],
+    ['tests/e2e', 'index.html', '<p>Old wording.</p>\n', '<p>New wording.</p>\n', 'it changes a test (index.html)'],
+    ['agents/x', 'index.html', '<p>Old wording.</p>\n', '<p>New wording.</p>\n', un('index.html')],
     ['.circleci/web', 'config.yml', 'name: old\n', 'name: new\n', 'it changes how the project is built or shipped in config.yml'],
     ['db/migrations/app', 'seed.yaml', 'name: old\n', 'name: new\n', 'it changes stored data in seed.yaml']
   ];
@@ -1837,7 +1783,7 @@ test('round 2, finding 9: a pass names each judged file with its staged id, whic
 // HTML, plain CSS, catalogues, Markdown and plain text only, so the rows on conditional
 // templates, Sass variables, reStructuredText literal blocks and directives, and TypeScript
 // generics now assert that each such file is a kind the check does not recognise.
-test('round 4: components and code elements in HTML, Markdown lists and definitions, catalogue values, custom properties; Vue, JSX, Sass, Less and reStructuredText files are not recognised', async () => {
+test('round 4: components and code elements in HTML, custom properties; Vue, JSX, Sass, Less and reStructuredText files are not recognised', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const shapes = [
@@ -1859,27 +1805,6 @@ test('round 4: components and code elements in HTML, Markdown lists and definiti
     ['src/styles/width.css', 'a { width: #fff; }\n', 'a { width: #000; }\n', un('src/styles/width.css')],
     ['src/styles/fill.css', 'path { fill: red; stroke: blue; outline-color: red; }\n', 'path { fill: blue; stroke: red; outline-color: blue; }\n', null],
     ['src/styles/design-tokens.css', '.a { border-color: red; }\n', '.a { border-color: blue; }\n', null],
-    // Markdown lists: a fence inside an item whose content starts at column 4, a thematic
-    // break that is no list item, and code after a list that has ended.
-    // Since the eighth round (the decision at review of 2026-10-09: a Markdown edit qualifies only
-    // as a wording change in pure prose, because no reader agrees with every renderer on
-    // structure) each Markdown row of this table, which relied on a list, indented code, a
-    // fence or a definition, asserts the functional plan's sentence; `docs/ordered.md` (a
-    // paragraph inside a list item) and `docs/after-def.md` (a line under a definition) passed.
-    ['docs/list-fence.md', '1.  Step:\n\n    ```\n    pip install requests\n    ```\n', '1.  Step:\n\n    ```\n    pip install reqests\n    ```\n', inexact('docs/list-fence.md')],
-    ['docs/break.md', '* * *\n\n    pip install requests\n', '* * *\n\n    pip install reqests\n', inexact('docs/break.md')],
-    ['docs/ended.md', '- Item.\n\nText.\n\n    pip install requests\n', '- Item.\n\nText.\n\n    pip install reqests\n', inexact('docs/ended.md')],
-    ['docs/wide.md', '-     pip install requests\n', '-     pip install reqests\n', inexact('docs/wide.md')],
-    ['docs/fence-out.md', '- a\n  ```\n  x\n- b\n```\npip install requests\n```\n', '- a\n  ```\n  x\n- b\n```\npip install reqests\n```\n', inexact('docs/fence-out.md')],
-    ['docs/ordered.md', '1. Step one.\n\n   Old words.\n', '1. Step one.\n\n   New words.\n', inexact('docs/ordered.md')],
-    ['docs/ordered-two.md', 'Text.\n2. foo\n\n      pip install requests\n', 'Text.\n2. foo\n\n      pip install reqests\n', inexact('docs/ordered-two.md')],
-    ['docs/item-fence.md', '- ```\n  pip install requests\n  ```\n', '- ```\n  pip install reqests\n  ```\n', inexact('docs/item-fence.md')],
-    ['docs/item-doctest.md', '- >>> print("old")\n  old\n', '- >>> print("old")\n  new\n', inexact('docs/item-doctest.md')],
-    // Since the review of 2026-10-09 a definition in any but its plain one-line form cannot be read exactly.
-    ['docs/two-defs.md', 'See [it][b].\n\n[a]:\n[b]: /one\n', 'See [it][b].\n\n[a]:\n[b]: /two\n', inexact('docs/two-defs.md')],
-    // A reference definition with an inline title.
-    ['docs/inline-title.md', 'See [it][a].\n\n[a]: /u\n"Old title"\n', 'See [it][a].\n\n[a]: /u\n"New title"\n', inexact('docs/inline-title.md')],
-    ['docs/after-def.md', 'See [it][a].\n\n[a]: /u\nOld words.\n', 'See [it][a].\n\n[a]: /u\nNew words.\n', inexact('docs/after-def.md')],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
     // stay, and each now asserts the "not recognised" refusal.
@@ -1942,45 +1867,14 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
     ['src/styles/block.css', 'a { color: red; }\nb {\n', 'a { color: blue; }\nb {\n', open('src/styles/block.css')],
     ['src/styles/string.css', 'a { color: red; }\nb { content: "x }\n', 'a { color: blue; }\nb { content: "x }\n', lost('src/styles/string.css')],
     ['src/styles/extra.css', 'a { color: red; }\n}\n', 'a { color: blue; }\n}\n', lost('src/styles/extra.css')],
-    // Markdown: a change above an unclosed fence, under one (a guard), an unclosed front
-    // matter, a brace beside the change and an unclosed HTML comment in the prose.
-    // Since the eighth round (the decision at review of 2026-10-09) Markdown is read as pure
-    // prose. A plain paragraph ABOVE a fence or a comment that is never closed is prose for
-    // every renderer, so `docs/fence-below.md` and `docs/comment-open.md` now qualify; a change
-    // under an open fence, inside front matter, beside a brace, or to the fence itself gets the
-    // functional plan's sentence.
-    ['docs/fence-below.md', 'Old words.\n\n```\ncode\n', 'New words.\n\n```\ncode\n', null],
-    ['docs/fence-above.md', '```\ncode\nOld words.\n', '```\ncode\nNew words.\n', inexact('docs/fence-above.md')],
-    ['docs/front-open.md', '---\nOld text.\n', '---\nNew text.\n', inexact('docs/front-open.md')],
-    // Since the sixth round a brace is a plain character to the HTML reader; in Markdown it
-    // reaches its own paragraph, so this change beside one is "not recognised", no longer "open".
-    ['docs/brace-open.md', 'Old words {{ x\n', 'New words {{ x\n', inexact('docs/brace-open.md')],
-    // Since the ninth round (the decision at review of 2026-10-09) a raw start tag anywhere in a
-    // Markdown file refuses it, `<!--` among them, also below the changed paragraph.
-    ['docs/comment-open.md', 'Old words.\n\n<!-- note\n', 'New words.\n\n<!-- note\n', inexact('docs/comment-open.md')],
     // One side well-formed and the other not.
     ['src/pages/one-side.html', '<p>Save</p>\n<!-- c -->\n', '<p>Store</p>\n<!-- c --\n', inexact('src/pages/one-side.html')],
-    ['docs/one-side.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n``\n', inexact('docs/one-side.md')],
     // Well-formed files still qualify.
     ['src/pages/closed.html', '<p>Save</p>\n<!-- note -->\n<script>run();</script>\n', '<p>Store</p>\n<!-- note -->\n<script>run();</script>\n', null],
-    ['docs/closed.md', 'Old words.\n\n```\ncode\n```\n', 'New words.\n\n```\ncode\n```\n', null],
-    // A catalogue line whose state at its start is not a fresh entry: inside a YAML block
-    // scalar, a quoted value or a flow collection begun above, or a properties value
-    // continued from the line above.
-    // Since the ninth round (the decisions at review of 2026-10-09) a catalogue is read whole in
-    // a strict subset, so a block scalar or a continued line anywhere refuses the file, also
-    // above the changed line (the last two rows passed); the files moved into `en/` because a
-    // catalogue's name or folder now holds a language tag.
-    ['i18n/en/block.yaml', 'desc: |\n  save: Save\n', 'desc: |\n  save: Store\n', lost('i18n/en/block.yaml')],
-    ['i18n/en/folded.yaml', 'desc: >-\n  save: Save\nnext: Hi\n', 'desc: >-\n  save: Store\nnext: Hi\n', lost('i18n/en/folded.yaml')],
-    ['i18n/en/quoted.yaml', 'a: "one\n  b: two"\n', 'a: "one\n  b: three"\n', lost('i18n/en/quoted.yaml')],
-    ['i18n/en/flow.yaml', 'a: [one,\n  b: two]\n', 'a: [one,\n  b: three]\n', lost('i18n/en/flow.yaml')],
-    ['lang/en/cont.properties', 'a=Save \\\nb=Cancel\n', 'a=Save \\\nb=Close\n', lost('lang/en/cont.properties')],
-    ['i18n/en/after-block.yaml', 'desc: |\n  Long text.\nsave: Save\n', 'desc: |\n  Long text.\nsave: Store\n', lost('i18n/en/after-block.yaml')],
-    ['lang/en/after-cont.properties', 'a=Save \\\n  more\nb=Cancel\n', 'a=Save \\\n  more\nb=Close\n', lost('lang/en/after-cont.properties')],
     // A file emptied is the content of a removal, never wording (found by the cut-short property case).
-    ['notes/emptied.txt', 'Old words.\n', '', un('notes/emptied.txt')],
-    ['notes/filled.txt', '', 'New words.\n', un('notes/filled.txt')],
+    ['src/pages/emptied.html', '<p>Old words.</p>\n', '', un('src/pages/emptied.html')],
+    ['src/pages/filled.html', '', '<p>New words.</p>\n', un('src/pages/filled.html')],
+    ['src/styles/emptied.css', 'a { color: red; }\n', '', un('src/styles/emptied.css')],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
     // stay, and each now asserts the "not recognised" refusal.
@@ -2013,22 +1907,20 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
 });
 
 test('round 4: CTOC\'s enforcement list applies only in CTOC\'s own repository', async () => {
-  const notes = { 'src/hooks/README.md': '# Hooks\n\nOld notes.\n' };
+  const notes = { 'src/hooks/notes.html': HOME };
   const ctoc = makeRepo({ ...notes, 'package.json': '{ "name": "ctoc" }\n', 'CLAUDE.md': '# CTOC Project Instructions\n', '.ctoc/keep.json': '{}\n' });
-  fs.writeFileSync(path.join(ctoc, 'src', 'hooks', 'README.md'), '# Hooks\n\nNew notes.\n');
-  assert.equal((await check(ctoc, 'src/hooks/README.md')).text,
-    refusal('src/hooks/README.md sits in an area named enforcement, and such areas are never a hotfix'));
+  fs.writeFileSync(path.join(ctoc, 'src', 'hooks', 'notes.html'), HOME_STORE);
+  assert.equal((await check(ctoc, 'src/hooks/notes.html')).text,
+    refusal('src/hooks/notes.html sits in an area named enforcement, and such areas are never a hotfix'));
   const react = makeRepo({ ...notes, 'package.json': '{ "name": "web" }\n', 'CLAUDE.md': '# Web\n', '.ctoc/keep.json': '{}\n' });
-  fs.writeFileSync(path.join(react, 'src', 'hooks', 'README.md'), '# Hooks\n\nNew notes.\n');
-  assertChecking(await check(react, 'src/hooks/README.md'), ['src/hooks/README.md']);
+  fs.writeFileSync(path.join(react, 'src', 'hooks', 'notes.html'), HOME_STORE);
+  assertChecking(await check(react, 'src/hooks/notes.html'), ['src/hooks/notes.html']);
 });
 
 // Renamed at review (2026-10-09): the rows on template literals, Vue and JSX templates and
 // Sass now assert that each such file is a kind the check does not recognise.
-test('round 3: the whole-file scanners read script escape states, titles, comments, stylesheet strings and Markdown code spans; JSX, Vue, Sass and reStructuredText files are not recognised', async () => {
+test('round 3: the whole-file scanners read script escape states, titles, comments and stylesheet strings; JSX, Vue, Sass and reStructuredText files are not recognised', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
-  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
-  const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
   const shapes = [
     // A script block's escape states: `</script>` inside `<!--<script>` does not end it.
     ['src/pages/escaped.html', '<script><!--<script></script><b>Save</b></script>\n<p>Hi</p>\n', '<script><!--<script></script><b>Store</b></script>\n<p>Hi</p>\n', un('src/pages/escaped.html')],
@@ -2039,27 +1931,6 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
     ['src/pages/tpl.html', '<template><p>Save</p></template>\n', '<template><p>Store</p></template>\n', un('src/pages/tpl.html')],
     // A CDATA section inside `<svg>`: outside the strict subset.
     ['src/pages/cdata.html', '<svg><![CDATA[ a > <b>Save</b> ]]></svg>\n', '<svg><![CDATA[ a > <b>Store</b> ]]></svg>\n', inexact('src/pages/cdata.html')],
-    // Catalogue escapes: YAML's \x and \u, a properties file's \u; an unknown or short
-    // escape is not wording.
-    // Since the coordinator's point at review of 2026-10-09 a value is read as written too, and
-    // an escape written with digits holds digits (until then this row passed: the decoded
-    // value is `Store`). A value with an escape that holds none still passes.
-    ['i18n/esc.yaml', 'title: "Save"\n', 'title: "Sto\\x72e"\n', risk('i18n/esc.yaml')],
-    ['i18n/en/esc-quote.yaml', 'title: "Save"\n', 'title: "Say \\"store\\" now"\n', null],
-    ['i18n/at.yaml', 'title: "Save"\n', 'title: "Mail \\u0040x"\n', risk('i18n/at.yaml')],
-    // Since the ninth round a YAML or JSON file outside the strict subset "holds something I
-    // cannot follow" (an escape YAML does not know, a second `: ` in a plain value, a comment
-    // in place of a value, a raw tab in a JSON string); the files whose names are no language
-    // tag moved into `en/`.
-    ['i18n/en/short.yaml', 'title: "Save"\n', 'title: "Sto\\x7"\n', lost('i18n/en/short.yaml')],
-    ['i18n/en/plain.yaml', 'title: Save\n', 'title: Store: now\n', lost('i18n/en/plain.yaml')],
-    ['i18n/en/hashstart.yaml', 'title: Save\n', 'title: #Store\n', lost('i18n/en/hashstart.yaml')],
-    // As `i18n/esc.yaml` above: the escape is written with digits (until the coordinator's
-    // point at review of 2026-10-09 this row passed).
-    ['lang/uni.properties', 'title=Save\n', 'title=Sto\\u0072e\n', risk('lang/uni.properties')],
-    ['lang/en/colon.properties', 'title=Save\n', 'title=Save\\: all\n', null],
-    ['lang/en/badu.properties', 'title=Save\n', 'title=Sto\\u00zz\n', un('lang/en/badu.properties')],
-    ['locales/ctl.json', '{\n  "title": "Save"\n}\n', '{\n  "title": "Sto\tre"\n}\n', lost('locales/ctl.json')],
     // Stylesheets: a colour function in its space form, a string, a colour beside a `url(…)`.
     ['src/styles/space.css', 'a { color: rgb(1 2 3 / 50%); }\n', 'a { color: rgb(1 2 4 / 50%); }\n', null],
     ['src/styles/badfn.css', 'a { color: rgb(1 2 3); }\n', 'a { color: rgb(1 2 3 / 4 / 5); }\n', un('src/styles/badfn.css')],
@@ -2067,30 +1938,9 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
     // A pass until the sixth round: the colour is not the whole value of its property, which
     // the functional plan (amended 2026-10-09) refuses as a change the check cannot read exactly.
     ['src/styles/quoted.css', 'a { background: url("one.png") red; }\n', 'a { background: url("one.png") blue; }\n', inexact('src/styles/quoted.css')],
-    // Markdown: code spans, unmatched backticks, a JSON front matter never closed, a link
-    // target in angle brackets, a full reference, a heading after an indented block.
-    // Since the eighth round (the decision at review of 2026-10-09) each of these rows, which
-    // relied on a code span, a link or a fence, asserts the functional plan's sentence
-    // (`docs/beside.md` and `docs/escaped.md` passed). `docs/open-json.md` now qualifies: its
-    // changed paragraph is plain prose bounded by an empty line, and no reader of the rule
-    // takes a `{` line above it for front matter. `docs/after-code.md` still qualifies.
-    ['docs/span.md', 'Run `pip install requests` first.\n', 'Run `pip install reqests` first.\n', inexact('docs/span.md')],
-    ['docs/beside.md', 'Run `npm test` first, ``x`` and ` alone.\n', 'Run `npm test` now, ``x`` and ` alone.\n', inexact('docs/beside.md')],
-    ['docs/open-json.md', '{\n  "title": "Old"\n\nBody old.\n', '{\n  "title": "Old"\n\nBody new.\n', null],
-    // Since the review of 2026-10-09 a destination in angle brackets cannot be read exactly
-    // (without its link text it would be a tag).
-    ['docs/angle.md', 'See [the guide](<a b.md>) now.\n', 'See [the guide](<a c.md>) now.\n', inexact('docs/angle.md')],
-    ['docs/full.md', 'See [the guide][a] now.\n\n[a]: /a\n[b]: /b\n', 'See [the guide][b] now.\n\n[a]: /a\n[b]: /b\n', inexact('docs/full.md')],
-    ['docs/escaped.md', 'See [x](a\\)b) old.\n', 'See [x](a\\)b) new.\n', inexact('docs/escaped.md')],
-    ['docs/after-code.md', 'Text.\n\n    code here\n\nOld words.\n', 'Text.\n\n    code here\n\nNew words.\n', null],
-    ['docs/unfence.md', '```\ncode\n```\nOld words.\n', '```\ncode\n\nOld words.\n', inexact('docs/unfence.md')],
-    // Instruction files by class, and documentation in any other dot-folder.
-    ['docs/GEMINI.local.md', 'Old rule.\n', 'New rule.\n', un('docs/GEMINI.local.md')],
-    ['src/copilot-instructions.md', 'Old rule.\n', 'New rule.\n', un('src/copilot-instructions.md')],
-    ['.vscode/notes.txt', 'Old note.\n', 'New note.\n', un('.vscode/notes.txt')],
-    // GitHub's assistant files stay governing under `.github/`.
-    ['.github/instructions/web.instructions.md', 'Old rule.\n', 'New rule.\n', un('.github/instructions/web.instructions.md')],
-    ['.github/ISSUE_TEMPLATE/bug.md', 'Describe the old bug.\n', 'Describe the new bug.\n', null],
+    // GitHub's assistant folders stay governing under `.github/`; every other file there is the build.
+    ['.github/prompts/card.html', '<p>Save</p>\n', '<p>Store</p>\n', un('.github/prompts/card.html')],
+    ['.github/pages/card.html', '<p>Save</p>\n', '<p>Store</p>\n', 'it changes how the project is built or shipped in .github/pages/card.html'],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
     // stay, and each now asserts the "not recognised" refusal.
@@ -2137,14 +1987,13 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
 // The fifth round (2026-10-09): the fixes that still apply after the owner's decision to
 // keep only the formats the check reads exactly. Each trap answered `checking` on
 // `6de2f75c`. [fix, path, base content, new content, the clause, or null for `checking`]
-test('round 5: host elements, the element stack, MDX, backtick pairing, block quotes, labels, stylesheet names, colour-named custom properties', async () => {
+test('round 5: host elements, the element stack, stylesheet names, custom properties', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const area = (f, word) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
   const sql = ['SELECT name FROM users', 'SELECT pass FROM admins'];
   const pip = ['pip install requests', 'pip install reqests'];
-  const rm = ['rm -rf build', 'rm -rf dist'];
   /** One row from a template holding `@`, replaced by the old and the new text. */
   const row = (fix, p, template, [o, n], expected) => [fix, p, template.replace('@', o), template.replace('@', n), expected];
   const shapes = [
@@ -2163,7 +2012,6 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     // 2. A stack of open elements: an end tag that does not close the top of the stack while
     // an element that holds text is open cannot be followed.
     row(2, 'src/pages/stack.html', '<run-sql><div></run-sql>@</div></run-sql>\n', sql, inexact('src/pages/stack.html')),
-    row(2, 'docs/stack.md', 'Text.\n\n<run-sql><div></run-sql>@</div></run-sql>\n', sql, inexact('docs/stack.md')),
     row(2, 'src/pages/implied.html', '<ul><li>One<li>@</ul>\n<p>a<br>b</p>\n', ['Save', 'Store'], null),
     // A pass until the review of 2026-10-09: an end tag that closes nothing is outside the
     // strict subset (the reviewer's general rule; a browser makes an empty element for `</p>`).
@@ -2174,74 +2022,6 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     // (the session's decision of 2026-10-09, item 1; a browser knows no braces).
     row(2, 'src/pages/braced.html', '<p data-x={a} data-y={`b`}>@</p>\n', ['Save', 'Store'], inexact('src/pages/braced.html')),
     row(2, 'src/pages/after-held.html', '<my-card><p>one</p></my-card>\n<p>@</p>\n', ['Save', 'Store'], null),
-    // 3. Markdown that may be built as MDX: a brace in the changed prose and an `import` or
-    // `export` block are code.
-    // Since the eighth round (the decision at review of 2026-10-09: Markdown qualifies only as a
-    // wording change in pure prose) every Markdown row of items 3 to 6 that relied on a brace,
-    // an `import` line, a code span, a list, a quote, a table or a link label asserts the
-    // functional plan's sentence. Of the rows that passed, `docs/mdx-far.md` (a paragraph below
-    // a `<p>` tag), `docs/tick-cell.md`, `docs/tick-third.md`, `docs/tick-alone.md`,
-    // `docs/tick-items.md` and `docs/quote-prose.md` refuse now; `docs/important.md` and
-    // `docs/quote-after.md` are plain paragraphs and still qualify.
-    row(3, 'docs/mdx-brace.md', 'Hello {eval(@)} there.\n', ['name', 'code'], inexact('docs/mdx-brace.md')),
-    row(3, 'docs/mdx-open.md', 'Hello {\n  eval(@)\n} there.\n', ['name', 'code'], inexact('docs/mdx-open.md')),
-    row(3, 'docs/mdx-beside.md', 'Hello {name}. @ words.\n', ['Old', 'New'], inexact('docs/mdx-beside.md')),
-    row(3, 'docs/mdx-import.md', "import Chart from './@'\n\nWords.\n", ['chart', 'other'], inexact('docs/mdx-import.md')),
-    row(3, 'docs/mdx-wrap.md', "import Chart\n  from './@'\n\nWords.\n", ['chart', 'other'], inexact('docs/mdx-wrap.md')),
-    row(3, 'docs/mdx-export.md', "export const meta = '@'\n\nWords.\n", ['old', 'new'], inexact('docs/mdx-export.md')),
-    row(3, 'docs/mdx-far.md', '<p>Hello {name}</p>\n\n@ words.\n', ['Old', 'New'], inexact('docs/mdx-far.md')),
-    row(3, 'docs/important.md', 'important @ words.\n', ['old', 'new'], null),
-    // 4. Backticks pair inside one paragraph or heading, never across a blank line or the
-    // start of a block; where a table cell, an escape or a tag makes the pairing uncertain,
-    // everything from the first to the last backtick is compared exactly.
-    row(4, 'docs/tick-para.md', 'A lone ` here.\n\nRun `@` now.\n', rm, inexact('docs/tick-para.md')),
-    row(4, 'docs/tick-heading.md', '# A lone ` here\nRun `@` now.\n', rm, inexact('docs/tick-heading.md')),
-    row(4, 'docs/tick-list.md', '- a lone ` here\n- run `@` now\n', rm, inexact('docs/tick-list.md')),
-    row(4, 'docs/tick-setext.md', 'A lone ` here\n===\nRun `@` now.\n', rm, inexact('docs/tick-setext.md')),
-    row(4, 'docs/tick-break.md', 'A lone ` here\n* * *\nRun `@` now.\n', rm, inexact('docs/tick-break.md')),
-    row(4, 'docs/tick-quote.md', 'A lone ` here\n> Run `@` now.\n', rm, inexact('docs/tick-quote.md')),
-    // Refused until the review of 2026-10-09 because a table cell might end at the `|`. The
-    // line is no table row (no delimiter row follows), and markdown-it reads the first two
-    // backticks as the span and the changed words as plain text, as the check now does.
-    row(4, 'docs/tick-cell.md', '| ` | `@` |\n', rm, inexact('docs/tick-cell.md')),
-    row(4, 'docs/tick-row.md', '| a | b |\n| - | - |\n| ` | `@` |\n', rm, inexact('docs/tick-row.md')),
-    row(4, 'docs/tick-escape.md', 'A \\` then `@` now.\n', rm, inexact('docs/tick-escape.md')),
-    // Since the review of 2026-10-09 the tag is read first, as a Markdown reader does, and the
-    // changed words stand in a code span: code, no longer "cannot read exactly".
-    row(4, 'docs/tick-tag.md', 'A <b title="`">x</b> then `@` now.\n', rm, inexact('docs/tick-tag.md')),
-    row(4, 'docs/tick-lazy.md', '> a `@\nc` d\n', ['b', 'x'], inexact('docs/tick-lazy.md')),
-    // An ordered item not numbered 1 after a bullet item starts no item: the span runs on.
-    // After another ordered item it does, and each item's lone backtick pairs with nothing.
-    // Since the review of 2026-10-09: readers disagree whether `2.` right under a bullet item
-    // starts a list or runs the paragraph on, so the file cannot be read exactly.
-    row(4, 'docs/tick-second.md', '- a `@\n2. b` c\n', ['b', 'x'], inexact('docs/tick-second.md')),
-    row(4, 'docs/tick-third.md', '2. a `@\n3. b` c\n', ['b', 'x'], inexact('docs/tick-third.md')),
-    row(4, 'docs/tick-wrapped.md', 'Run `rm -rf\n@` now.\n', ['build', 'dist'], inexact('docs/tick-wrapped.md')),
-    row(4, 'docs/tick-indent.md', '> a `@\n    c` d\n', ['b', 'x'], inexact('docs/tick-indent.md')),
-    row(4, 'docs/tick-lazy-rule.md', '- a `@\nb\n===\ny` z\n', ['x', 'w'], inexact('docs/tick-lazy-rule.md')),
-    row(4, 'docs/tick-item-rule.md', '> a\n- b `\n  ===\n  run `@` now\n', rm, inexact('docs/tick-item-rule.md')),
-    row(4, 'docs/tick-import.md', 'a `@\nimport `c` d\n', ['b', 'x'], inexact('docs/tick-import.md')),
-    row(4, 'docs/tick-after-fence.md', '```\ncode\n```\n    @\n', pip, inexact('docs/tick-after-fence.md')),
-    row(4, 'docs/tick-after-heading.md', '# Title\n    @\n', pip, inexact('docs/tick-after-heading.md')),
-    row(4, 'docs/tick-after-quote.md', '>     code\n    @\n', pip, inexact('docs/tick-after-quote.md')),
-    row(4, 'docs/tick-alone.md', 'Run `npm test` first.\n\n@ words with ` alone.\n', ['Old', 'New'], inexact('docs/tick-alone.md')),
-    row(4, 'docs/tick-items.md', '- run `npm test`\n- @ words\n- then `npm start`\n', ['old', 'new'], inexact('docs/tick-items.md')),
-    // 5. Block quotes are read like the document they quote.
-    row(5, 'docs/quote-code.md', '> Install:\n>\n>     @\n', pip, inexact('docs/quote-code.md')),
-    row(5, 'docs/quote-fence.md', '> ~~~\n> @\n> ~~~\n', pip, inexact('docs/quote-fence.md')),
-    row(5, 'docs/quote-doctest.md', '> >>> print("old")\n> @\n', ['old', 'new'], inexact('docs/quote-doctest.md')),
-    row(5, 'docs/quote-list.md', '> - Install:\n>\n>       @\n', pip, inexact('docs/quote-list.md')),
-    row(5, 'docs/quote-nested.md', '> > Install:\n> >\n> >     @\n', pip, inexact('docs/quote-nested.md')),
-    row(5, 'docs/item-quote.md', '- >     @\n', pip, inexact('docs/item-quote.md')),
-    row(5, 'docs/quote-tab.md', '>\t@\n', pip, inexact('docs/quote-tab.md')),
-    row(5, 'docs/quote-deep.md', `${'> '.repeat(40)}@ words.\n`, ['Old', 'New'], inexact('docs/quote-deep.md')),
-    row(5, 'docs/quote-def.md', 'See [@] now.\n\n> [other]: /u/delete\n', ['guide', 'other'], inexact('docs/quote-def.md')),
-    row(5, 'docs/item-def.md', 'See [@] now.\n\n- [other]: /u/delete\n', ['guide', 'other'], inexact('docs/item-def.md')),
-    row(5, 'docs/markers.md', `${'- '.repeat(20)}@ words.\n`, ['Old', 'New'], inexact('docs/markers.md')),
-    row(5, 'docs/quote-prose.md', '> @ words.\n>\n> More words.\n\nAfter.\n', ['Old', 'New'], inexact('docs/quote-prose.md')),
-    row(5, 'docs/quote-after.md', '> ~~~\n> code\n> ~~~\n\n@ words.\n', ['Old', 'New'], null),
-    // 6. Link labels fold case as CommonMark does.
-    ['6', 'docs/fold.md', 'See [guide] now.\n\n[SS]: /u/delete\n', 'See [\u1e9e] now.\n\n[SS]: /u/delete\n', inexact('docs/fold.md')],
     // 7. `listing` and `tt` are code elements.
     row(7, 'src/pages/listing.html', '<listing>@</listing>\n', pip, un('src/pages/listing.html')),
     row(7, 'src/pages/tt.html', '<p>Run <tt>@</tt></p>\n', pip, un('src/pages/tt.html')),
@@ -2250,30 +2030,27 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
     row(8, 'src/styles/payment.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/payment.css', 'payment')),
     row(8, 'src/styles/tokens.css', 'a { color: @; }\n', ['red', 'blue'], null),
     row(8, 'src/tokens/base.css', 'a { color: @; }\n', ['red', 'blue'], area('src/tokens/base.css', 'token')),
-    // 9. A custom property named for a colour, holding exactly one colour before and after,
-    // is a colour; one whose value is not exactly one colour cannot be read exactly (the
-    // functional plan's sentence since the sixth round); every other custom-property change
-    // is a setting.
+    // 9. A changed custom property is a setting, whatever it is named and whatever it holds
+    // (the tenth round, the session coordinator's decision of 2026-10-10: custom properties
+    // never qualify; until then one named for a colour and holding exactly one colour did).
     row(9, 'src/styles/enabled.css', ':root { --enabled: @; }\n', ['green', 'red'], setting('src/styles/enabled.css')),
-    row(9, 'src/styles/mode.css', ':root { --mode: @; }\n', ['red', 'lime'], setting('src/styles/mode.css')),
-    row(9, 'src/styles/color-mode.css', ':root { --color-mode: @; }\n', ['dark', 'light'], inexact('src/styles/color-mode.css')),
-    row(9, 'src/styles/two-tokens.css', ':root { --brand-color: @; }\n', ['red', 'red url(x)'], inexact('src/styles/two-tokens.css')),
-    row(9, 'src/styles/var.css', ':root { --color-a: var(--@); }\n', ['b', 'c'], inexact('src/styles/var.css')),
-    row(9, 'src/styles/important.css', ':root { --color-a: @ !important; }\n', ['red', 'blue'], inexact('src/styles/important.css')),
-    row(9, 'src/styles/important-added.css', ':root { --color-a: @; }\n', ['red', 'blue !important'], inexact('src/styles/important-added.css')),
-    row(9, 'src/styles/commented.css', ':root { --color-a: @ /* x */; }\n', ['red', 'blue'], inexact('src/styles/commented.css')),
+    row(9, 'src/styles/color-mode.css', ':root { --color-mode: @; }\n', ['dark', 'light'], setting('src/styles/color-mode.css')),
+    row(9, 'src/styles/two-tokens.css', ':root { --brand-color: @; }\n', ['red', 'red url(x)'], setting('src/styles/two-tokens.css')),
+    row(9, 'src/styles/var.css', ':root { --color-a: var(--@); }\n', ['b', 'c'], setting('src/styles/var.css')),
+    row(9, 'src/styles/important.css', ':root { --color-a: @ !important; }\n', ['red', 'blue'], setting('src/styles/important.css')),
+    row(9, 'src/styles/commented.css', ':root { --color-a: @ /* x */; }\n', ['red', 'blue'], setting('src/styles/commented.css')),
     row(9, 'src/styles/renamed.css', ':root { --color-@: red; }\n', ['a', 'b'], setting('src/styles/renamed.css')),
-    row(9, 'src/styles/bad-function.css', ':root { --color-a: @; }\n', ['red', 'oklch(60% 0.2)'], inexact('src/styles/bad-function.css')),
     row(9, 'src/styles/and-more.css', ':root { --color-a: @; }\na { width: 1px; }\n', ['red', 'blue; }\na { width: 2px; }\nb { --x: y'], setting('src/styles/and-more.css')),
+    row(9, 'src/styles/color-brand.css', ':root {\n  --color-brand: @;\n}\n', ['#0b5ed7', '#1a73e8'], setting('src/styles/color-brand.css')),
+    row(9, 'src/styles/button-colour.css', ':root { --button-colour: @; }\n', ['red', 'blue'], setting('src/styles/button-colour.css')),
+    row(9, 'src/styles/upper.css', ':root { --Brand-COLOR: @; }\n', ['RED', 'Transparent'], setting('src/styles/upper.css')),
+    [9, 'src/styles/both.css', ':root { --color-a: red; }\na { color: red; }\n', ':root { --color-a: blue; }\na { color: blue; }\n', setting('src/styles/both.css')],
+    // A real colour property beside a custom property that stays as it is still qualifies.
+    [9, 'src/styles/beside.css', ':root { --color-a: red; }\na { color: red; }\n', ':root { --color-a: red; }\na { color: blue; }\n', null],
+    // A custom property whose declaration this reader does not vouch for (a comment before its colon) is refused too.
+    row(9, 'src/styles/comment-name.css', ':root { --color-a /* x */ : @; }\n', ['red', 'blue'], un('src/styles/comment-name.css')),
     row(9, 'src/styles/string-open.css', 'a { color: @; }\nb { content: "x', ['red', 'blue'], 'I could not read the change (src/styles/string-open.css leaves a tag, quote, comment, block, fence or span open)'),
-    row(9, 'src/styles/ruleset.css', ':root { --color-a: { color: @ } }\n', ['red', 'blue'], lost('src/styles/ruleset.css')),
-    row(9, 'src/styles/color-brand.css', ':root {\n  --color-brand: @;\n}\n', ['#0b5ed7', '#1a73e8'], null),
-    row(9, 'src/styles/button-colour.css', ':root { --button-colour: @; }\n', ['red', 'blue'], null),
-    row(9, 'src/styles/upper.css', ':root { --Brand-COLOR: @; }\n', ['RED', 'Transparent'], null),
-    row(9, 'src/styles/functions.css', ':root { --color-a: @; }\n', ['hwb(120 0% 0% / 0.5)', 'oklch(60% 0.2 240)'], null),
-    row(9, 'src/styles/spaces.css', ':root { --color-a: @; }\n', ['lab(50% 40 59)', 'color(display-p3 1 0.5 0 / 50%)'], null),
-    [9, 'src/styles/both.css', ':root { --color-a: red; }\na { color: red; }\n', ':root { --color-a: blue; }\na { color: blue; }\n', null],
-    [9, 'src/styles/both-bad.css', ':root { --color-a: red; }\na { width: 1px; }\n', ':root { --color-a: blue; }\na { width: 2px; }\n', un('src/styles/both-bad.css')]
+    row(9, 'src/styles/ruleset.css', ':root { --color-a: { color: @ } }\n', ['red', 'blue'], lost('src/styles/ruleset.css'))
   ];
   const base = {};
   for (const [, p, b] of shapes) base[p] = b;
@@ -2296,7 +2073,7 @@ test('round 5: host elements, the element stack, MDX, backtick pairing, block qu
 // camel-case paths, and the functional plan's sentence for a change the check cannot read
 // exactly. Each row marked `red` answered otherwise on `5326daae`; the others are guards.
 // [item, path, base content, new content, the clause, or null for `checking`]
-test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and paragraphs, folded paths, the cannot-read-exactly sentence', async () => {
+test('round 6: the strict HTML subset, folded paths, the cannot-read-exactly sentence', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
@@ -2304,7 +2081,6 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
   const sql = ['SELECT name FROM users', 'SELECT pass FROM admins'];
   const pip = ['pip install requests', 'pip install reqests'];
   const save = ['Save', 'Store'];
-  const words = ['Old', 'New'];
   const run = ['run()', 'drop()'];
   /** One row from a template holding `@`, replaced by the old and the new text. */
   const row = (item, p, template, [o, n], expected) => [item, p, template.replace('@', o), template.replace('@', n), expected];
@@ -2334,7 +2110,6 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
     row(2, 'src/pages/style-space.html', '<style>x</style ><b></b>@<b></b></style>\n', save, un('src/pages/style-space.html')),
     row(2, 'src/pages/doctype.html', '<!DocType HTML>\n<!-- a - b -- c -->\n<!---->\n<p>@</p>\n', save, null),
     row(2, 'src/pages/script-comment.html', '<script><!--\nx();\n//--></script>\n<p>@</p>\n', save, null),
-    row(2, 'docs/comment.md', 'Text.\n\n<!--><run-sql>--><span>@</span></run-sql>\n', sql, exact('docs/comment.md')),
     // 3. `<svg>` and `<math>` are opaque from their start tag to their matching end tag; the
     // host elements are HTML's only; inside foreign content nothing HTML is followed.
     row(3, 'src/pages/svg-pre.html', '<svg><style><pre></style><span>@</span></pre></svg>\n', pip, exact('src/pages/svg-pre.html')),
@@ -2356,68 +2131,6 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
     row(4, 'src/pages/open-div.html', '<div>\n<p>@</p>\n', save, exact('src/pages/open-div.html')),
     row(4, 'src/pages/implied-list.html', '<ul><li>One<li>@</ul>\n', save, null),
     row(4, 'src/pages/card.html', '<my-card>@</my-card>\n', save, exact('src/pages/card.html')),
-    // 5. A changed line that starts `import ` or `export ` is code wherever it stands.
-    // Since the eighth round (the decision at review of 2026-10-09: Markdown qualifies only as a
-    // wording change in pure prose) the Markdown rows of items 5 to 8 that relied on a heading,
-    // an autolink, a placeholder or a brace assert the functional plan's sentence; a paragraph
-    // below any raw `<` no longer qualifies (`docs/autolink.md`, `docs/placeholder.md` and the
-    // like passed), and neither does a heading whatever its anchor. The session's decision
-    // also removed the guards for Markdown built as MDX. Kept, by the executor, is the one
-    // that costs a line: a paragraph that starts with `import ` or `export ` (rows 5), because
-    // `import Chart from "chart"` is a plain prose line by the rule. `docs/import-mid.md` (the
-    // word inside a paragraph) now qualifies, and so do `docs/brace-open.md` and
-    // `docs/brace-string.md`: a plain paragraph between the braces of an MDX expression that
-    // runs over empty lines is prose to every Markdown renderer. That is a known limit of the
-    // decision for projects that build `.md` files as MDX.
-    row(5, 'docs/import-heading.md', "# Title\nimport Chart from './@'\n", ['chart', 'other'], exact('docs/import-heading.md')),
-    row(5, 'docs/import-wrapped.md', "# Title\nimport Chart\n  from './@'\n", ['chart', 'other'], exact('docs/import-wrapped.md')),
-    row(5, 'docs/import-fence.md', "```\ncode\n```\nexport const meta = '@'\n", ['old', 'new'], exact('docs/import-fence.md')),
-    row(5, 'docs/import-mid.md', 'We\nimport @ goods.\n', ['old', 'new'], null),
-    row(5, 'docs/important-heading.md', '# Title\nimportant @ words.\n', ['old', 'new'], exact('docs/important-heading.md')),
-    // 6. An autolink is one opaque piece. A placeholder such as `<file>` inside a paragraph
-    // holds the rest of its own paragraph only; one that starts a line holds the rest of the file.
-    row(6, 'docs/autolink.md', 'See <https://example.org/guide> first.\n\n@ words.\n', words, exact('docs/autolink.md')),
-    row(6, 'docs/autolink-same.md', 'See <http://example.org/guide> and the @ words.\n', ['old', 'new'], exact('docs/autolink-same.md')),
-    [6, 'docs/autolink-mail.md', 'Write to <mailto:team@example.org> or <team@example.org>.\n\nOld words.\n', 'Write to <mailto:team@example.org> or <team@example.org>.\n\nNew words.\n', exact('docs/autolink-mail.md')],
-    row(6, 'docs/autolink-own.md', 'See <https://example.org/@> first.\n', ['guide', 'other'], exact('docs/autolink-own.md')),
-    // No autolink (a space inside), and no tag a Markdown reader passes on: read as a
-    // placeholder, which its paragraph's end closes.
-    // A pass until the review of 2026-10-09: what is neither an autolink nor a tag for a
-    // Markdown reader is outside the strict subset.
-    row(6, 'docs/autolink-space.md', 'See <https://example.org/a b> first.\n\n@ words.\n', words, exact('docs/autolink-space.md')),
-    row(6, 'docs/autolink-space-same.md', 'See <https://example.org/a b> @.\n', ['first', 'now'], exact('docs/autolink-space-same.md')),
-    row(6, 'docs/placeholder.md', 'Edit <file> and <your-name> then save.\n\n@ words.\n', words, exact('docs/placeholder.md')),
-    row(6, 'docs/placeholder-closed.md', 'Edit <file>x</file> and <name> then save.\n\n@ words.\n', words, exact('docs/placeholder-closed.md')),
-    row(6, 'docs/placeholder-same.md', 'Edit <file> then @.\n', ['save', 'store'], exact('docs/placeholder-same.md')),
-    row(6, 'docs/placeholder-block.md', '<file>\n\n@ words.\n', words, exact('docs/placeholder-block.md')),
-    row(6, 'docs/placeholder-item.md', '- <file>\n\n@ words.\n', words, exact('docs/placeholder-item.md')),
-    row(6, 'docs/placeholder-object.md', 'Use <object><runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-object.md')),
-    row(6, 'docs/placeholder-div.md', 'Use <div> and <runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-div.md')),
-    row(6, 'docs/placeholder-end.md', 'Use </p> and <runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-end.md')),
-    row(6, 'docs/placeholder-center.md', 'Use <center> and <runsql> here.\n\n@ words.\n', words, exact('docs/placeholder-center.md')),
-    // Refused until the review of 2026-10-09. The fence ends the paragraph, the paragraph's end
-    // closes the placeholder as a browser does, and markdown-it and parse5 read the changed
-    // words as plain text of a paragraph of their own, as the check now does.
-    row(6, 'docs/placeholder-code-line.md', 'Use <runsql> here\n```\ncode\n```\n@ words.\n', words, exact('docs/placeholder-code-line.md')),
-    // 7. A changed heading qualifies only when its generated anchor stays the same.
-    row(7, 'docs/heading.md', '# @\n\nWords.\n', ['Install', 'Setup'], exact('docs/heading.md')),
-    row(7, 'docs/heading-typo.md', '## Getting @\n\nWords.\n', ['started', 'going'], exact('docs/heading-typo.md')),
-    row(7, 'docs/heading-setext.md', '@\n=======\n\nWords.\n', ['Install', 'Upgrade'], exact('docs/heading-setext.md')),
-    row(7, 'docs/heading-quote.md', '> # @\n\nWords.\n', ['Install', 'Upgrade'], exact('docs/heading-quote.md')),
-    row(7, 'docs/heading-item.md', '- ## @\n\nWords.\n', ['Install', 'Upgrade'], exact('docs/heading-item.md')),
-    row(7, 'docs/heading-reference.md', '# The @\n\nWords.\n', ['copy', '&copy;'], exact('docs/heading-reference.md')),
-    row(7, 'docs/heading-caps.md', '# @\n\nWords.\n', ['instal the App', 'Instal the app'], exact('docs/heading-caps.md')),
-    row(7, 'docs/heading-setext-caps.md', '@\n---\n\nWords.\n', ['instal the App', 'Instal the app'], exact('docs/heading-setext-caps.md')),
-    row(7, 'docs/heading-marks.md', '# Install@\n\nWords.\n', ['.', '!'], exact('docs/heading-marks.md')),
-    row(7, 'docs/heading-below.md', '# Install\n\n@ words.\n', words, null),
-    // 8. A brace reaches its own paragraph, and an expression left open reaches what follows it.
-    row(8, 'docs/brace-far.md', 'Hello {name} there.\n\n@ words.\n', words, null),
-    row(8, 'docs/brace-before.md', '@ words.\n\nHello {name} there.\n', words, null),
-    row(8, 'docs/brace-same.md', 'Hello {name}. @ words.\n', words, exact('docs/brace-same.md')),
-    row(8, 'docs/brace-same-wrapped.md', 'Hello {name}.\n@ words.\n', words, exact('docs/brace-same-wrapped.md')),
-    row(8, 'docs/brace-open.md', '{/*\n\n@ words.\n\n*/}\n', words, null),
-    row(8, 'docs/brace-string.md', 'Hello {"}" +\n\n@\n\n} there.\n', ['run', 'drop'], null),
-    row(8, 'docs/brace-liquid.md', '{% if a %}\n\n{{ name }}\n\n@ words.\n', words, null),
     // 9 and 10. The path is folded (Unicode NFKC, lower case) and split at every character
     // that is no letter; camel-case sub-words count as words too.
     row(9, 'ＡＵＴＨ/index.html', '<p>@</p>\n', save, area('ＡＵＴＨ/index.html', 'auth')),
@@ -2428,11 +2141,11 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
     row(10, 'src/pages/Author.html', '<p>@</p>\n', save, null),
     row(10, 'src/styles/brandTokens.css', 'a { color: @; }\n', ['red', 'blue'], null),
     // The functional plan's fifth case: a colour that is not the whole value of a colour
-    // property, and a colour-named custom property whose value is not exactly one colour.
+    // property. (A custom property is a setting since the tenth round, whatever its name.)
     row('colour', 'src/styles/border.css', '.save { border: 1px solid @; }\n', ['#0a58ca', '#0b5ed7'], exact('src/styles/border.css')),
     row('colour', 'src/styles/shadow.css', 'a { box-shadow: 0 0 2px @; }\n', ['red', 'blue'], exact('src/styles/shadow.css')),
-    row('colour', 'src/styles/two-tokens.css', ':root { --brand-color: @; }\n', ['red', 'red url(x)'], exact('src/styles/two-tokens.css')),
-    row('colour', 'src/styles/color-mode.css', ':root { --color-mode: @; }\n', ['dark', 'light'], exact('src/styles/color-mode.css')),
+    row('colour', 'src/styles/two-tokens.css', ':root { --brand-color: @; }\n', ['red', 'red url(x)'], setting('src/styles/two-tokens.css')),
+    row('colour', 'src/styles/color-mode.css', ':root { --color-mode: @; }\n', ['dark', 'light'], setting('src/styles/color-mode.css')),
     row('colour', 'src/styles/enabled.css', ':root { --enabled: @; }\n', ['green', 'red'], setting('src/styles/enabled.css')),
     row('colour', 'src/styles/whole.css', 'a { border: @; outline-color: @ }\n', ['red', 'blue'], null),
     row('colour', 'src/styles/important.css', 'a { color: @ !important; }\n', ['red', 'blue'], null),
@@ -2468,11 +2181,10 @@ test('round 6: the strict HTML subset, Markdown imports, autolinks, headings and
 // classes it found and the three false refusals it let go. Each row marked `red` answered
 // otherwise on `e43ea9ae`; the others are guards.
 // [item, path, base content, new content, the clause, or null for `checking`]
-test('round 7: names, frames, options, noscript, end tags, text over lines and beside comments; Markdown read as its reader renders it', async () => {
+test('round 7: names, frames, options, noscript, end tags, text over lines and beside comments', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
   const save = ['Save', 'Store'];
-  const words = ['Old', 'New'];
   const pip = ['pip install requests', 'pip install reqests'];
   const row = (item, p, template, [o, n], expected) => [item, p, template.replace('@', o), template.replace('@', n), expected];
   const shapes = [
@@ -2528,55 +2240,7 @@ test('round 7: names, frames, options, noscript, end tags, text over lines and b
     row(6, 'src/pages/reference-at.html', '<p>Mail us &commat; @</p>\n', ['home', 'work'], un('src/pages/reference-at.html')),
     row(6, 'src/pages/reference-open.html', '<p>Terms &amp @</p>\n', ['rules', 'conditions'], un('src/pages/reference-open.html')),
     // Text that comes or goes whole is no reworded text.
-    row(6, 'src/pages/emptied.html', '<table>@<tr><td>a</td></tr></table>\n', ['x', ' '], un('src/pages/emptied.html')),
-    // 7. Markdown, script text: an `export` line is a paragraph for a Markdown reader, and the
-    // `<script>` under it starts an HTML block that a blank line does not end (red).
-    // Since the eighth round (the decision at review of 2026-10-09: Markdown qualifies only as a
-    // wording change in pure prose) every Markdown row of items 7 to 12 asserts the functional
-    // plan's sentence. The rows that passed (`docs/lazy-quote.md`, `docs/lazy-item.md`,
-    // `docs/lazy-none.md`, `docs/lazy-indented.md`, `docs/image-beside.md`, `docs/details.md`,
-    // `docs/table.md`) relied on a lazy line, inline HTML, an element left open or a table.
-    row(7, 'docs/export-script.md', 'export const x = y\n<script>\n\n@\n</script>\n', ['alpha', 'zulu'], exact('docs/export-script.md')),
-    row(7, 'docs/doctest-script.md', '>>> x\n<script>\n\n@\n</script>\n', ['alpha', 'zulu'], exact('docs/doctest-script.md')),
-    // An HTML block is raw: a fence or a code span inside it is no code, and its tags count (red).
-    row(7, 'docs/block-fence.md', '<div>\n```\n<code>\n```\n</div>\n\n@ words.\n', words, exact('docs/block-fence.md')),
-    row(7, 'docs/block-span.md', '<div>\n`<code>`\n</div>\n\n@ words.\n', words, exact('docs/block-span.md')),
-    row(7, 'docs/block-autolink.md', '<div>\n<https://example.org/x>\n</div>\n\n@ words.\n', words, exact('docs/block-autolink.md')),
-    // 8. A definition or a label over several lines (red).
-    row(8, 'docs/def-lines.md', '[\nguide]: /@\n\nWords.\n', ['one', 'two'], exact('docs/def-lines.md')),
-    row(8, 'docs/label-lines.md', 'See [@\nguide] now.\n\n[the guide]: /u\n', ['the', 'a'], exact('docs/label-lines.md')),
-    row(8, 'docs/label-target.md', 'See [the guide](/@) now.\n\n[the guide]: /u\n', ['one', 'two'], exact('docs/label-target.md')),
-    // 9. A tag split across block quote lines: the markers are no part of it (red).
-    row(9, 'docs/quote-tag.md', '> <a\n> href="/@">link</a>\n', ['one', 'two'], exact('docs/quote-tag.md')),
-    // 10. Continuation and code: a quoted line under a lazy line continues the paragraph and
-    // may underline it into a heading (red); an indented line under a definition, a finished
-    // HTML block or a table is code (red); a lazy line is prose.
-    row(10, 'docs/lazy-underline.md', '> @\nmore\n> ---\n', ['Install', 'Upgrade'], exact('docs/lazy-underline.md')),
-    row(10, 'docs/def-code.md', '[guide]: /u\n    @\n', pip, exact('docs/def-code.md')),
-    row(10, 'docs/comment-code.md', '<!-- note -->\n    @\n', pip, exact('docs/comment-code.md')),
-    row(10, 'docs/table-code.md', '| a | b |\n| - | - |\n| c | d |\n    @\n', pip, exact('docs/table-code.md')),
-    row(10, 'docs/lazy-quote.md', '> A quote that\nruns @ lazily.\n\nAfter.\n', ['on', 'along'], exact('docs/lazy-quote.md')),
-    // Since the ninth round (the decision at review of 2026-10-09) a run of plain list items and
-    // plain lines qualifies: whichever way a renderer divides it, only words change.
-    row(10, 'docs/lazy-item.md', '- an item that\nruns @ lazily\n- the next item\n', ['on', 'along'], null),
-    row(10, 'docs/lazy-none.md', '> ```\n> code\n> ```\n@ words.\n', words, exact('docs/lazy-none.md')),
-    // Under a quote inside a quote, a line four columns in that would start a block:
-    // markdown-it ends both quotes and reads it as code, CommonMark's text makes it a lazy line (red).
-    row(10, 'docs/lazy-nested.md', '> > Quote\n    <div>@</div>\n', save, exact('docs/lazy-nested.md')),
-    row(10, 'docs/lazy-indented.md', '> Quote\n    <b>@</b> lazily\n', save, exact('docs/lazy-indented.md')),
-    // 11. What a Markdown reader does not pass on as a tag is none: an end tag behind a
-    // backslash leaves the code element open (red); an image's text is an attribute (red).
-    row(11, 'docs/escaped-end.md', 'Run <code>x\\</code> and @ it.</code>\n', ['save', 'store'], exact('docs/escaped-end.md')),
-    row(11, 'docs/image-text.md', '![The @ logo](/logo.png)\n', ['old', 'new'], exact('docs/image-text.md')),
-    row(11, 'docs/image-beside.md', '![The logo](/logo.png) <br> The @ words.\n', ['old', 'new'], exact('docs/image-beside.md')),
-    // 12. The tags a Markdown reader makes count: an end tag inside a paragraph closes nothing
-    // outside it (red); a list item's paragraph may or may not get a `<p>`, so a placeholder
-    // left open in it cannot be read exactly.
-    row(12, 'docs/end-in-paragraph.md', '<x-box>\n\nText </x-box> and @ words.\n', ['old', 'new'], exact('docs/end-in-paragraph.md')),
-    row(12, 'docs/item-placeholder.md', '- Use <file> here\n  <div>@</div>\n', words, exact('docs/item-placeholder.md')),
-    row(12, 'docs/details.md', '<details>\n<summary>More</summary>\n\nThe @ words.\n\n</details>\n', ['old', 'new'], exact('docs/details.md')),
-    row(12, 'docs/table.md', '| Name | Use |\n| --- | --- |\n| Save | @ your work |\n', ['Keep', 'Store'], exact('docs/table.md')),
-    row(12, 'docs/table-extra.md', '| Name |\n| --- |\n| Save | @ |\n', ['dropped', 'gone'], exact('docs/table-extra.md'))
+    row(6, 'src/pages/emptied.html', '<table>@<tr><td>a</td></tr></table>\n', ['x', ' '], un('src/pages/emptied.html'))
   ];
   const base = {};
   for (const [, p, b] of shapes) base[p] = b;
@@ -2593,257 +2257,14 @@ test('round 7: names, frames, options, noscript, end tags, text over lines and b
   assert.deepEqual(wrong, []);
 });
 
-// The eighth round (2026-10-09, the decision at review, under the owner's decision that the
-// check keeps only what it can read exactly): Markdown is not one language, and no reader
-// agrees with every renderer on structure, so a `.md` or `.txt` edit qualifies only as a
-// wording change in pure prose. These rows pin the rule item by item; the corpus holds the
-// findings of the security run. Every row marked `c2c` answered otherwise on `c2c9f86d`.
-// [item, path, base content, new content, the clause, or null for `checking`]
-test('round 8: Markdown and plain text qualify only as a wording change in pure prose', async () => {
-  const un = (f) => `I do not recognise ${f} as wording or a colour`;
-  const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
-  const area = (f, word) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
-  const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
-  const words = ['old', 'new'];
-  let count = 0;
-  /** One row from a template holding `@`, replaced by the old and the new text; the file is named after the item. */
-  const row = (item, template, [o, n], expected, ext = 'md', name = null) => {
-    const p = name || `docs/r8/${String(item).replace(/[^a-z0-9]+/gi, '-')}-${++count}.${ext}`;
-    return [item, p, template.replace('@', o), template.replace('@', n), expected === true ? exact(p) : expected];
-  };
-  const shapes = [
-    // 1. A plain prose line: letters, combining marks, digits, spaces and plain punctuation.
-    row('plain', 'Wait, then go; is it "done"? Yes! It\'s the well-known @ way.\n', words, null),
-    row('plain', '\u201cQuoted\u201d words \u2014 and so on\u2026 \u2018yes\u2019 \u2013 the @ way\n', words, null),
-    row('plain', '"@" words here.\n', ['Old', 'New'], null),
-    row('plain', '\u2018@\u2019 words here.\n', ['Old', 'New'], null),
-    row('plain', 'Chapter 12 has the @ words.\n', words, null),
-    row('plain', 'Cafe\u0301 and na\u00efve @ words, \u041f\u0440\u0438\u0432\u0435\u0442 \u4e16\u754c.\n', words, null),
-    row('plain', 'The @ words run on\n   in a second line\n  and a third.\n', words, null),
-    row('plain', 'One.\n\nThe @ words.\n\nThree.\n', words, null),
-    // A line of the paragraph that is indented more than three spaces is no plain prose line,
-    // also when it is not the first one; and both sides are held to the rule, so a change that
-    // takes brackets off a line is none.
-    row('not plain', 'The @ words\n     and five spaces.\n', words, true),
-    ['not plain', 'docs/r8/brackets-gone.md', 'See [the old guide] now.\n', 'See the old guide now.\n', exact('docs/r8/brackets-gone.md')],
-    // Not plain: white space other than a space, punctuation that is not prose, a character
-    // of the control or format categories; and the limits on the punctuation that is prose.
-    ...['a\tb', 'a\u00a0b', 'a.b', 'a,b', 'a;b', 'what?!', 'a -b', 'a- b', 'a--b', 'pre-2', 'a: b', 'a/b', 'a_b', '*a*', '#a', '`a`',
-      'a\\b', '~a', 'a@b', 'a&b', 'a=b', 'a+b', 'a%', '$a', '{a}', '[a]', 'a|b', 'a^b', 'a<b', 'a>b', 'a\u200bb', 'a\u202eb', 'a\u00adb',
-      'a\u2028b', 'a\u0007b', '\u00aba\u00bb', 'a\u2019b.c']
-      .map((bad) => row('not plain', `Some ${bad} and the @ words.\n`, words, true)),
-    row('not plain', '12 @ words.\n', words, true),
-    // Since the ninth round (the decision at review of 2026-10-09): parentheses are prose, and a
-    // list item whose text is plain prose qualifies (`Some a: b …` above stays refused because
-    // it stands in the file's first paragraph, where a metadata reader takes `Key: value`).
-    row('plain since round 9', 'Some (a) and the @ words.\n', words, null),
-    row('plain since round 9', '- the @ words\n', words, null),
-    row('not plain', '\u2026the @ words\n', words, true),
-    row('not plain', '    the @ words\n', words, true),
-    // The first line of a changed paragraph is not indented (found by the differential test:
-    // a list item above may hold such a paragraph).
-    row('indented', ' The @ words.\n', words, true),
-    row('indented', '- Step one.\n\n   The @ words.\n', words, true),
-    // The leading and the trailing spaces of a changed line stay as they are.
-    ['spaces', 'docs/r8/lead.md', 'The words.\n  More old words.\n', 'The words.\n More new words.\n', exact('docs/r8/lead.md')],
-    ['spaces', 'docs/r8/trail.md', 'The old words.\nMore.\n', 'The new words. \nMore.\n', exact('docs/r8/trail.md')],
-    ['spaces', 'docs/r8/trail-kept.md', 'The old words.  \nMore.\n', 'The new words.  \nMore.\n', null],
-    // 2. The paragraph: every line of it is plain, and an empty line or the file's start or end
-    // bounds it; a line of spaces counts as empty, a line of other white space does not.
-    row('paragraph', '# Title\nThe @ words.\n', words, true),
-    row('paragraph', 'The @ words.\n- an item\n', words, null), // a plain list item is prose since the ninth round
-    row('paragraph', 'The @ words.\nSee [a link](/x).\n', words, true),
-    // A line of spaces counted as empty until the ninth round. marked 4.3.0 reads on over such a
-    // line to a `---` or `===` below and makes a heading of the whole (found in this round's
-    // sample of passed edits), so only a line that holds nothing bounds a paragraph now.
-    row('paragraph', 'Text.\n   \nThe @ words.\n', words, true),
-    row('paragraph', 'Text.\n\t\nThe @ words.\n', words, true),
-    row('paragraph', '# Title\n\nThe @ words.\n\n- an item\n', words, null),
-    // 3. Position: front matter or a metadata block, from a line of three or more `-`, or `+++`,
-    // directly followed by a non-blank line, to its closing line; with none, the rest of the file.
-    row('front matter', '---\ntitle: x\n\nThe @ words inside\n\n---\n\nAfter.\n', words, true),
-    row('front matter', '---\ntitle: x\n\nInside\n\n---\n\nThe @ words after.\n', words, null),
-    row('front matter', '---\ntitle: x\n...\n\nThe @ words after.\n', words, null),
-    row('front matter', '---\ntitle: x\n\nThe @ words, never closed.\n', words, true),
-    row('front matter', '-----\ntitle: x\n\nThe @ words inside\n\n---\n', words, true),
-    row('front matter', '+++\ntitle = "x"\n---\n\nThe @ words inside\n\n+++\n', words, true),
-    row('front matter', '---\n\nThe @ words under a rule.\n', words, null),
-    row('front matter', 'Text.\n\n---\nkey: x\n\nThe @ words inside\n\n---\n', words, true),
-    row('front matter', '```\n---\ntitle: x\n```\n\nThe @ words.\n', words, null),
-    // A closing line that is itself directly followed by a non-blank line opens the next block,
-    // and groups of dashes with spaces between open one too (pandoc reads both as a table, or
-    // as more metadata, when the first block was none to it; run on this machine, 2026-10-09).
-    row('front matter', '---\ntitle: x\n---\nText right after.\n\nThe @ words.\n', words, true),
-    row('front matter', '---\ntitle: x\n---\n\nText after an empty line.\n\nThe @ words.\n', words, null),
-    row('front matter', '----------- -------\nFirst row here\n\nThe @ words\n\nThird row\n----------- -------\n', words, true),
-    // Position: a code fence. Three or more backticks or tildes at the start of a line open
-    // one; a line of as many of the same, followed only by spaces, closes it; an unclosed one
-    // makes the rest of the file code.
-    row('fence', '```\n\nThe @ words inside\n\n```\n', words, true),
-    row('fence', '~~~sh\n\nThe @ words inside\n\n~~~\n', words, true),
-    row('fence', '```\ncode\n```\n\nThe @ words after.\n', words, null),
-    row('fence', '```\ncode\n```   \n\nThe @ words after.\n', words, null),
-    row('fence', '```\ncode\n\nThe @ words, never closed.\n', words, true),
-    row('fence', '````\n```\n````\n\nThe @ words after.\n', words, null),
-    row('fence', '```\n~~~\n```\n\nThe @ words after.\n', words, null),
-    row('fence', '```\ncode\n``` x\n```\n\nThe @ words after.\n', words, null),
-    row('fence', '```\ncode\n``` x\n\nThe @ words inside.\n\n```\n', words, true),
-    row('fence', 'The @ words before.\n\n```\ncode\n', words, null),
-    // A fence-like line that readers read differently refuses the whole file: other white
-    // space beside it, indentation (four spaces by the decision; one to three because a list
-    // item above may hold the fence and end early, found by the differential test), a
-    // backtick or a second word after it, a closing fence longer than the opening one, and a
-    // fence right under the start of a definition.
-    row('fence, ambiguous', 'The @ words.\n\n```\t\ncode\n```\n', words, true),
-    row('fence, ambiguous', 'The @ words.\n\n    ```\n    code\n    ```\n', words, true),
-    row('fence, ambiguous', 'The @ words.\n\n ```\ncode\n ```\n', words, true),
-    row('fence, ambiguous', 'The @ words.\n\n``` a`b\ncode\n```\n', words, true),
-    row('fence, ambiguous', 'The @ words.\n\n```js title\ncode\n```\n', words, true),
-    row('fence, ambiguous', 'The @ words.\n\n```\ncode\n````\n', words, true),
-    row('fence, ambiguous', 'The @ words.\n\n[ref]:\n```\ncode\n```\n', words, true),
-    row('fence, ambiguous', 'The @ words.\n\n---\ntitle: x\n```\n---\n', words, true),
-    ['fence, ambiguous', 'docs/r8/mark-fence.md', '\uFEFF```\ncode\n```\n\nThe old words.\n\n```\n', '\uFEFF```\ncode\n```\n\nThe new words.\n\n```\n', exact('docs/r8/mark-fence.md')],
-    // Position: a raw `<` above. The decision names twelve raw starts and their closers; the
-    // differential test showed that a closer can be escaped by the Markdown around it and that
-    // any element left open holds the paragraph, so every `<` before a letter, `!`, `?` or
-    // `/` above the paragraph refuses it, also inside front matter.
-    row('raw', '<br>\n\nThe @ words.\n', words, true),
-    row('raw', 'A <b\n\nThe @ words.\n', words, true),
-    row('raw', '</div>\n\nThe @ words.\n', words, true),
-    row('raw', '<!x>\n\nThe @ words.\n', words, true),
-    row('raw', '<?php\n\nThe @ words.\n', words, true),
-    row('raw', '<script>\n</script>\n\nThe @ words.\n', words, true),
-    row('raw', '<!-- a\n-->\n\nThe @ words.\n', words, true),
-    row('raw', '---\ntitle: <b>\n---\n\nThe @ words.\n', words, true),
-    row('raw', 'A < b and <3\n\nThe @ words.\n', words, null),
-    row('raw', 'The @ words.\n\n<div>\n', words, null),
-    // Two shapes are read as closed by every renderer: a comment alone on its line, and a tag
-    // inside a code span on one line. A tag inside a code fence is not one of them: a renderer
-    // that knows no fences reads it as HTML, and a block tag left open there holds the rest of
-    // the file (found with Python-Markdown without its fenced-code extension, 2026-10-09). A
-    // fence that holds no tag, and a fence with a tag below the paragraph, hold nothing.
-    // A comment alone on its line held nothing until the ninth round; a `<!--` anywhere now refuses the file.
-    row('raw, closed', '<!-- a note -->   \n<!---->\n\nThe @ words.\n', words, true),
-    row('raw, closed', ' <!-- a note -->\n\nThe @ words.\n', words, true),
-    row('raw, closed', '<!-- a -- b -->\n\nThe @ words.\n', words, true),
-    row('raw, closed', '<!-- a --> x\n\nThe @ words.\n', words, true),
-    row('raw, closed', '<!--->\n\nThe @ words.\n', words, true),
-    row('raw, closed', '<!-- a <b> -->\n\nThe @ words.\n', words, true),
-    row('raw, closed', 'Use `<a>` and ``<b> ` <c>`` now.\n\nThe @ words.\n', words, null),
-    row('raw, closed', 'Use `<a>` <b> now.\n\nThe @ words.\n', words, true),
-    row('raw, closed', 'Use \\`<a>` now.\n\nThe @ words.\n', words, true),
-    row('raw, closed', 'Use \\<a> now.\n\nThe @ words.\n', words, true),
-    row('raw, closed', 'Use `<a>\n` now.\n\nThe @ words.\n', words, true),
-    row('raw, closed', 'A ` alone.\nUse `<a>` now.\n\nThe @ words.\n', words, true),
-    row('raw, closed', 'Use `x | <a>` now.\n\nThe @ words.\n', words, true),
-    row('raw, closed', '```\n<div> <b>\n```\n\nThe @ words.\n', words, true),
-    row('raw, closed', '```html\n<div>x</div>\n```\n\nThe @ words.\n', words, true),
-    row('raw, closed', '~~~\n<option>One\n~~~\n\nThe @ words.\n', words, true),
-    row('raw, closed', '```\nif (a < b) return\n```\n\nThe @ words.\n', words, null),
-    row('raw, closed', 'The @ words.\n\n```\n<div>\n```\n', words, null),
-    row('raw, closed', '```\n<!-- a -->\n```\n\nThe @ words.\n', words, true),
-    row('raw, closed', '```\n<?php\n```\n\nThe @ words.\n', words, true),
-    row('raw, closed', '```\n<TextArea>\n```\n\nThe @ words.\n', words, true),
-    // A first word that pandoc reads as a list marker; a first word that MDX reads as code.
-    row('first word', 'i. The @ words.\n', words, true),
-    row('first word', 'IV. The @ words.\n', words, true),
-    row('first word', 'Yes. The @ words.\n', words, null),
-    row('first word', 'import Chart from "@"\n', ['chart', 'other'], true),
-    row('first word', 'export default @\n', ['Layout', 'Other'], true),
-    row('first word', 'important @ words.\n', words, null),
-    // 4. Changed words: rule 6 as before, and no word of 7 to 40 hexadecimal digits.
-    row('changed words', 'The @ passed.\n', ['decade', 'facade'], null),
-    row('changed words', 'The wall was @ again.\n', ['effaced', 'defaced'], risk('docs/r8/changed-words-1.md'), 'md', 'docs/r8/changed-words-1.md'),
-    row('changed words', 'The wall was well-@, again.\n', ['effaced', 'DEFACED'], risk('docs/r8/changed-words-2.md'), 'md', 'docs/r8/changed-words-2.md'),
-    row('changed words', `The word @ is long.\n`, ['a'.repeat(40), 'b'.repeat(40)], risk('docs/r8/changed-words-3.md'), 'md', 'docs/r8/changed-words-3.md'),
-    row('changed words', `The word @ is longer.\n`, ['a'.repeat(41), 'b'.repeat(41)], null),
-    row('changed words', 'Wait @ days.\n', ['30', '60'], risk('docs/r8/changed-words-4.md'), 'md', 'docs/r8/changed-words-4.md'),
-    // 5. Nothing else in the file may change: no line comes or goes, no line ending and no
-    // byte-order mark changes, no carriage return stands on its own.
-    ['nothing else', 'docs/r8/two.md', 'The old words.\n\n# Title\n\nMore old words.\n', 'The new words.\n\n# Title\n\nMore new words.\n', null],
-    ['nothing else', 'docs/r8/two-bad.md', 'The old words.\n\n# Old title\n', 'The new words.\n\n# New title\n', exact('docs/r8/two-bad.md')],
-    ['nothing else', 'docs/r8/swapped.md', 'One line here.\nTwo lines here.\n', 'Two lines here.\nOne line here.\n', null],
-    ['nothing else', 'docs/r8/added.md', 'The old words.\n', 'The new words.\n\n', exact('docs/r8/added.md')],
-    ['nothing else', 'docs/r8/removed.md', 'The old words.\nMore.\n', 'The new words. More.\n', exact('docs/r8/removed.md')],
-    ['nothing else', 'docs/r8/no-newline.md', 'The old words.\n', 'The new words.', exact('docs/r8/no-newline.md')],
-    ['nothing else', 'docs/r8/crlf.md', 'The old words.\r\nMore.\r\n', 'The new words.\r\nMore.\r\n', null],
-    ['nothing else', 'docs/r8/crlf-one.md', 'The old words.\r\nMore.\r\n', 'The new words.\nMore.\r\n', exact('docs/r8/crlf-one.md')],
-    ['nothing else', 'docs/r8/bom-gone.md', '\ufeffThe old words.\n', 'The new words.\n', exact('docs/r8/bom-gone.md')],
-    ['nothing else', 'docs/r8/bom-kept.md', '\ufeffText.\n\nThe old words.\n', '\ufeffText.\n\nThe new words.\n', null],
-    ['nothing else', 'docs/r8/bom-line.md', '\ufeffThe old words.\n', '\ufeffThe new words.\n', exact('docs/r8/bom-line.md')],
-    ['nothing else', 'docs/r8/return.md', 'a\rb\n\nThe old words.\n', 'a\rb\n\nThe new words.\n', exact('docs/r8/return.md')],
-    // 6. Plain text qualifies only under a documentation name, in any letter case, also with a
-    // language part; every other `.txt` is not recognised, as wording or otherwise.
-    row('names', 'Read the @ guide.\n', words, null, 'txt', 'docs/README.txt'),
-    row('names', 'Read the @ guide.\n', words, null, 'txt', 'docs/Readme.pt-BR.txt'),
-    row('names', 'Read the @ guide.\n', words, null, 'txt', 'site/humans.txt'),
-    row('names', 'Read the @ guide.\n', words, null, 'txt', 'docs/HISTORY.TXT'),
-    row('names', 'Read the @ guide.\n', words, null, 'txt', 'docs/Authors.txt'),
-    row('names', 'Read the @ guide.\n', words, un('docs/readme-first.txt'), 'txt', 'docs/readme-first.txt'),
-    row('names', 'Read the @ guide.\n', words, un('docs/guide.txt'), 'txt', 'docs/guide.txt'),
-    row('names', 'Read the @ guide.\n', words, un('docs/notes.backup.old.txt'), 'txt', 'docs/notes.backup.old.txt'),
-    row('names', 'Read the @ guide.\n', words, un('docs/readme.backup.txt'), 'txt', 'docs/readme.backup.txt'),
-    row('names', '# Read the @ guide.\n', words, exact('docs/INSTALL.txt'), 'txt', 'docs/INSTALL.txt'),
-    row('names', '```\n\nRead the @ guide.\n\n```\n', words, exact('docs/NEWS.txt'), 'txt', 'docs/NEWS.txt'),
-    // 7. Legal texts never qualify, `.md` or `.txt`: the sensitive-area clause, with `license`
-    // for a licence and `legal` for the other names.
-    row('legal', 'You may use the @ tool.\n', words, area('LICENSE-MIT.txt', 'license'), 'txt', 'LICENSE-MIT.txt'),
-    row('legal', 'You may use the @ tool.\n', words, area('docs/licence.md', 'license'), 'md', 'docs/licence.md'),
-    row('legal', 'You may use the @ tool.\n', words, area('Copying.md', 'legal'), 'md', 'Copying.md'),
-    row('legal', 'You may use the @ tool.\n', words, area('NOTICES.txt', 'legal'), 'txt', 'NOTICES.txt'),
-    row('legal', 'You may use the @ tool.\n', words, area('docs/Patents.txt', 'legal'), 'txt', 'docs/Patents.txt'),
-    row('legal', 'You may use the @ tool.\n', words, area('legal.md', 'legal'), 'md', 'legal.md'),
-    row('legal', '# You may use the @ tool.\n', words, area('docs/COPYING.md', 'legal'), 'md', 'docs/COPYING.md'),
-    row('legal', 'You may use the @ tool.\n', words, null, 'md', 'docs/unnoticed.md')
-  ];
-  const base = {};
-  for (const [, p, b] of shapes) {
-    assert.equal(base[p], undefined, `${p} is used once`);
-    base[p] = b;
-  }
-  const root = makeRepo(base);
-  const wrong = [];
-  for (const [item, p, b, n, expected] of shapes) {
-    fs.writeFileSync(path.join(root, ...p.split('/')), n);
-    const res = await check(root, p);
-    fs.writeFileSync(path.join(root, ...p.split('/')), b);
-    const want = expected === null ? STATUS_LINE : refusal(expected);
-    if (res.text !== want) wrong.push(`${item} ${p} ${JSON.stringify(b)}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
-    else if (expected === null) assertChecking(res, [p]);
-  }
-  assert.deepEqual(wrong, []);
-  // The three sentences a person reads, and the cause words the log keeps for them.
-  const said = async (p, content) => {
-    fs.writeFileSync(path.join(root, ...p.split('/')), content);
-    return (await check(root, p)).text;
-  };
-  assert.equal(await said('docs/r8/two-bad.md', 'The new words.\n\n# New title\n'),
-    'I did not treat this as a hotfix because it changes docs/r8/two-bad.md in a way the check cannot read exactly, '
-    + 'and only what it can read exactly qualifies; it goes through a normal plan, and your edits stay in place, not committed.');
-  assert.equal(await said('docs/guide.txt', 'Read the new guide.\n'),
-    'I did not treat this as a hotfix because I do not recognise docs/guide.txt as wording or a colour; '
-    + 'it goes through a normal plan, and your edits stay in place, not committed.');
-  assert.equal(await said('legal.md', 'You may use the new tool.\n'),
-    'I did not treat this as a hotfix because legal.md sits in an area named legal, and such areas are never a hotfix; '
-    + 'it goes through a normal plan, and your edits stay in place, not committed.');
-  assert.deepEqual(logLines(root).slice(-3).map((l) => l.cause), ['unrecognised', 'unrecognised', 'sensitive-area']);
-});
-
-// The ninth round (2026-10-09, decisions at review). Markdown: the size rule runs before any
-// reader reads a file's content; a raw start tag anywhere refuses the file; and the pure-prose
-// rule is widened by three things proven with the differential test: a colon after a word and
-// before a space (never in the file's first paragraph), parentheses, and list items whose text
-// is plain prose. Every row marked `red` answered otherwise on `4212d9ff`; the others are guards.
-// [item, path, base content, new content, the clause, or null for `checking`]
-test('round 9: Markdown — size before content, a raw start tag anywhere, colons, parentheses and list items', async () => {
+// The ninth round (2026-10-09, decisions at review): the size rule runs once the kind of every
+// file is known and before any reader reads a file's content. Every row marked `red` answered
+// otherwise on `4212d9ff`; the others are guards. (Until the tenth round this test also held the
+// Markdown rows of the ninth round: a raw start tag anywhere, colons, parentheses, list items.)
+// [item, path, base content, new content, the clause]
+test('round 9: the size rule runs before the content rules, and after the kind of each file', async () => {
   const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
   const size = (n, m) => `it changes ${n} lines in ${m} ${m === 1 ? 'file' : 'files'} and a hotfix is at most 20 lines in at most 3 files`;
-  const words = ['old', 'new'];
-  let count = 0;
-  const row = (item, template, [o, n], expected, name = null) => {
-    const p = name || `docs/r9/${String(item).replace(/[^a-z0-9]+/gi, '-')}-${++count}.md`;
-    return [item, p, template.replace('@', o), template.replace('@', n), expected === true ? exact(p) : expected];
-  };
   const reworded = (n, wrap = (l) => l) => [Array.from({ length: n }, (_, i) => wrap(`Old line ${String.fromCharCode(97 + i)}`)).join('\n'),
     Array.from({ length: n }, (_, i) => wrap(`New line ${String.fromCharCode(97 + i)}`)).join('\n')];
   const [oldEleven, newEleven] = reworded(11);
@@ -2851,99 +2272,18 @@ test('round 9: Markdown — size before content, a raw start tag anywhere, colon
   const [oldColours, newColours] = [Array.from({ length: 11 }, (_, i) => `.a${i} { color: red; }`).join('\n'),
     Array.from({ length: 11 }, (_, i) => `.a${i} { color: blue; }`).join('\n')];
   const shapes = [
-    // 1. The size rule runs before the content rules (red): a change over the limit that a
-    // reader would also refuse gets the size clause; under the limit it gets the reader's.
-    ['size', 'docs/r9/grown.md', 'A line.\n', `A line.\n${'One more line.\n'.repeat(21)}`, size(21, 1)],
-    ['size', 'docs/r9/held.md', `<div>\n\n${oldEleven}\n`, `<div>\n\n${newEleven}\n`, size(22, 1)],
+    // A change over the limit that a reader would also refuse gets the size clause (red);
+    // under the limit it gets the reader's.
+    ['size', 'src/pages/r9-grown.html', '<p>A line.</p>\n', `<p>A line.</p>\n${'<p>One more line.</p>\n'.repeat(21)}`, size(21, 1)],
     ['size', 'src/pages/r9-open.html', `<div>\n${oldPages}\n`, `<div>\n${newPages}\n`, size(22, 1)],
     ['size', 'src/styles/r9-extra.css', `${oldColours}\n}\n`, `${newColours}\n}\n`, size(22, 1)],
-    ['size', 'docs/r9/small-held.md', '<div>\n\nThe old words.\n', '<div>\n\nThe new words.\n', exact('docs/r9/small-held.md')],
+    ['size', 'src/pages/r9-small-open.html', '<div>\n<p>The old words.</p>\n', '<div>\n<p>The new words.</p>\n', exact('src/pages/r9-small-open.html')],
     // The kind of a file is still named ahead of its size (guards).
     ['size', 'src/r9/cart.js', `${oldEleven}\n`, `${newEleven}\n`, 'it changes program logic in src/r9/cart.js, and only wording and colours qualify'],
     ['size', 'src/r9/Page.vue', `${oldEleven}\n`, `${newEleven}\n`, gone('src/r9/Page.vue')],
-    ['size', 'agents/r9.md', `${oldEleven}\n`, `${newEleven}\n`, gone('agents/r9.md')],
-    // 2. A raw start tag anywhere refuses the file, in any letter case (red: below the changed
-    // paragraph, inside a code span and inside a fence each passed).
-    ...['<script>', '<STYLE>', '<pre>', '<textarea>', '<xmp>', '<plaintext>', '<Title>', '<noscript>', '<iframe src="x">', '<!-- note -->', '<![CDATA[x]]>', '<?php ?>']
-      .map((tag) => row('raw start below', `The @ words.\n\n${tag}\n`, words, true)),
-    row('raw start in a span', 'The @ words.\n\nUse `<script>` here.\n', words, true),
-    row('raw start in a fence', 'The @ words.\n\n```\n<pre>\n```\n', words, true),
-    row('raw start alone', '<!-- markdownlint-disable -->\n\nThe @ words.\n', words, true),
-    // The shape on which one renderer (Python-Markdown) gave four different pages by the length
-    // of the paragraph above it: a script in a block quote, its end tag outside the quote.
-    row('raw start below', 'The @ words here.\n\n> <script>\n> <!--<script>\n> </script>\n>\n> Bravo then.\n>\n</script>\n', words, true),
-    // Other tags below the paragraph hold nothing, as before (guards).
-    row('other tag below', 'The @ words.\n\n<div>\n\n<b>x</b> and `<i>`\n', words, null),
-    // 3. A colon that follows a letter, a digit, a closing quote or a closing parenthesis and
-    // stands before a space or the end of the line (red), outside the file's first paragraph.
-    row('colon', 'Text.\n\nNote: the @ way works.\n', words, null),
-    row('colon', 'Text.\n\nThe @ steps are:\nfirst this, then that.\n', words, null),
-    row('colon', 'Text.\n\nStep 2: the @ way.\n', words, null),
-    row('colon', 'Text.\n\nHe said "go": the @ way, and “stop”: no.\n', words, null),
-    row('colon', 'Text.\n\nThe way (short): the @ one.\n', words, null),
-    // In the first paragraph a metadata reader takes `Key: value` lines.
-    row('colon, first paragraph', 'Note: the @ way works.\n', words, true),
-    row('colon, first paragraph', 'Title of the page\nAuthor: the @ one\n\nText.\n', words, true),
-    row('colon, first paragraph', '\n\nNote: the @ way works.\n', words, true),
-    row('colon, first paragraph', 'Note: a way.\n\nThe @ words.\n', words, null),
-    // Never at a line start, never before anything but a space, never after anything else.
-    row('colon, not plain', 'Text.\n\n: the @ way\n', words, true),
-    row('colon, not plain', 'Text.\n\nRatio a:b in the @ way.\n', words, true),
-    row('colon, not plain', 'Text.\n\nAt 10:30 the @ way.\n', words, true),
-    row('colon, not plain', 'Text.\n\nSee http://x for the @ way.\n', words, true),
-    row('colon, not plain', 'Text.\n\nWait : the @ way.\n', words, true),
-    row('colon, not plain', 'Text.\n\nWait:: the @ way.\n', words, true),
-    row('colon, not plain', 'Text.\n\nWait, : the @ way.\n', words, true),
-    row('colon, not plain', 'Text.\n\nSmile :) the @ way.\n', words, true),
-    // 4. Parentheses (red). No link or tag can form: the paragraph holds no bracket and no `<`.
-    row('parentheses', 'The @ way (the short one) works.\n', words, null),
-    row('parentheses', 'See the item(s) and (see above.) Then the @ way.\n', words, null),
-    row('parentheses', 'The way ("quoted") and the @ one (c).\n', words, null),
-    row('parentheses, not plain', '(a) The @ way.\n', words, true),
-    row('parentheses, not plain', 'See [the guide](the @ way).\n', words, true),
-    row('parentheses, not plain', 'The way.(the @ one)\n', words, true),
-    // 5. List items (red): 0 to 3 spaces, a bullet or one to nine digits and `.` or `)`, 1 to 4
-    // spaces, then plain prose; every line of the run of non-blank lines is such a line or a
-    // plain prose line.
-    row('list item', '- the @ words\n- more words\n', words, null),
-    row('list item', '* the @ words\n  and a second line\n', words, null),
-    row('list item', '+ a plain item\n+ the @ item\n', words, null),
-    row('list item', '1. the first step\n2. the @ step\n', words, null),
-    row('list item', '1) the @ step\n', words, null),
-    row('list item', '123456789. the @ step\n', words, null),
-    row('list item', '-    the @ words\n', words, null),
-    row('list item', 'Text.\n\n   - the @ words\n', words, null),
-    row('list item', 'The steps\n- the @ step\nand a lazy line\n', words, null),
-    row('list item', '- "the" @ words (short): yes\n', words, true), // a colon in the first paragraph
-    row('list item', 'Text.\n\n- "the" @ words (short): yes\n', words, null),
-    row('list item, not plain', '-     the @ words\n', words, true),
-    row('list item, not plain', '    - the @ words\n', words, true),
-    row('list item, not plain', '1234567890. the @ step\n', words, true),
-    row('list item, not plain', '- [ ] the @ task\n', words, true),
-    row('list item, not plain', '- the @ words\n-\n', words, true),
-    row('list item, not plain', '- the @ words\n- \n', words, true),
-    row('list item, not plain', '-the @ words\n', words, true),
-    row('list item, not plain', '- - the @ words\n', words, true),
-    row('list item, not plain', '- 12 @ words\n', words, true),
-    row('list item, not plain', '- a `code` item\n- the @ item\n', words, true),
-    row('list item, not plain', '- a [link](/x) item\n- the @ item\n', words, true),
-    row('list item, not plain', '- the @ item\n===\n', words, true),
-    // A first word that pandoc reads as a list marker, at the start of an item's text and of
-    // any line of a run that holds an item.
-    row('list item, not plain', '- i. the @ words\n', words, true),
-    row('list item, not plain', '- the first item\n  a. the @ words\n', words, true),
-    // 6. Only an empty line bounds a paragraph (red): a line of spaces does not. One renderer
-    // (marked 4.3.0) reads on over it to an underline below and makes a heading of the whole,
-    // so the words above would be a heading's, and its generated anchor would change.
-    row('a line of spaces', 'The @ words here.\n \n---\n\nMore.\n', words, true),
-    row('a line of spaces', 'The @ words here.\n  \nMore words.\n\n===\n', words, true),
-    row('a line of spaces', 'More words.\n   \nThe @ words here.\n', words, true),
-    row('a line of spaces', 'The @ words here.\n\n---\n\nMore.\n', words, null),
-    // The prefix is identical on both sides.
-    ['list item, prefix', 'docs/r9/marker.md', '- the old words\n', '* the new words\n', exact('docs/r9/marker.md')],
-    ['list item, prefix', 'docs/r9/marker-space.md', '- the old words\n', '-  the new words\n', exact('docs/r9/marker-space.md')],
-    ['list item, prefix', 'docs/r9/number.md', '1. the old words\n', '2. the new words\n', exact('docs/r9/number.md')],
-    ['list item, prefix', 'docs/r9/became-item.md', 'A the old words\n', '- the new words\n', exact('docs/r9/became-item.md')]
+    ['size', 'docs/r9.md', `${oldEleven}\n`, `${newEleven}\n`, gone('docs/r9.md')],
+    ['size', 'locales/r9/en.yml', `${oldEleven.replace(/^/gm, 'k: ')}\n`, `${newEleven.replace(/^/gm, 'k: ')}\n`, SETTING('locales/r9/en.yml')],
+    ['size', 'agents/r9.html', `${oldPages}\n`, `${newPages}\n`, gone('agents/r9.html')]
   ];
   const base = {};
   for (const [, p, b] of shapes) {
@@ -2956,37 +2296,27 @@ test('round 9: Markdown — size before content, a raw start tag anywhere, colon
     fs.writeFileSync(path.join(root, ...p.split('/')), n);
     const res = await check(root, p);
     fs.writeFileSync(path.join(root, ...p.split('/')), b);
-    const want = expected === null ? STATUS_LINE : refusal(expected);
-    if (res.text !== want) wrong.push(`${item} ${p} ${JSON.stringify(b)}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
-    else if (expected === null) assertChecking(res, [p]);
+    if (res.text !== refusal(expected)) wrong.push(`${item} ${p}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
   }
   assert.deepEqual(wrong, []);
 });
 
-// The ninth round, catalogue files (decisions at review of 2026-10-09). A file is a catalogue
-// only under a language tag or a wording bundle's name, and never under a dependency, build
-// or settings name; JSON is read with JSON.parse on both sides; YAML and properties files are
-// read whole in a strict subset; and the wording rule also refuses every number character, a
-// format character, a bare host, a scheme anywhere and a change in the sequence of
-// placeholders. Every row marked `red` answered otherwise on `4212d9ff`.
+// The ninth round (decisions at review of 2026-10-09): a dependency, build or settings name is
+// decided by the name, wherever the file lies; the wording rule also refuses every number
+// character, a format character, a bare host and a scheme anywhere; and a byte-order mark or a
+// line ending neither comes nor goes. Every row marked `red` answered otherwise on `4212d9ff`.
+// (Until the tenth round this test also held the rows of the catalogue readers: JSON by
+// JSON.parse, strict YAML and properties, placeholders. No catalogue file qualifies any more.)
 // [item, path, base content, new content, the clause, or null for `checking`]
-test('round 9: catalogue files — recognition, JSON by JSON.parse, strict YAML and properties, the wording rule', async () => {
+test('round 9: names that are dependencies, the build or settings; the wording rule in a page; byte-order marks and line endings', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
-  const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const build = (f) => `it changes how the project is built or shipped in ${f}`;
   const deps = (f) => `it changes the dependencies in ${f}`;
   const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
   const json = (o) => `${JSON.stringify(o, null, 2)}\n`;
-  let count = 0;
-  /** One row from a template holding `@`; without a name, a catalogue file named for the item. */
-  const row = (item, ext, template, [o, n], expected, name = null) => {
-    const p = name || `locales/r9/en/${String(item).replace(/[^a-z0-9]+/gi, '-')}-${++count}.${ext}`;
-    return [item, p, template.replace('@', o), template.replace('@', n), typeof expected === 'function' ? expected(p) : expected];
-  };
   const shapes = [
-    // 1. Recognition (red): a dependency, build or settings name is decided before the
-    // catalogue kind, in any letter case, wherever the file lies.
+    // 1. A dependency, build or settings name, in any letter case, wherever the file lies.
     ['name', 'packages/i18n/package.json', json({ name: 'i18n', description: 'Old texts' }), json({ name: 'i18n', description: 'New texts' }), deps('packages/i18n/package.json')],
     ['name', 'locales/package.json', json({ name: 'x', scripts: { test: 'node run tests' } }), json({ name: 'x', scripts: { test: 'echo skipped' } }), deps('locales/package.json')],
     ['name', 'messages/docker-compose.yml', 'services:\n  web:\n    image: app\n', 'services:\n  web:\n    image: other\n', build('messages/docker-compose.yml')],
@@ -3000,136 +2330,33 @@ test('round 9: catalogue files — recognition, JSON by JSON.parse, strict YAML 
     ['name', 'locales/app.config.json', json({ mode: 'dev' }), json({ mode: 'prod' }), setting('locales/app.config.json')],
     ['name', 'lang/Composer.JSON', json({ name: 'old' }), json({ name: 'new' }), deps('lang/Composer.JSON')],
     ['name', 'locales/PACKAGE-LOCK.json', json({ name: 'old' }), json({ name: 'new' }), deps('locales/PACKAGE-LOCK.json')],
-    // A catalogue folder alone is no catalogue (red): the name or a folder below it is a
-    // language tag, or the name is a wording bundle's.
+    // A file in a catalogue folder is a settings file by its extension.
     ['tag', 'i18n/routes.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('i18n/routes.json')],
     ['tag', 'locales/settings.yml', 'mode: dark\n', 'mode: light\n', setting('locales/settings.yml')],
     ['tag', 'messages/config.properties', 'mode=dark\n', 'mode=light\n', setting('messages/config.properties')],
     ['tag', 'src/locales/index.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('src/locales/index.json')],
     ['tag', 'locales/english.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('locales/english.json')],
     ['tag', 'locales/messages_english.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('locales/messages_english.json')],
-    // The shapes that qualify (guards): a tag as the name, a tag as a folder, a bundle with a
-    // tag behind `_`, a bundle alone, a tag with a region or a script.
-    ['tag', 'locales/en.json', json({ home: 'Start' }), json({ home: 'Begin' }), null],
-    ['tag', 'locales/de/common.json', json({ home: 'Start' }), json({ home: 'Begin' }), null],
-    ['tag', 'i18n/messages_fr.properties', 'home=Start\n', 'home=Begin\n', null],
-    ['tag', 'config/locales/en.yml', 'en:\n  home: Start\n', 'en:\n  home: Begin\n', null],
-    ['tag', 'lang/pt_BR/app.yaml', 'home: Start\n', 'home: Begin\n', null],
-    ['tag', 'locales/zh-Hans.json', json({ home: 'Start' }), json({ home: 'Begin' }), null],
-    ['tag', 'translations/Strings.json', json({ home: 'Start' }), json({ home: 'Begin' }), null],
-    ['tag', 'messages/labels_en-US.yml', 'home: Start\n', 'home: Begin\n', null],
-    // 2. JSON is read with JSON.parse on both sides: the same keys in the same order, the same
-    // types, and only string leaves differ. A string in a list is wording too (red: the line
-    // reader knew only `"key": "value"`).
-    row('json', 'json', json({ days: ['one day', '@'], menu: { save: 'Save' } }), ['many days', 'several days'], null),
-    row('json', 'json', json({ menu: { save: '@', more: [{ label: 'Help' }] } }), ['Save', 'Store'], null),
-    row('json, not wording', 'json', json({ save: 'Save', count: 0 }).replace('0', '@'), ['1', '2'], un),
-    row('json', 'json', json({ save: 'Save', flag: '@' }), ['yes', 'no'], null),
-    ['json, not wording', 'locales/r9/en/typed.json', json({ flag: 'yes' }), json({ flag: true }), un('locales/r9/en/typed.json')],
-    ['json, not wording', 'locales/r9/en/key.json', json({ save: 'Save', cancel: 'Cancel' }), json({ store: 'Save', cancel: 'Cancel' }), un('locales/r9/en/key.json')],
-    ['json, not wording', 'locales/r9/en/order.json', json({ a: 'One', b: 'Two' }), json({ b: 'Two', a: 'One' }), un('locales/r9/en/order.json')],
-    ['json, not wording', 'locales/r9/en/indent.json', '{\n  "a": "Old"\n}\n', '{\n    "a": "New"\n}\n', un('locales/r9/en/indent.json')],
-    // A duplicate key, a comment, a trailing comma, another formatting than JSON.stringify
-    // writes: the parse or the comparison with the parsed value fails (red: each passed).
-    row('json, duplicate key', 'json', '{\n  "save": "@",\n  "save": "Keep"\n}\n', ['Save', 'Store'], lost),
-    row('json, duplicate key', 'json', '{\n  "save": "Keep",\n  "save": "@"\n}\n', ['Save', 'Store'], lost),
-    row('json, comment', 'json', '{\n  // a note\n  "save": "@"\n}\n', ['Save', 'Store'], lost),
-    row('json, trailing comma', 'json', '{\n  "save": "@",\n}\n', ['Save', 'Store'], lost),
-    row('json, other form', 'json', '{\n  "save" : "@"\n}\n', ['Save', 'Store'], lost),
-    row('json, other form', 'json', '{\n  "save": "caf\\u00e9 @"\n}\n', ['old', 'new'], lost),
-    row('json, other form', 'json', '{ "save": "@" }\n', ['Save', 'Store'], lost),
-    row('json, other form', 'json', '\ufeff{\n  "save": "@"\n}\n', ['Save', 'Store'], lost),
-    row('json, other form', 'json', '{\n  "2": "b",\n  "1": "@"\n}\n', ['Save', 'Store'], lost),
-    // The forms that are JSON.stringify's own qualify: two or four spaces, a tab, one line,
-    // with or without a last line break, Windows line endings.
-    row('json, form', 'json', '{\n    "save": "@"\n}\n', ['Save', 'Store'], null),
-    row('json, form', 'json', '{\n\t"save": "@"\n}', ['Save', 'Store'], null),
-    // One line holds every string of the catalogue, so a change to all of them would count as
-    // two changed lines: a file with no indentation is refused, as the line reader refused it.
-    row('json, other form', 'json', '{"save":"@"}\n', ['Save', 'Store'], lost),
-    row('json, form', 'json', '{\r\n  "save": "@"\r\n}\r\n', ['Save', 'Store'], null),
-    // 3. YAML: a strict subset, and the whole file is refused for anything outside it (red:
-    // each line was read alone, so what stood on other lines was never seen).
-    row('yaml', 'yml', '---\n# The catalogue\nmenu:\n  save: @\n  days:\n    - Monday\n  list:\n  - "one"\n  - \'two\'\n\nnext: Hi\n', ['Save', 'Store'], null),
-    row('yaml', 'yml', 'days:\n  - @\n  - Tuesday\n', ['Monday', 'Mondays'], null),
-    // An escape written with digits holds digits as it is written (the coordinator's point
-    // at review of 2026-10-09; until then this row passed), one without them passes.
-    row('yaml', 'yml', 'save: "@ it\\x21"\n', ['Save', 'Store'], risk),
-    row('yaml', 'yml', 'save: "@ \\"it\\" now"\n', ['Save', 'Store'], null),
-    row('yaml, a tag', 'yml', 'desc: !!str |\n  save: @\n', ['Save', 'Store'], lost),
-    row('yaml, an anchor', 'yml', 'desc: &a |\n  save: @\n', ['Save', 'Store'], lost),
-    row('yaml, a tab', 'yml', 'desc:\t|\n  save: @\n', ['Save', 'Store'], lost),
-    row('yaml, a quoted key', 'yml', '"a: b": |\n  save: @\n', ['Save', 'Store'], lost),
-    row('yaml, a quoted scalar over lines', 'yml', '- "one\n  save: @"\n', ['Save', 'Store'], lost),
-    row('yaml, a flow collection over lines', 'yml', '- { a: one,\n    b: two@ }\n', ['', ', c'], lost),
-    row('yaml, an alias', 'yml', 'a: &x Save\nb: *x\nc: @\n', ['Old', 'New'], lost),
-    row('yaml, a document marker', 'yml', 'a: @\n---\nb: x\n', ['Old', 'New'], lost),
-    row('yaml, a document marker', 'yml', 'a: @\n...\n', ['Old', 'New'], lost),
-    row('yaml, a scalar over lines', 'yml', 'a: @ words\n  and more\n', ['Old', 'New'], lost),
-    row('yaml, a complex key', 'yml', '? a\n: @\n', ['Old', 'New'], lost),
-    row('yaml, a duplicate key', 'yml', 'save: @\nsave: Keep\n', ['Save', 'Store'], lost),
-    row('yaml, a duplicate key', 'yml', 'menu:\n  save: @\nother:\n  save: Keep\nmenu:\n  x: y\n', ['Save', 'Store'], lost),
-    row('yaml, a key that is no word', 'yml', 'on: @\n', ['Old', 'New'], lost),
-    row('yaml, a key that is no word', 'yml', '404: @ found\n', ['Not', 'Never'], lost),
-    row('yaml, the indentation', 'yml', 'a: x\n  b: @\n', ['Old', 'New'], lost),
-    row('yaml, the indentation', 'yml', 'a:\n    b: @\n  c: x\n', ['Old', 'New'], lost),
-    row('yaml, a comment after a value', 'yml', 'a: @ # note\n', ['Old', 'New'], lost),
-    row('yaml, a carriage return on its own', 'yml', 'a: @\rb: x\n', ['Old', 'New'], lost),
-    // A changed value that is no string for a YAML reader, or no wording.
-    row('yaml, not wording', 'yml', 'limit: @\n', ['.inf', '.nan'], un),
-    row('yaml, not wording', 'yml', 'flag: @\n', ['True', 'False'], un),
-    row('yaml, not wording', 'yml', 'a: @\n', ['Old', '"Old"'], un),
-    row('yaml, not wording', 'yml', 'a: "@"\n', ['Old', 'O\\x6cd'], un),
-    ['yaml, not wording', 'locales/r9/en/comment.yml', '# Old note\na: x\n', '# New note\na: x\n', un('locales/r9/en/comment.yml')],
-    ['yaml, not wording', 'locales/r9/en/spaces.yml', 'a: Old\n', 'a: New \n', un('locales/r9/en/spaces.yml')],
-    // 4. Properties: the key ends at the first unescaped `=`, `:` or white space (red).
-    row('properties', 'properties', 'a\\=b=@\n', ['value', 'other'], un),
-    ['properties', 'locales/r9/en/escaped-key.properties', 'a\\=b=value\n', 'a\\=c=value\n', un('locales/r9/en/escaped-key.properties')],
-    row('properties', 'properties', 'a\\:b : @\n', ['Old', 'New'], un),
-    row('properties', 'properties', 'key\\ one = @\n', ['Old', 'New'], un),
-    // A changed line needs `=` or `:` right behind its key: where white space ends the key, a
-    // reader that splits at the first `=` takes another key than Java does.
-    row('properties', 'properties', 'greeting @ there\n', ['Hello', 'Welcome'], un),
-    ['properties', 'locales/r9/en/key-space.properties', 'a b=Old\n', 'a c=Old\n', un('locales/r9/en/key-space.properties')],
-    ['properties', 'locales/r9/en/key-space-value.properties', 'a b=Old\n', 'a b=New\n', un('locales/r9/en/key-space-value.properties')],
-    row('properties', 'properties', '  greeting = @ there\n! a note\n# another\n\nkey:value\nword alone\n', ['Hello', 'Welcome'], null),
-    // A continued line anywhere refuses the file.
-    row('properties, a continued line', 'properties', 'a=@\nb=one \\\n  two\n', ['Old', 'New'], lost),
-    row('properties, a continued line', 'properties', '# note \\\na=@\n', ['Old', 'New'], lost),
-    row('properties, a continued line', 'properties', 'a=@ \\\\\nb=x\n', ['Old', 'New'], lost),
-    // 5. The wording rule (red): every number character, a format character, a bare host, a
-    // scheme anywhere, and the placeholders in their order.
-    row('wording', 'json', json({ a: 'See account.example.@' }), ['com', 'net'], risk),
-    row('wording', 'json', json({ a: 'Read [the guide](@)' }), ['/guide', 'javascript:steal()'], un),
-    row('wording', 'json', json({ a: 'Write @' }), ['to us', 'mailto:x'], un),
-    ['wording', 'locales/r9/en/bell.json', json({ a: 'Ring' }), json({ a: 'Ring\u0007' }), risk('locales/r9/en/bell.json')],
-    row('wording', 'json', json({ a: 'Save@' }), ['', '\u202e'], risk),
-    row('wording', 'json', json({ a: 'Step @' }), ['two', '\u2461'], risk),
-    row('wording', 'json', json({ a: 'Part @' }), ['eight', '\u2167'], risk),
-    row('wording', 'yml', 'a: Hello @\n', [':name', ':email'], un),
-    row('wording', 'json', json({ a: '@' }), ['%s of %d', '%d of %s'], un),
-    row('wording', 'json', json({ a: 'Hi @' }), ['$name', '$user'], un),
-    row('wording', 'json', json({ a: 'Hi @' }), ['%{name}', '%{user}'], un),
-    row('wording', 'properties', 'a=Hi @\n', ['%1$s and %2$s', '%2$s and %1$s'], un),
-    // The placeholders stay as they are and the words around them change (guards).
-    row('wording', 'json', json({ a: '@ :name, %s, %1$s, {n}, {{m}}, %{k} and $x' }), ['Hello', 'Welcome'], null),
-    row('wording', 'json', json({ a: 'Note: the @ way, e.g. this one (short).' }), ['old', 'new'], null),
+    // The shapes that qualified until the tenth round (a tag as the name, a tag as a folder, a
+    // bundle with a tag behind `_`, a bundle alone, a tag with a region or a script): each is a
+    // settings file by its extension now, like the rows above.
+    ['tag', 'locales/en.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('locales/en.json')],
+    ['tag', 'locales/de/common.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('locales/de/common.json')],
+    ['tag', 'i18n/messages_fr.properties', 'home=Start\n', 'home=Begin\n', setting('i18n/messages_fr.properties')],
+    ['tag', 'config/locales/en.yml', 'en:\n  home: Start\n', 'en:\n  home: Begin\n', setting('config/locales/en.yml')],
+    ['tag', 'lang/pt_BR/app.yaml', 'home: Start\n', 'home: Begin\n', setting('lang/pt_BR/app.yaml')],
+    ['tag', 'locales/zh-Hans.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('locales/zh-Hans.json')],
+    ['tag', 'translations/Strings.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('translations/Strings.json')],
+    ['tag', 'messages/labels_en-US.yml', 'home: Start\n', 'home: Begin\n', setting('messages/labels_en-US.yml')],
     // The same rule in HTML text.
     ['wording', 'src/pages/r9-host.html', '<p>See account.example.com now</p>\n', '<p>See account.example.net now</p>\n', risk('src/pages/r9-host.html')],
     ['wording', 'src/pages/r9-scheme.html', '<p>Write to us</p>\n', '<p>Write mailto:us</p>\n', risk('src/pages/r9-scheme.html')],
     ['wording', 'src/pages/r9-numeral.html', '<p>Step two</p>\n', '<p>Step \u2461</p>\n', risk('src/pages/r9-numeral.html')],
     // 6. A byte-order mark on one side only, or another number of carriage returns (red for
-    // the YAML file and the stylesheet; an HTML page was let through with every line ending changed).
-    ['mark', 'locales/r9/en/mark.yml', 'a: Old\n', '\ufeffa: New\n', un('locales/r9/en/mark.yml')],
-    // A byte-order mark in a catalogue refuses it on both sides too: Ruby's YAML reader reads only
-    // the first entry behind one (found on 2026-10-09 with Psych 3.1.0; until then this row passed).
-    ['mark', 'locales/r9/en/mark-kept.yml', '\ufeffa: Old\n', '\ufeffa: New\n', lost('locales/r9/en/mark-kept.yml')],
-    ['mark', 'locales/r9/en/returns.yml', 'a: Old\nb: x\n', 'a: New\nb: x\r\n', un('locales/r9/en/returns.yml')],
-    ['mark', 'locales/r9/en/returns-kept.yml', 'a: Old\r\nb: x\r\n', 'a: New\r\nb: x\r\n', null],
+    // the stylesheet; an HTML page was let through with every line ending changed).
     ['mark', 'src/styles/r9-mark.css', 'a { color: red; }\n', '\ufeffa { color: blue; }\n', un('src/styles/r9-mark.css')],
     ['mark', 'src/styles/r9-returns.css', 'a { color: red; }\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n', un('src/styles/r9-returns.css')],
-    ['mark', 'src/pages/r9-returns.html', '<p>Save</p>\n<p>More</p>\n', '<p>Store</p>\n<p>More</p>\r\n', un('src/pages/r9-returns.html')],
-    ['mark', 'locales/r9/en/returns.properties', 'a=Old\nb=x\n', 'a=New\nb=x\r\n', un('locales/r9/en/returns.properties')]
+    ['mark', 'src/pages/r9-returns.html', '<p>Save</p>\n<p>More</p>\n', '<p>Store</p>\n<p>More</p>\r\n', un('src/pages/r9-returns.html')]
   ];
   const base = {};
   for (const [, p, b] of shapes) {
@@ -3153,11 +2380,9 @@ test('round 9: catalogue files — recognition, JSON by JSON.parse, strict YAML 
 // The ninth round, stylesheets (decisions at review of 2026-10-09): a strict subset, held to
 // postcss by the differential test. A statement does not end at a `;` inside round or square
 // brackets; a statement that is neither a declaration, an at-rule nor a rule's head refuses
-// the file; a changed declaration that holds a backslash is refused; and a custom property
-// named for a colour qualifies only when everything else in the file that names it is a
-// `var()` in the value of a real colour property. Every row marked `red` answered otherwise
-// on `4212d9ff`. [item, path, base content, new content, the clause, or null for `checking`]
-test('round 9: stylesheets — brackets, statements outside the subset, escapes, and what reads a colour-named custom property', async () => {
+// the file; and a changed declaration that holds a backslash is refused. Every row marked
+// `red` answered otherwise on `4212d9ff`. [item, path, base content, new content, the clause, or null for `checking`]
+test('round 9: stylesheets — brackets, statements outside the subset, escapes, and custom properties', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
@@ -3225,19 +2450,19 @@ test('round 9: stylesheets — brackets, statements outside the subset, escapes,
     // 3. A string ends at a carriage return or a form feed too (red).
     row('string', 'a { content: "x\r"; color: ~ }\n', lost),
     row('string', 'a { content: "x\f"; color: ~ }\n', lost),
-    // 4. A custom property named for a colour: everything else in the file that names it is a
-    // `var()` in the value of a real colour property (red: each answered `checking`).
+    // 4. A changed custom property is a setting whatever reads it (the tenth round: custom
+    // properties never qualify; until then one named for a colour and read by colour
+    // properties only did, and the last four rows answered `checking`).
     row('custom property', ':root { --brand-color: ~ }\na { animation-name: var(--brand-color) }\n', setting),
     row('custom property', ':root { --brand-color: ~ }\n@container style(--brand-color: red) { a { margin: 0 } }\n', setting),
-    row('custom property', ':root { --brand-color: ~ }\n@property --brand-color { syntax: "<color>"; inherits: false; initial-value: red }\n', setting),
     row('custom property', ':root { --brand-color: ~; --other: var(--brand-color) }\n', setting),
-    row('custom property', ':root { --brand-color: ~ }\na { width: calc(var( --brand-color ) * 2) }\n', setting),
-    row('custom property', ':root { --brand-color: ~ }\na { color: xvar(--brand-color) }\n', setting),
-    // Read by colour properties only, read by nothing, or only named alike (guards).
-    row('custom property', ':root { --brand-color: ~ }\na { color: var(--brand-color); border: 1px solid VAR( --brand-color , blue) }\n', null),
-    row('custom property', ':root { --brand-color: ~ }\na { background: linear-gradient(var(--brand-color), white) }\n', null),
-    row('custom property', ':root { --brand-color: ~ }\n.btn--brand-color { margin: 0 } a { width: var(--Brand-Color) }\n', null),
-    row('custom property', ':root { --brand-color: ~ } /* animation-name: var(--brand-color) */\n', null)
+    row('custom property', ':root { --brand-color: ~ }\na { color: var(--brand-color); border: 1px solid VAR( --brand-color , blue) }\n', setting),
+    row('custom property', ':root { --brand-color: ~ }\na { background: linear-gradient(var(--brand-color), white) }\n', setting),
+    row('custom property', ':root { --brand-color: ~ }\n.btn--brand-color { margin: 0 } a { width: var(--Brand-Color) }\n', setting),
+    row('custom property', ':root { --brand-color: ~ } /* animation-name: var(--brand-color) */\n', setting),
+    // A real colour property that reads a custom property is no colour value; one beside it is.
+    row('custom property', ':root { --brand-color: red }\na { color: var(--brand-color, ~) }\n', (f) => inexact(f)),
+    row('custom property', ':root { --brand-color: red }\na { color: var(--brand-color); background-color: ~ }\n', null)
   ];
   const base = {};
   for (const [, p, b] of shapes) base[p] = b;
@@ -3255,73 +2480,26 @@ test('round 9: stylesheets — brackets, statements outside the subset, escapes,
   assert.deepEqual(wrong, []);
 });
 
-test('round 9: paths and names — governing names and folders, what the instruction files link to, sensitive words in every spelling, byte-order marks and line endings', async (t) => {
+test('round 9: paths and names — governing folders, sensitive words in every spelling, byte-order marks and line endings', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const area = (word) => (f) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
-  const PROSE = ['Some words here.\n', 'Some other words here.\n'];
   const PAGE = [HOME, HOME_STORE];
   const COLOUR = ['a { color: red; }\n', 'a { color: blue; }\n'];
-  const INSTRUCTIONS = [
-    '# Instructions',
-    '',
-    'Read [the guide](docs/linked.md) and [the rules](./docs/rules.md "Rules") first.',
-    'See [spaces](<docs/with space.md>), [encoded](docs/with%20pct.md), [part](docs/frag.md#part), [rooted](/docs/rooted.md),',
-    '[brackets](docs/a(b).md), ![image](docs/image.md), [cased](DOCS/Cased.md), [the reference][r] and',
-    'the badge [![badge](docs/badge.md)](docs/behind-badge.md). Half done: [progress](docs/50%done.md),',
-    '[the menu](docs/caf%C3%A9.md) and [bytes that spell nothing](docs/x%FFy.md).',
-    'No file of this repository: [site](https://example.com/docs/free.md), [mail](mailto:a@example.com), [top](#top),',
-    '[up](../outside.md) and [the folder](docs/).',
-    '',
-    '[r]: docs/ref.md',
-    '[page]: <site/linked page.html> "A page"',
-    ''
-  ].join('\n');
   // [what the row shows, path, [before, after], the clause, or null for the first call's `checking`]
   const rows = [
-    // 1. The names of files that govern the work, in any letter case and at any depth (red: `checking`).
-    ['governing name', 'docs/IRON_LOOP.md', PROSE, un],
-    ['governing name', 'guide/iron_loop.md', PROSE, un],
-    ['governing name', 'guide/SKILL.md', PROSE, un],
-    ['governing name', 'notes/skill.md', PROSE, un],
-    ['governing name', 'notes/MEMORY.md', PROSE, un],
-    ['governing folder', 'prompts/intro.md', PROSE, un],
-    ['governing folder', 'docs/Prompts/tone.md', PROSE, un],
-    ['governing folder', 'output-styles/terse.md', PROSE, un],
+    // 1. The folders that govern the work, in any letter case and at any depth (red: `checking`).
+    ['governing folder', 'prompts/intro.html', PAGE, un],
+    ['governing folder', 'docs/Prompts/tone.html', PAGE, un],
+    ['governing folder', 'output-styles/terse.css', COLOUR, un],
     ['governing folder', 'site/output-styles/page.html', PAGE, un],
-    // Names that only resemble them (guards).
-    ['governing name', 'docs/memory-notes.md', PROSE, null],
-    ['governing name', 'docs/skills-we-need.md', PROSE, null],
-    ['governing folder', 'docs/prompting/tone.md', PROSE, null],
-    // One reader says what a language part is, for a catalogue and for a documentation text
-    // (red: `readme.zh-hans-cn.txt` passed under a looser reading of its own).
-    ['language part', 'docs/readme.zh-Hans-CN.txt', PROSE, un],
-    ['language part', 'docs/readme.de-formal.txt', PROSE, un],
-    ['language part', 'docs/readme.zh-Hans.txt', PROSE, null],
-    // 2. A file an instruction file of the last commit links to governs the work (red: `checking`).
-    ['linked', 'docs/linked.md', PROSE, un],
-    ['linked', 'docs/rules.md', PROSE, un],
-    ['linked', 'docs/with space.md', PROSE, un],
-    ['linked', 'docs/with pct.md', PROSE, un],
-    ['linked', 'docs/frag.md', PROSE, un],
-    ['linked', 'docs/rooted.md', PROSE, un],
-    ['linked', 'docs/a(b).md', PROSE, un],
-    ['linked', 'docs/image.md', PROSE, un],
-    ['linked', 'docs/cased.md', PROSE, un],
-    ['linked', 'docs/ref.md', PROSE, un],
-    ['linked', 'docs/50%done.md', PROSE, un],
-    ['linked', 'docs/caf\u00e9.md', PROSE, un],
-    ['linked', 'docs/x%FFy.md', PROSE, un],
-    ['linked', 'docs/badge.md', PROSE, un],
-    ['linked', 'docs/behind-badge.md', PROSE, un],
-    ['linked', 'site/linked page.html', PAGE, un],
-    // An instruction file in a folder links from that folder.
-    ['linked', 'packages/app/rules/style.md', PROSE, un],
-    ['linked', 'docs/shared.md', PROSE, un],
-    ['linked', 'src/styles/linked.css', COLOUR, un],
-    // Named by an address elsewhere only, under a linked folder, or beside a linked file (guards).
-    ['linked', 'docs/free.md', PROSE, null],
-    ['linked', 'docs/beside.md', PROSE, null],
-    ['linked', 'packages/app/docs/linked.md', PROSE, null],
+    ['governing folder', 'site/skills/page.html', PAGE, un],
+    ['governing folder', '.claude/theme/page.css', COLOUR, un],
+    // 2. A file an instruction file links to. Until the tenth round such a file governed the
+    // work; the reader of links is taken out with the Markdown reader, a Markdown file is
+    // refused by its extension, and a linked page or stylesheet is judged like any other.
+    ['linked', 'docs/linked.md', ['Some words here.\n', 'Some other words here.\n'], un],
+    ['linked', 'site/linked page.html', PAGE, null],
+    ['linked', 'src/styles/linked.css', COLOUR, null],
     // 3. A sensitive word behind capitals, a mark or a character nobody sees (red: `checking`).
     ['sensitive word', 'src/APIKey/page.html', PAGE, area('key')],
     ['sensitive word', 'src/SSOLogin/page.html', PAGE, area('login')],
@@ -3337,15 +2515,13 @@ test('round 9: paths and names — governing names and folders, what the instruc
     ['sensitive word', 'src/APIKeyboard/page.html', PAGE, null],
     ['sensitive word', 'src/styles/design-tokens.css', COLOUR, null],
     // 4. A byte-order mark on one side only, or another count of carriage returns, in a
-    // stylesheet and in a catalogue (red: `checking`).
+    // stylesheet (red: `checking`).
     ['mark and line ending', 'src/styles/marked.css', [COLOUR[0], `\ufeff${COLOUR[1]}`], un],
     ['mark and line ending', 'src/styles/ending.css', ['a { color: red; }\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n'], un],
-    ['mark and line ending', 'locales/en/marked.yml', ['save: Save\nopen: Open\n', '\ufeffsave: Store\nopen: Open\n'], un],
-    ['mark and line ending', 'locales/en/ending.yml', ['save: Save\nopen: Open\n', 'save: Store\r\nopen: Open\n'], un],
     ['mark and line ending', 'src/styles/both.css', ['\ufeffa { color: red; }\r\n', '\ufeffa { color: blue; }\r\n'], null]
   ];
-  const base = { 'CLAUDE.md': INSTRUCTIONS,
-    'packages/app/AGENTS.md': 'Follow [the style](rules/style.md), [the shared guide](../../docs/shared.md) and [the colours](../../src/styles/linked.css).\n' };
+  const base = { 'CLAUDE.md': '# Instructions\n\nRead [the guide](docs/linked.md) and [the page](<site/linked page.html>).\n@src/styles/linked.css\n',
+    'AGENTS.md': 'Follow [the colours](src/styles/linked.css).\n' };
   for (const [, p, [before]] of rows) base[p] = before;
   const root = makeRepo(base);
   const wrong = [];
@@ -3359,80 +2535,9 @@ test('round 9: paths and names — governing names and folders, what the instruc
   }
   assert.deepEqual(wrong, []);
 
-  await t.test('the links are those of the last commit: a link removed in the working folder still counts, one added there does not', async () => {
-    fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# Instructions\n\nRead [the free one](docs/free.md).\n');
-    fs.writeFileSync(path.join(root, 'docs', 'linked.md'), PROSE[1]);
-    fs.writeFileSync(path.join(root, 'docs', 'free.md'), PROSE[1]);
-    assert.equal((await check(root, 'docs/linked.md')).text, refusal(un('docs/linked.md')));
-    assertChecking(await check(root, 'docs/free.md'), ['docs/free.md']);
-    for (const f of ['CLAUDE.md', 'docs/linked.md', 'docs/free.md']) git(root, ['checkout', '-q', '--', f]);
-  });
-
-  await t.test('an instruction file that is a link: what it points to is read in its place, from both folders', async () => {
-    const linked = makeRepo({ 'docs/instructions.md': 'Read [more](extra.md).\n', 'docs/extra.md': PROSE[0], 'tools/extra.md': PROSE[0],
-      'docs/free.md': PROSE[0] }, { commit: false });
-    fs.symlinkSync('../docs/instructions.md', path.join(linked, 'tools', 'CLAUDE.md'));
-    git(linked, ['add', '-A']);
-    git(linked, ['commit', '-q', '-m', 'base']);
-    for (const p of ['docs/instructions.md', 'docs/extra.md', 'tools/extra.md']) {
-      fs.writeFileSync(path.join(linked, ...p.split('/')), p === 'docs/instructions.md' ? 'Read [much more](extra.md).\n' : PROSE[1]);
-      assert.equal((await check(linked, p)).text, refusal(un(p)), p);
-      git(linked, ['checkout', '-q', '--', p]);
-    }
-    fs.writeFileSync(path.join(linked, 'docs', 'free.md'), PROSE[1]);
-    assertChecking(await check(linked, 'docs/free.md'), ['docs/free.md']);
-  });
-
-  await t.test('an instruction file the check cannot read refuses every change', async () => {
-    // Each of these is a committed `AGENTS.md` whose links cannot be listed: no hotfix until it can.
-    const cases = [
-      ['bytes that are no text', (r) => fs.writeFileSync(path.join(r, 'AGENTS.md'), Buffer.from([0x23, 0x20, 0xff, 0xfe, 0x0a])), 'AGENTS.md is not text'],
-      ['a link that leaves the repository', (r) => fs.symlinkSync('../elsewhere/AGENTS.md', path.join(r, 'AGENTS.md')), 'AGENTS.md is a link the check cannot follow'],
-      ['a link to nothing', (r) => fs.symlinkSync('docs/gone.md', path.join(r, 'AGENTS.md')), 'AGENTS.md is a link the check cannot follow'],
-      ['a link to a folder', (r) => fs.symlinkSync('docs', path.join(r, 'AGENTS.md')), 'AGENTS.md is a link the check cannot follow'],
-      ['a link to a link', (r) => { fs.symlinkSync('docs/free.md', path.join(r, 'second.md')); fs.symlinkSync('second.md', path.join(r, 'AGENTS.md')); },
-        'AGENTS.md is a link the check cannot follow']
-    ];
-    for (const [what, make, why] of cases) {
-      const r = makeRepo({ 'docs/free.md': PROSE[0] }, { commit: false });
-      make(r);
-      git(r, ['add', '-A']);
-      git(r, ['commit', '-q', '-m', 'base']);
-      fs.writeFileSync(path.join(r, 'docs', 'free.md'), PROSE[1]);
-      assert.equal((await check(r, 'docs/free.md')).text, unreadable(why), what);
-      assert.equal((await check(r, '--run-tests', 'docs/free.md')).text, unreadable(why), `${what}, the test call`);
-    }
-  });
 });
 
-test('round 9: an instruction file of any size is read in time proportional to its size, and so is a long path', async (t) => {
-  // Shapes that make a link reader which looks ahead from every start quadratic: starts
-  // with no end, brackets never closed, angle brackets never closed, definitions, and many
-  // real links.
-  const hostile = (kb) => [']('.repeat(kb * 512), `](${'('.repeat(kb * 1024)}`, '](<'.repeat(kb * 341), '[a]: '.repeat(kb * 204),
-    '[a](b) '.repeat(kb * 146), '[a]: b\n'.repeat(kb * 146)].join('\n');
-  const repoWith = (kb) => {
-    const root = makeRepo({ 'CLAUDE.md': `${hostile(kb)}\n`, 'docs/free.md': 'Some words here.\n' });
-    fs.writeFileSync(path.join(root, 'docs', 'free.md'), 'Some other words here.\n');
-    return root;
-  };
-  const wall = async (call) => {
-    const start = process.hrtime.bigint();
-    await call();
-    return Number(process.hrtime.bigint() - start) / 1e6;
-  };
-  // What a call costs with an empty instruction file (git's own calls, mostly): taken off.
-  const emptyRoot = repoWith(0);
-  const emptyCall = () => check(emptyRoot, 'docs/free.md');
-  const idle = Math.min(await wall(emptyCall), await wall(emptyCall), await wall(emptyCall));
-  const at = (kb) => {
-    const root = repoWith(kb);
-    return async () => assertChecking(await check(root, 'docs/free.md'), ['docs/free.md']);
-  };
-  const file = await growth(at, 32, 2048, async (call) => Math.max(await wall(call) - idle, 0));
-  t.diagnostic(`an instruction file of 6 x ${file.n} KiB: ${file.small.toFixed(1)} ms over an empty one, 6 x ${4 * file.n} KiB: ${file.big.toFixed(1)} ms, ${file.ratio.toFixed(1)} times as long`);
-  assert.ok(file.ratio < 8, `6 x ${file.n} KiB took ${file.small.toFixed(1)} ms and 6 x ${4 * file.n} KiB took ${file.big.toFixed(1)} ms`);
-
+test('round 9: a long path is read in time proportional to its size', async (t) => {
   // A folder name of capitals, small letters, marks and characters nobody sees: every piece is one sub-word.
   const piece = `aB${String.fromCharCode(0x301, 0x200b)}`;
   const longPath = (n) => {
@@ -3554,7 +2659,6 @@ test('round 9: the copy is removed whatever the tests leave in it, and a removal
 });
 
 test('round 9: every guard fails closed — a file its reader cannot parse is refused, a fault in any rule stops the check, and nothing falls back to a looser reading', async (t) => {
-  const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const open = (f) => `I could not read the change (${f} leaves a tag, quote, comment, block, fence or span open)`;
 
@@ -3562,23 +2666,6 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
     // [format, path, before, after, clause]. Where both sides hold the same unparsable piece and
     // one string differs beside it, a reader that fell back to reading lines would pass.
     const rows = [
-      ['JSON', 'locales/en/both.json', '{\n  "save": "Save",\n}\n', '{\n  "save": "Store",\n}\n', lost],
-      ['JSON', 'locales/en/new.json', '{\n  "save": "Save",\n  "open": "Open"\n}\n', '{\n  "save": "Store",\n  "open": "Open",\n}\n', lost],
-      ['JSON', 'locales/en/old.json', '{\n  "save": "Save",\n  "open": "Open",\n}\n', '{\n  "save": "Store",\n  "open": "Open"\n}\n', lost],
-      ['JSON', 'locales/en/cut.json', '{\n  "save": "Save"\n', '{\n  "save": "Store"\n', lost],
-      ['JSON', 'locales/en/comment.json', '{\n  // a note\n  "save": "Save"\n}\n', '{\n  // a note\n  "save": "Store"\n}\n', lost],
-      ['JSON', 'locales/en/twice.json', '{\n  "save": "Save",\n  "save": "Keep"\n}\n', '{\n  "save": "Store",\n  "save": "Keep"\n}\n', lost],
-      ['JSON', 'locales/en/empty.json', '{\n  "save": "Save"\n}\n', '\n', un],
-      ['YAML', 'locales/en/both.yml', 'save: Save\nmenu: [a, b]\n', 'save: Store\nmenu: [a, b]\n', lost],
-      ['YAML', 'locales/en/new.yml', 'save: Save\nopen: Open\n', 'save: Store\nopen: &a Open\n', lost],
-      ['YAML', 'locales/en/old.yml', 'save: Save\nopen: !!str Open\n', 'save: Store\nopen: Open\n', lost],
-      ['YAML', 'locales/en/block.yml', 'save: Save\ntext: |\n  save: Save\n', 'save: Store\ntext: |\n  save: Save\n', lost],
-      ['YAML', 'locales/en/tab.yml', 'save: Save\nopen:\tOpen\n', 'save: Store\nopen:\tOpen\n', lost],
-      ['YAML', 'locales/en/cut.yml', 'save: "Save"\nopen: Open\n', 'save: "Store\nopen: Open\n', lost],
-      ['properties', 'lang/en/both.properties', 'save=Save\nlong=a \\\n  b\n', 'save=Store\nlong=a \\\n  b\n', lost],
-      ['properties', 'lang/en/new.properties', 'save=Save\nopen=Open\n', 'save=Store\nopen=Open\\\n', lost],
-      ['properties', 'lang/en/old.properties', 'save=Save\nopen=Open\\\n', 'save=Store\nopen=Open\n', lost],
-      ['properties', 'lang/en/escape.properties', 'save=Save\n', 'save=Sto\\u00zzre\n', un],
       ['CSS', 'src/styles/both.css', 'a { color: red; oops }\n', 'a { color: blue; oops }\n', lost],
       ['CSS', 'src/styles/new.css', 'a { color: red; }\nb { margin: 0; }\n', 'a { color: blue; }\nb { margin: 0; \n', open],
       ['CSS', 'src/styles/old.css', 'a { color: red; }\nb { margin: 0; \n', 'a { color: blue; }\nb { margin: 0; }\n', open],
@@ -3586,10 +2673,7 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
       ['CSS', 'src/styles/string.css', 'a { color: red; }\nb { content: "x\n; }\n', 'a { color: blue; }\nb { content: "x\n; }\n', lost],
       ['HTML', 'src/pages/both.html', '<p>Save</p>\n<div class="x\n', '<p>Store</p>\n<div class="x\n', inexact],
       ['HTML', 'src/pages/new.html', '<p>Save</p>\n<p>More</p>\n', '<p>Store</p>\n<p>More</p\n', inexact],
-      ['HTML', 'src/pages/comment.html', '<p>Save</p>\n<!-- open\n', '<p>Store</p>\n<!-- open\n', inexact],
-      ['Markdown', 'docs/both.md', 'Some words here.\n\n``` js extra\ncode\n```\n', 'Some other words here.\n\n``` js extra\ncode\n```\n', inexact],
-      ['Markdown', 'docs/new.md', 'Some words here.\n\nMore words.\n', 'Some other words here.\n\n<div>More words.\n', inexact],
-      ['Markdown', 'docs/return.md', 'Some words here.\rMore.\n', 'Some other words here.\rMore.\n', inexact]
+      ['HTML', 'src/pages/comment.html', '<p>Save</p>\n<!-- open\n', '<p>Store</p>\n<!-- open\n', inexact]
     ];
     const base = {};
     for (const [, p, before] of rows) base[p] = before;
@@ -3659,9 +2743,6 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
     for (const lineCount of [undefined, null, NaN, -1, 1.5, '2']) {
       assert.throws(() => ruleRefusal({ ...passing(), lineCount }), /no count of its changed lines/, `a line count of ${String(lineCount)}`);
     }
-    assert.throws(() => ruleRefusal({ ...passing(), top: os.tmpdir() }), /no list of the files the instruction files link to/);
-    assert.throws(() => ruleRefusal({ ...passing(), top: os.tmpdir(), governed: ['site/page.html'] }), /no list of the files the instruction files link to/);
-    assert.equal(ruleRefusal({ ...passing(), top: os.tmpdir(), governed: new Set(['site/page.html']) }).cause, 'unrecognised');
     // A file with nothing changed in it is no pass of nothing, in any format.
     for (const rel of ['docs/page.md', 'site/page.html', 'locales/en/page.json', 'locales/en/page.yml', 'lang/en/page.properties', 'site/page.css']) {
       const same = { display: rel, topRel: rel, status: 'M', oldMode: '100644', newMode: '100644', oldSha: null, oldText: 'Some words here.\n',
@@ -3675,23 +2756,13 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
   });
 
   await t.test('through the menu: a fault in the reading, in a rule or in the test run is "the check stopped"', async () => {
-    const root = makeRepo({ 'src/pages/home.html': HOME, 'locales/en/common.json': '{\n  "save": "Save"\n}\n', 'tests/home.test.js': PASSING_TEST },
-      { testScript: SCRIPT });
+    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': PASSING_TEST }, { testScript: SCRIPT });
     const page = ['src/pages/home.html', HOME_STORE];
-    const catalogue = ['locales/en/common.json', '{\n  "save": "Store"\n}\n'];
-    const real = { extname: path.posix.extname, stringify: JSON.stringify, parse: JSON.parse, normalize: String.prototype.normalize,
-      test: RegExp.prototype.test };
+    const real = { extname: path.posix.extname, normalize: String.prototype.normalize, test: RegExp.prototype.test };
     // [where the fault is injected, the judged file, the arguments before it, how to inject]
     const faults = [
       ['rule 1, the copy of the index', page, [], () => t.mock.method(safeFs, 'cpSync', boom)],
       ['rule 7, the name of the judged file', page, [], () => t.mock.method(path.posix, 'extname', (p) => (p === 'home.html' ? boom() : real.extname(p)))],
-      ['rule 4, the JSON reader writing the file back', catalogue, [],
-        () => t.mock.method(JSON, 'stringify', (...args) => (args.length === 3 && args[0] && args[0].save ? boom() : real.stringify(...args)))],
-      ['rule 4, the JSON reader, a fault that is no syntax error', catalogue, [],
-        () => t.mock.method(JSON, 'parse', (text, ...rest) => {
-          if (String(text).includes('"save"')) throw new TypeError('injected fault');
-          return real.parse(text, ...rest);
-        })],
       ['rule 5, the folding of the path', page, [], () => t.mock.method(String.prototype, 'normalize', function fold(form) {
         if (form === 'NFKD') boom();
         return real.normalize.call(this, form);
@@ -3731,12 +2802,8 @@ test('round 9: a transform only adds reasons to refuse, and the check reads what
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const area = (word) => (f) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
   const marker = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
-  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const testEdited = (f) => `it changes a test (${f})`;
-  const deps = (f) => `it changes the dependencies in ${f}`;
   const PAGE = [HOME, HOME_STORE];
-  const PROSE = ['Some words here.\n', 'Some other words here.\n'];
-  const yaml = (a, b) => [`save: ${a}\nopen: Open\n`, `save: ${b}\nopen: Open\n`];
   const page = (a, b) => [HOME.replace('Save', a), HOME.replace('Save', b)];
   // [the transform, path, [before, after], the clause, or null for the first call's `checking`]
   const rows = [
@@ -3746,49 +2813,23 @@ test('round 9: a transform only adds reasons to refuse, and the check reads what
     ['path: marks and format characters dropped', 'src/authACUTElogin/page.html', PAGE, area('auth')],
     ['path: compatibility letters', 'src/authKGSIGN/page.html', PAGE, area('auth')],
     ['path: compatibility letters', 'src/FWAUTH/page.html', PAGE, area('auth')],
-    // A governing name, a test folder and a dependency name behind a character nobody sees.
-    ['path: a governing name folded', 'docs/CLAUDEZWNJ.md', PROSE, un],
-    ['path: a governing name folded', 'docs/FWAGENTS.md', PROSE, un],
-    ['path: a governing folder folded', 'promptsZWSP/intro.md', PROSE, un],
+    // A governing folder and a test folder behind a character nobody sees.
+    ['path: a governing folder folded', 'promptsZWSP/intro.html', PAGE, un],
     ['path: a test folder folded', 'teZWSPsts/page.html', PAGE, testEdited],
-    ['path: a dependency name folded', 'locales/en/pacZWSPkage.json', ['{\n  "save": "Save"\n}\n', '{\n  "save": "Store"\n}\n'], deps],
     // A name that qualifies only once folded does not qualify: the raw name must qualify too.
-    ['path: a qualifying name must qualify as written', 'docs/page.mZWSPd', PROSE, un],
-    ['path: a qualifying name must qualify as written', 'locaZWSPles/en/common.json', ['{\n  "save": "Save"\n}\n', '{\n  "save": "Store"\n}\n'], setting],
+    ['path: a qualifying name must qualify as written', 'site/page.htZWSPml', PAGE, un],
+    ['path: a qualifying name must qualify as written', 'site/page.cZWSPss', ['a { color: red; }\n', 'a { color: blue; }\n'], un],
     // An accent in a name changes nothing (guards).
-    ['path: an accent', 'docs/cafEACUTE/page.md', PROSE, null],
-    ['path: an accent', 'locales/pt_BR/cafEACUTE.json', ['{\n  "save": "Save"\n}\n', '{\n  "save": "Store"\n}\n'], null],
-    // A catalogue value is read as written and as its format decodes it.
-    ['catalogue: an escape decoded', 'locales/en/escape.yml', yaml('"Save"', '"StoBSLASHu0072e"'), marker],
-    ['catalogue: an escape decoded', 'locales/en/hex.yml', yaml('"Save"', '"StoBSLASHx72e"'), marker],
-    ['catalogue: an escape decoded', 'lang/en/escape.properties', ['save=Save\n', 'save=CafBSLASHu00e9\n'], marker],
-    ['catalogue: an escape decoded', 'locales/en/at.yml', yaml('"Save"', '"Save aBSLASHx40b"'), marker],
-    ['catalogue: an escape decoded', 'locales/en/quotes.yml', yaml("'Save'", "'It''s saved'"), null],
-    ['catalogue: an escape decoded', 'locales/en/escaped-quote.yml', yaml('"Save"', '"Say BSLASH"saveBSLASH" now"'), null],
-    ['catalogue: an escape decoded', 'lang/en/plain.properties', ['save=Save\n', 'save=Store it\n'], null],
-    // What a YAML reader of the older kind reads as a switch, and a key that names an object's own machinery.
-    ['catalogue: a switch for an older YAML reader', 'locales/en/switch.yml', yaml('y', 'n'), un],
-    ['catalogue: a switch for an older YAML reader', 'locales/en/switch-name.yml', ['save: Save\ny: Yes please\n', 'save: Store\ny: Yes please\n'], lost],
-    ['catalogue: a key no catalogue holds', 'locales/en/proto.json', ['{\n  "__proto__": {\n    "save": "Save"\n  }\n}\n', '{\n  "__proto__": {\n    "save": "Store"\n  }\n}\n'], lost],
-    ['catalogue: a key no catalogue holds', 'locales/en/proto.yml', ['__proto__:\n  save: Save\n', '__proto__:\n  save: Store\n'], lost],
-    ['catalogue: a key no catalogue holds', 'lang/en/proto.properties', ['a.__proto__.save=Save\n', 'a.__proto__.save=Store\n'], lost],
-    // What the loaders of the older YAML showed (PyYAML 6.0.3 and Ruby's Psych 3.1.0, run on the
-    // edits the check passed): Psych reads only the first entry of a file behind a byte-order
-    // mark, and PyYAML loads no file that holds a bare `=` or `<<` as a value.
-    ['catalogue: a byte-order mark', 'locales/en/mark.yml', ['BOMsave: Save\nopen: Open\n', 'BOMsave: Save\nopen: Opened\n'], lost],
-    ['catalogue: a byte-order mark', 'lang/en/mark.properties', ['BOMsave=Save\nopen=Open\n', 'BOMsave=Save\nopen=Opened\n'], lost],
-    ['catalogue: a value only one YAML reader takes for a string', 'locales/en/equals.yml', ['save: Save\nsign: =\n', 'save: Store\nsign: =\n'], lost],
-    ['catalogue: a value only one YAML reader takes for a string', 'locales/en/merge.yml', ['save: Save\nsign: <<\n', 'save: Store\nsign: <<\n'], lost],
+    ['path: an accent', 'docs/cafEACUTE/page.html', PAGE, null],
     // A character reference is read as written and as the character it spells.
     ['markup: a reference decoded', 'src/pages/shy.html', page('Save', 'Sto&shy;re'), marker],
     ['markup: a reference decoded', 'src/pages/amp.html', page('Save', 'Save &amp; close'), null],
     // A colour's name in the letters a browser compares: the Kelvin sign is no `k`.
-    ['stylesheet: letter case', 'src/styles/kelvin.css', [':root { --brand-color: red }\n', ':root { --brand-color: blacKELVIN }\n'],
-      (f) => inexact(f)],
-    ['stylesheet: letter case', 'src/styles/upper.css', [':root { --brand-color: red }\n', ':root { --brand-color: BLACK }\n'], null],
+    ['stylesheet: letter case', 'src/styles/kelvin.css', ['a { color: red }\n', 'a { color: blacKELVIN }\n'], un],
+    ['stylesheet: letter case', 'src/styles/upper.css', ['a { color: red }\n', 'a { COLOR: BLACK }\n'], un],
+    ['stylesheet: letter case', 'src/styles/upper-value.css', ['a { COLOR: red }\n', 'a { COLOR: BLACK }\n'], null],
     // Line endings: the same on every line, not only as many.
     ['line endings moved', 'src/styles/moved.css', ['a { color: red; }\r\nb { margin: 0; }\n', 'a { color: blue; }\nb { margin: 0; }\r\n'], un],
-    ['line endings moved', 'locales/en/moved.yml', ['save: Save\r\nopen: Open\n', 'save: Store\nopen: Open\r\n'], un],
     ['line endings moved', 'src/pages/moved.html', ['<p>Save</p>\r\n<p>More</p>\n', '<p>Store</p>\n<p>More</p>\r\n'], un],
     ['line endings moved', 'src/styles/kept.css', ['a { color: red; }\r\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n'], null],
     // A character set other than UTF-8, which is how the check read the bytes.
@@ -3816,4 +2857,75 @@ test('round 9: a transform only adds reasons to refuse, and the check reads what
     if (res.text !== want) wrong.push(`${what}: ${JSON.stringify(p)} ${JSON.stringify(after).slice(0, 60)}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
   }
   assert.deepEqual(wrong, []);
+});
+
+// The tenth round (the session coordinator's decision of 2026-10-10, on the owner's "fix the
+// rework rounds"). Five reviewers attacked the eighth and ninth rounds, and every blocking
+// finding sat in three kinds: Markdown and plain-text prose, catalogue files, and custom
+// properties named for a colour. Those three are taken out of this piece: a `.md`, `.txt`,
+// `.json`, `.yaml`, `.yml` or `.properties` file never qualifies, whatever its name and its
+// place, and neither does a changed custom property. What stays is visible text in plain HTML
+// pages and a colour value in a standard colour property of a stylesheet.
+test('round 10: a file of a removed kind never qualifies, whatever its name and place', async () => {
+  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  const json = (word) => `{\n  "save": "${word} the file"\n}\n`;
+  // [extension, path, the text with `@` where one word changes, the clause]. Every path
+  // qualified until this round: a documentation name, a catalogue folder with a language tag.
+  const removed = [
+    ['.md', 'README.md', 'Read the @ guide first.\n', gone],
+    ['.md', 'docs/guide.md', 'Read the @ guide first.\n', gone],
+    ['.md', 'docs/GUIDE.MD', 'Read the @ guide first.\n', gone],
+    ['.txt', 'CHANGES.txt', 'The @ wording of the release.\n', gone],
+    ['.txt', 'docs/readme.en.txt', 'Read the @ guide first.\n', gone],
+    ['.txt', 'docs/README.TXT', 'Read the @ guide first.\n', gone],
+    ['.json', 'locales/en.json', json('@'), setting],
+    ['.json', 'locales/de/common.json', json('@'), setting],
+    ['.json', 'translations/Strings.JSON', json('@'), setting],
+    ['.yaml', 'i18n/fr.yaml', 'save: @ the file\n', setting],
+    ['.yaml', 'lang/pt_BR/app.yaml', 'save: @ the file\n', setting],
+    ['.yml', 'config/locales/en.yml', 'en:\n  save: @ the file\n', setting],
+    ['.yml', 'messages/labels_en-US.yml', 'save: @ the file\n', setting],
+    ['.properties', 'i18n/messages_fr.properties', 'save=@ the file\n', setting],
+    ['.properties', 'lang/en/app.properties', 'save = @ the file\n', setting]
+  ];
+  assert.deepEqual([...new Set(removed.map(([ext]) => ext))], ['.md', '.txt', '.json', '.yaml', '.yml', '.properties'], 'every removed extension has a row');
+  const wrong = [];
+  for (const [, rel, template, clause] of removed) {
+    const refused = ruleRefusal(changeOf(rel, template.replace('@', 'old'), template.replace('@', 'new')));
+    if (refused === null || refused.clause !== clause(rel)) wrong.push(`${rel}: ${refused === null ? 'passed' : refused.clause}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+
+test('round 10: through the real menu process, an imported instruction file, a catalogue and a README are refused', () => {
+  const root = tmpDir();
+  git(root, ['init', '-q']);
+  const env = { ...process.env, TMPDIR: PRIVATE_TMP, TEMP: PRIVATE_TMP, TMP: PRIVATE_TMP };
+  delete env.CLAUDE_PROJECT_DIR;
+  delete env.NODE_TEST_CONTEXT;
+  // The entry point sets a project up on its first call; what it writes is committed with the rest.
+  assert.equal(spawnSync(NODE, [START], { cwd: root, encoding: 'utf8', env, timeout: 60000 }).status, 0);
+  writeFiles(root, {
+    'CLAUDE.md': '# Instructions\n\n@docs/rules.md\n',
+    'docs/rules.md': 'Follow the old rules.\n',
+    'locales/en.json': '{\n  "save": "Save the file"\n}\n',
+    'README.md': 'Read the old guide first.\n'
+  });
+  git(root, ['add', '-A']);
+  git(root, ['commit', '-q', '-m', 'base']);
+  const runs = [
+    ['docs/rules.md', 'Follow the new rules.\n', gone('docs/rules.md')],
+    ['locales/en.json', '{\n  "save": "Store the file"\n}\n', 'it changes a setting in locales/en.json, and settings changes are a common cause of outages'],
+    ['README.md', 'Read the new guide first.\n', gone('README.md')]
+  ];
+  for (const [rel, after, clause] of runs) {
+    fs.writeFileSync(path.join(root, ...rel.split('/')), after);
+    for (const args of [[rel], ['--run-tests', rel]]) {
+      const run = spawnSync(NODE, [START, 'hotfix', 'check', ...args], { cwd: root, encoding: 'utf8', env, timeout: 60000 });
+      assert.equal(run.status, 0, run.stderr);
+      const answer = JSON.parse(run.stdout);
+      assert.equal(answer.verdict, 'refused', `${rel}: ${run.stdout}`);
+      assert.equal(answer.text, refusal(clause), rel);
+    }
+  }
 });

@@ -2,30 +2,23 @@
 
 // The differential test: the hotfix check's readers against real parsers.
 //
-// A seeded generator makes HTML and Markdown documents and one edit of each, of eleven kinds
-// (a word replaced, deleted or added, a mark added or removed, a change at a line start,
-// lines joined or split, a line added or removed, leading or trailing spaces changed). For
-// every edit the check passes (rules 2 to 7 of `ruleRefusal`: no refusal) the real parsers
-// are asked what the edit changed:
+// A seeded generator makes HTML documents and stylesheets and one edit of each, of eleven
+// kinds (a word replaced, deleted or added, a mark added or removed, a change at a line start,
+// lines joined or split, a line added or removed, leading or trailing spaces changed), and in
+// a stylesheet mostly a colour replaced. For every edit the check passes (rules 2 to 7 of
+// `ruleRefusal`: no refusal) the real parsers are asked what the edit changed:
 //   HTML      the old and the new document are parsed by parse5, the HTML standard's parser,
 //             with scripting enabled and with scripting disabled (one leading byte-order
 //             mark taken off first, as a browser does). The two trees must be identical
 //             except for the data of exactly one text node, whose every ancestor is a plain
 //             HTML element that does not hold its text.
-//   Markdown  both documents are rendered by markdown-it in four configurations (the default;
-//             `html: true`; `linkify: true`; `html: true, linkify: true, typographer: true`)
-//             and each result is parsed by parse5, with scripting enabled and disabled. In
-//             EVERY configuration the two trees must be identical except for the data of text
-//             nodes whose ancestors are only `p`, `li`, `ul` and `ol` (and `body` and `html`):
-//             the words of a paragraph or of a list item. No tag, attribute, code or structure
-//             may differ. (Until the ninth round only `p`: a list item's text was no prose.)
-//   YAML      (the ninth round) catalogue files and edits; both sides are loaded by js-yaml,
-//             and the two values must have the same shape, the same keys in the same order
-//             and the same types, and differ only in string values.
-//   CSS       (the ninth round) stylesheets and edits; both sides are parsed by postcss, and
-//             the two trees must be identical except for the value of exactly one
-//             declaration, which postcss-value-parser reads as exactly one colour on both
-//             sides, in a real colour property or a custom property named for a colour.
+//   CSS       both sides are parsed by postcss, and the two trees must be identical except
+//             for the value of exactly one declaration, which postcss-value-parser reads as
+//             exactly one colour on both sides, in a real colour property.
+// (Until the tenth round, the session coordinator's decision of 2026-10-10, this file also
+// held a Markdown section against markdown-it and a YAML section against js-yaml: Markdown
+// prose and catalogue files are no kinds the check reads any more, and the two parsers are
+// no dependencies of this repository's tests.)
 // Anything else is a disagreement: the check called a change wording that a real parser
 // reads as something else.
 //
@@ -35,20 +28,17 @@
 // witness then passed, and the copy was thrown away. The plan's Execution Record holds the
 // table of rules, witnesses and results.
 //
-// parse5, markdown-it, js-yaml, postcss and postcss-value-parser are test-only dependencies
-// of this file (devDependencies, exact versions); the hotfix check requires none of them. parse5 and markdown-it load
-// ECMAScript modules with `require`, which needs Node.js 20.19 or later, or 22.12 or later:
-// the guard below says so in one sentence.
+// parse5, postcss and postcss-value-parser are test-only dependencies of this file
+// (devDependencies, exact versions); the hotfix check requires none of them. parse5 is an
+// ECMAScript module loaded with `require`, which needs Node.js 20.19 or later, or 22.12 or
+// later: the guard below says so in one sentence.
 //
-// Size: by default 110,000 HTML, 22,000 Markdown, 60,000 YAML and 30,000 CSS cases, about twenty
-// seconds in the gated run (under coverage, beside the rest of the suite, on the build machine). The long soak (6
-// million HTML cases and 1 million of each other kind) runs with HOTFIX_DIFFERENTIAL_SOAK=1.
+// Size: by default 110,000 HTML and 30,000 CSS cases. The long soak (6 million HTML cases
+// and 1 million CSS cases) runs with HOTFIX_DIFFERENTIAL_SOAK=1.
 // Every case is a pure function of the seed and its index, so a failure names both and
 // reproduces:
 //   HOTFIX_DIFFERENTIAL_SEED=<seed>   another seed (default 20261009)
 //   HOTFIX_DIFFERENTIAL_HTML=<count>  another number of HTML cases
-//   HOTFIX_DIFFERENTIAL_MARKDOWN=<count>
-//   HOTFIX_DIFFERENTIAL_YAML=<count>
 //   HOTFIX_DIFFERENTIAL_CSS=<count>
 //   HOTFIX_DIFFERENTIAL_FROM=<index>  the first case index (to run one share of a soak)
 //   HOTFIX_DIFFERENTIAL_SHOW=<count>  also print that many plain visible-text edits the check refuses
@@ -58,7 +48,7 @@
 const [NODE_MAJOR, NODE_MINOR] = process.versions.node.split('.').map(Number);
 if (!((NODE_MAJOR === 20 && NODE_MINOR >= 19) || (NODE_MAJOR === 22 && NODE_MINOR >= 12) || NODE_MAJOR > 22)) {
   throw new Error('The differential test of the hotfix check needs Node.js 20.19 or later, or 22.12 or later, '
-    + `because parse5 and markdown-it load ECMAScript modules with require; this is Node.js ${process.versions.node}.`);
+    + `because parse5 is an ECMAScript module loaded with require; this is Node.js ${process.versions.node}.`);
 }
 
 const test = require('node:test');
@@ -68,8 +58,6 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const parse5 = require('parse5');
-const MarkdownIt = require('markdown-it');
-const yaml = require('js-yaml');
 const postcss = require('postcss');
 const valueParser = require('postcss-value-parser');
 
@@ -81,17 +69,7 @@ const SEED = Number(process.env.HOTFIX_DIFFERENTIAL_SEED || 20261009);
 const FROM = Number(process.env.HOTFIX_DIFFERENTIAL_FROM || 0);
 const HTML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_HTML || (SOAK ? 6000000 : 110000));
 const SHOW = Number(process.env.HOTFIX_DIFFERENTIAL_SHOW || 0);
-const MARKDOWN_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_MARKDOWN || (SOAK ? 1000000 : 22000));
-const YAML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_YAML || (SOAK ? 1000000 : 60000));
 const CSS_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_CSS || (SOAK ? 1000000 : 30000));
-
-/** The Markdown readers of the oracle: markdown-it in four configurations. */
-const MARKDOWN_READERS = [
-  ['the default', new MarkdownIt()],
-  ['html', new MarkdownIt({ html: true })],
-  ['linkify', new MarkdownIt({ linkify: true })],
-  ['html, linkify and typographer', new MarkdownIt({ html: true, linkify: true, typographer: true })]
-];
 
 // ---------------------------------------------------------------------------------------
 // The random source: mulberry32, one stream per (seed, case index).
@@ -689,420 +667,6 @@ function htmlDocument(r) {
 }
 
 // ---------------------------------------------------------------------------------------
-// The Markdown generator: every construct of the security run's findings, the shapes on
-// which Markdown readers disagree, and plain paragraphs in all positions.
-// ---------------------------------------------------------------------------------------
-
-const LABELS = ['ref', 'note', 'Ref', 'two words'];
-/** Filler a plain sentence is made of, beside the words an edit replaces. */
-const FILLER = ['the', 'a', 'Read', 'then', 'and', 'It', 'well-known', 'caf\u00e9', 'na\u00efve', 'we', 'Save', 'file'];
-
-/** One plain prose line: words, sentence punctuation, quotes, a hyphenated word, typographic marks. */
-function plainLine(r) {
-  const parts = [];
-  for (let n = 2 + int(r, 5); n > 0; n--) {
-    let w = chance(r, 0.6) ? word(r) : pick(r, FILLER);
-    const roll = r();
-    if (roll < 0.1) w += ',';
-    else if (roll < 0.14) w += ';';
-    else if (roll < 0.17) w = `"${w}"`;
-    else if (roll < 0.19) w = `\u201c${w}\u201d`;
-    else if (roll < 0.21) w += ' \u2014';
-    else if (roll < 0.23) w += '\u2026';
-    else if (roll < 0.25) w = `${w}'s`;
-    else if (roll < 0.27) w += ` ${1 + int(r, 30)}`;
-    // The ninth round: a colon after a word, a quote, a digit or a parenthesis; words in
-    // parentheses; and, seldom, the forms of each that are no prose.
-    else if (roll < 0.31) w += ':';
-    else if (roll < 0.34) w = `(${w})`;
-    else if (roll < 0.36) w = `(${w} ${pick(r, FILLER)})${pick(r, ['', ':', ',', '.'])}`;
-    else if (roll < 0.37) w = `"${w}":`;
-    else if (roll < 0.38) w += ` ${1 + int(r, 9)}:`;
-    else if (roll < 0.38 + 0.012 * wild) w = pick(r, [`${w}:${word(r)}`, `${w} :`, `${w}::`, `:${w}`, `${w}(`, `${w}.(x)`, `${w}:)`, `http://${w}`]);
-    parts.push(w);
-  }
-  let out = parts.join(' ');
-  out = out[0].toUpperCase() + out.slice(1);
-  return out + pick(r, ['.', '.', '.', '', '?', '!']);
-}
-/** A plain paragraph: one to three plain lines, the later ones sometimes indented, sometimes ending in two spaces. */
-function plainParagraph(r) {
-  const lines = [];
-  for (let n = 1 + int(r, 3); n > 0; n--) lines.push(plainLine(r));
-  return lines.map((l, i) => (i > 0 && chance(r, 0.1) ? `${' '.repeat(1 + int(r, 3))}${l}` : l) + (chance(r, 0.05) ? '  ' : ''));
-}
-
-/** The markers of a plain list item, and seldom one that is none for some reader. */
-const ITEM_MARKERS = ['- ', '- ', '- ', '* ', '+ ', '1. ', '1. ', '2. ', '1) ', '10. ', '-  ', '-    ', ' - ', '   * ', '123456789. '];
-const ODD_MARKERS = ['-     ', '    - ', '-\t', '- [ ] ', '1234567890. ', '-', '1.', '- - ', '- # ', '- > ', 'a. ', '(1) ', '#. '];
-/**
- * A list of plain items (the ninth round): one to four items of plain prose, one marker
- * mostly, sometimes a second line under an item (indented or lazy), and seldom an item that is
- * no plain prose or a marker some reader reads otherwise.
- */
-function plainList(r) {
-  const marker = pick(r, ITEM_MARKERS);
-  const lines = [];
-  for (let n = 1 + int(r, 4); n > 0; n--) {
-    const m = chance(r, 0.85) ? marker : chance(r, 0.6 / Math.max(wild, 0.2)) ? pick(r, ITEM_MARKERS) : pick(r, ODD_MARKERS);
-    lines.push(m + (chance(r, 1 - 0.08 * wild) ? plainLine(r) : inlineLine(r)));
-    if (chance(r, 0.25)) lines.push(' '.repeat(pick(r, [0, 2, 2, 3, 1, 4])) + plainLine(r));
-  }
-  return lines;
-}
-
-function inlinePiece(r) {
-  const w = word(r);
-  const x = word(r);
-  const label = pick(r, LABELS);
-  return weighted(r, [
-    [40 / wild, () => w],
-    [4, () => `*${w}*`],
-    [3, () => `**${w} ${x}**`],
-    [2, () => `_${w}_`],
-    [5, () => `\`${w}\``],
-    [2, () => `\`\`${w} \` ${x}\`\``],
-    [2, () => `\`${w}`],
-    [5, () => `[${w}](/${x})`],
-    [3, () => `[${w}](/${x} "${word(r)}")`],
-    [2, () => `[${w}](</${x}>)`],
-    [2, () => `[${w}](${x}`],
-    [3, () => `![${w}](/${x}.png)`],
-    [3, () => `[${w}][${label}]`],
-    [3, () => `[${label}]`],
-    [2, () => `[${w}][]`],
-    [2, () => `[${w}]`],
-    [3, () => `<https://${w}.example/${x}>`],
-    [2, () => `<${w}@example.com>`],
-    [W(4), () => `<b>${w}</b>`],
-    [3, () => `<a href="/${w}">${x}</a>`],
-    [3, () => `<code>${w}</code>`],
-    [W(2), () => `<x-foo>${w}</x-foo>`],
-    [3, () => `<file> ${w}`],
-    [2, () => `<!-- ${w} -->`],
-    [1, () => `<!-- ${w}`],
-    [1, () => `<br> ${w}`],
-    [2, () => `<img src="/${w}.png" alt="${x}">`],
-    [2, () => `&amp; ${w}`],
-    [1, () => `&${w};`],
-    [2, () => `\\*${w}\\*`],
-    [2, () => `\\<b>${w}`],
-    [2, () => `\\<script>${w}`],
-    [2, () => `\`<${w}>\``],
-    [2, () => `\`<script>\` ${w}`],
-    [1, () => `\\\`<script>\` ${w}`],
-    [1, () => `\`\`<b> \` <i>\`\` ${w}`],
-    [1, () => `\`${w} | <script>\` ${x}`],
-    [1, () => `\`${w}\` <i> \`${x}\``],
-    [1, () => `\`a\n<div>\n\` ${w}`],
-    [W(2), () => `<b>${w}`],
-    [1, () => `</b> ${w}`],
-    [1, () => `| ${w}`],
-    [1, () => `a < ${w}`],
-    [W(1), () => `<script>${w}</script>`],
-    [1, () => `<textarea>${w}</textarea> ${x}`],
-    [1, () => `${w}.com`],
-    [1, () => `README.md ${w}`],
-    [1, () => `{${w}}`],
-    [1, () => `[[${w} guide]]`],
-    [1, () => `${w}:${x}`],
-    [1, () => `Template: ${w}`],
-    [1, () => `(${w})`],
-    [1, () => `${w}  `],
-    [1, () => `${w}\\`]
-  ])();
-}
-function inlineLine(r) {
-  const parts = [];
-  for (let n = 1 + int(r, 4); n > 0; n--) parts.push(inlinePiece(r));
-  return parts.join(' ');
-}
-function paragraph(r) {
-  if (chance(r, 0.5 / wild)) return plainParagraph(r);
-  const lines = [];
-  for (let n = 1 + int(r, 3); n > 0; n--) lines.push(chance(r, 0.4) ? plainLine(r) : inlineLine(r));
-  return lines;
-}
-
-const DEFINITIONS = [
-  (l, w, x) => [`[${l}]: /${w}`],
-  (l, w, x) => [`[${l}]: /${w} "${x}"`],
-  (l, w, x) => [`[${l}]:`, `  /${w}`],
-  (l, w, x) => [`[${l}]: /${w}`, `  "${x}"`],
-  (l, w, x) => [`[${l}]: /${w}`, `${x}`],
-  (l, w, x) => [`[g]: guide/${w}`],
-  (l, w, x) => [`[${l}]:`, '```', w, '```', '', `Read ${x} ${w} then.`],
-  (l, w, x) => [`[${l}]:`, '~~~js', w, '~~~', '', `Read ${x} ${w} then.`, '', '~~~'],
-  (l, w, x) => [`[${l}]:`, '---', `Read ${x} ${w} then.`],
-  (l, w, x) => [`[${l}]:`, '<div>', '', `Read ${x} ${w} then.`]
-];
-
-const HTML_BLOCKS = [
-  (r, w, x) => ['<div>', plainLine(r), '</div>'],
-  (r, w, x) => ['<div>', '', ...plainParagraph(r), '', '</div>'],
-  (r, w, x) => ['<div markdown="1">', '', ...plainParagraph(r), '', '</div>'],
-  (r, w, x) => ['<div>', '', ...plainParagraph(r)],
-  (r, w, x) => ['<x-foo>', '', ...plainParagraph(r), '', '</x-foo>'],
-  (r, w, x) => ['<run-sql>', '', `Select ${w} from ${x}`, '', '</run-sql>'],
-  (r, w, x) => ['<details>', `<summary>${w}</summary>`, '', ...plainParagraph(r), '', '</details>'],
-  (r, w, x) => ['<table>', `<tr><td>${w}</td></tr>`, '</table>'],
-  (r, w, x) => ['<pre>', w, '', plainLine(r), '</pre>'],
-  (r, w, x) => ['<pre>', `<!-- </pre> -->`, '', plainLine(r)],
-  (r, w, x) => ['<script>', w, '', plainLine(r), '</script>'],
-  (r, w, x) => ['<script>', '</pre>', '', `\`</script>\``, '', plainLine(r)],
-  (r, w, x) => ['<script>', '<!--<script>', '</script>', '', plainLine(r), '', '</script>'],
-  (r, w, x) => ['<style>', `.a { content: "${w}" }`, '', plainLine(r), '</style>'],
-  (r, w, x) => ['<textarea>', w, '', plainLine(r), '</textarea>'],
-  (r, w, x) => ['<xmp>', '', '`</xmp>`', '', plainLine(r)],
-  (r, w, x) => ['<title>', w, '', plainLine(r)],
-  (r, w, x) => ['<noscript>', '', plainLine(r), '', '</noscript>'],
-  (r, w, x) => ['<iframe>', '', plainLine(r)],
-  (r, w, x) => ['<plaintext>', '', plainLine(r)],
-  (r, w, x) => ['<!--', w, '', plainLine(r), '-->'],
-  (r, w, x) => [`<!-- ${w} -->`],
-  (r, w, x) => [`<!-- ${w} -->`, plainLine(r)],
-  (r, w, x) => [`<!-- ${w} --> ${x}`],
-  (r, w, x) => [`<!-- ${w} --!>`, '', plainLine(r), '', '-->'],
-  (r, w, x) => [`<!-->${w}`, '', plainLine(r)],
-  (r, w, x) => [`<!-- ${w} -- ${x} -->`, '', plainLine(r)],
-  (r, w, x) => [` <!-- ${w}`, '', '-->', '', plainLine(r)],
-  (r, w, x) => [`> <!-- ${w}`, '', '-->', '', plainLine(r)],
-  (r, w, x) => [`- ${w}`, '', `  <!-- ${x}`, '', '-->', '', plainLine(r)],
-  (r, w, x) => [`<!-- ${w}`, '', '-->', '', plainLine(r)],
-  (r, w, x) => [`<?${w}`, '', plainLine(r), '?>'],
-  (r, w, x) => [`<!${w}`, '', plainLine(r), '>'],
-  (r, w, x) => ['<![CDATA[', w, '', plainLine(r), ']]>'],
-  (r, w, x) => ['<hr>', `<https://${w}.example/${x}>`, '', plainLine(r)],
-  (r, w, x) => [`<a href="/${w}"><div></a></div>`, '', plainLine(r)],
-  (r, w, x) => [`<img src="/${w}.png" alt="${x}">`],
-  (r, w, x) => [`<img alt="${w}>`, '', plainLine(r), '', '">'],
-  (r, w, x) => [`<br>`, '', plainLine(r)],
-  (r, w, x) => [`<b>`, '', plainLine(r), '', '</b>'],
-  (r, w, x) => ['<svg>', `<text>${w}</text>`, '', plainLine(r), '</svg>'],
-  (r, w, x) => ['<select>', `<option>${w}`, '', plainLine(r), '</select>']
-];
-
-const quoteLines = (r, lines) => lines.map((l, i) => {
-  if (i > 0 && l !== '' && chance(r, 0.18)) return l; // a lazy line
-  const marker = weighted(r, [[20, () => '> '], [4, () => '>'], [1, () => '>\t'], [1, () => ' > '], [1, () => '>> > \t']])();
-  return (marker + l).replace(/\s+$/, l === '' ? '' : '$&');
-});
-function listLines(r, lines) {
-  const marker = pick(r, ['- ', '- ', '* ', '+ ', '1. ', '2. ', '1) ', '-   ', '10. ', '-\t', '- [ ] ', '- [x] ']);
-  const width = marker === '-\t' ? 4 : Math.min(marker.length, 4);
-  return lines.map((l, i) => {
-    if (i === 0) return marker + l;
-    if (l === '') return l;
-    const roll = r();
-    if (roll < 0.6) return ' '.repeat(width) + l;
-    if (roll < 0.85) return l; // a lazy line, or the end of the item
-    return ' '.repeat(pick(r, [1, 2, 3, 4, 5, 6])) + l;
-  });
-}
-const FENCES = [
-  (w, x, p) => ['```', w, '', p, '```'],
-  (w, x, p) => ['```js', w, '```'],
-  (w, x, p) => ['~~~', w, '', p, '~~~'],
-  (w, x, p) => ['````', '```', p, '````'],
-  (w, x, p) => ['```', w, '', p],
-  (w, x, p) => ['```', w, '````', '', p, '', '```'],
-  (w, x, p) => [' ```', w, '```', '', p, '', '```'],
-  (w, x, p) => ['```', w, ' ```', '', p, '', '```'],
-  (w, x, p) => ['   ```', w, '   ```', '', p],
-  (w, x, p) => ['    ```', w, '    ```', '', p],
-  (w, x, p) => ['``` foo bar', w, '```', '', p, '', '```'],
-  (w, x, p) => ['```js title="a.js"', w, '```', '', p],
-  (w, x, p) => ['```', w, '```\u00a0', '', p, '', '```'],
-  (w, x, p) => ['```', w, '```\t', '', p],
-  (w, x, p) => ['\t```', w, '```', '', p],
-  (w, x, p) => [`\`\`\` ${w} \`\`\``, '', p],
-  (w, x, p) => ['~~~ a ` b', w, '~~~', '', p],
-  (w, x, p) => ['```', '~~~', p, '```', '', '~~~'],
-  (w, x, p) => ['```', w, '``` x', p, '```'],
-  (w, x, p) => ['```', '<div>', '', '<script>', '```', '', p],
-  (w, x, p) => ['  ```', '<div>', '  ```', '', p],
-  (w, x, p) => ['\ufeff```', w, '```', '', p, '', '```']
-];
-const FRONT_MATTER = [
-  (w, x, p) => ['---', `title: ${w}`, '---'],
-  (w, x, p) => ['---', p, '---'],
-  (w, x, p) => ['+++', `title = "${w}"`, '', p, '+++'],
-  (w, x, p) => ['---js', `{ title: "${w}" }`, '', p, '---'],
-  (w, x, p) => ['---', `title: ${w}`, '', p],
-  (w, x, p) => ['---', 'text: |', '  ```', '---', '', p, '', '```'],
-  (w, x, p) => ['---', `title: ${w}`, '...', '', p],
-  (w, x, p) => ['----', p, '', plain(p), '---'],
-  (w, x, p) => ['+++', p, '---', '', plain(p), '', '+++'],
-  (w, x, p) => ['\ufeff---', `title: ${w}`, '', p, '---'],
-  (w, x, p) => ['---', `title: ${w}`, '---', p, '', plain(p), '', '---'],
-  (w, x, p) => ['---', `The ${w}: [`, '---', p, '', plain(p), '', '---'],
-  (w, x, p) => ['----------- ------- ----------', `First       ${w}     ${x}`, '', p, '', plain(p), '----------- ------- ----------'],
-  (w, x, p) => ['----', p, '', plain(p), '----'],
-  (w, x, p) => ['Right     Left', '-------   ------', `${w}     ${x}`, '', p],
-  (w, x, p) => ['+++', `title = "${w}"`, '+++', p, '', plain(p)]
-];
-const plain = (p) => p.replace('.', '');
-
-function block(r, depth) {
-  const w = word(r);
-  const x = word(r);
-  const p = plainLine(r);
-  return weighted(r, [
-    [44 / wild, () => plainParagraph(r)],
-    [10, () => paragraph(r)],
-    [5, () => [`${'#'.repeat(1 + int(r, 3))} ${chance(r, 0.5) ? plainLine(r) : inlineLine(r)}`]],
-    [2, () => [`## ${w} !`]],
-    [3, () => [plainLine(r), pick(r, ['===', '---', '=', '--', '-'])]],
-    [2, () => [plainLine(r), '', pick(r, ['===', '---'])]],
-    [8, () => (depth >= 2 ? paragraph(r) : listLines(r, blocks(r, depth + 1, 1 + int(r, 2))))],
-    [4, () => [...listLines(r, plainParagraph(r)), ...listLines(r, plainParagraph(r))]],
-    [16 / wild, () => plainList(r)],
-    [4, () => [plainLine(r), ...plainList(r)]],
-    [3, () => [...plainList(r), plainLine(r)]],
-    [2, () => [...plainList(r), pick(r, ['===', '---', '-', '* * *', '    code', '> quote', '| a | b |'])]],
-    [2, () => [`${pick(r, ['Title', 'Author', 'Tags'])}: ${plainLine(r)}`, plainLine(r)]],
-    [3, () => [`${pick(r, ['- ', '1. ', '* ', '-   '])}${w}`, '', `${' '.repeat(int(r, 4))}${plainLine(r)}`]],
-    [2, () => [`${pick(r, ['- ', '1. ', '* '])}${w}`, plainLine(r)]],
-    [2, () => [`-   ${w}:`, '', `        ${x} ${w}`]],
-    [7, () => (depth >= 2 ? quoteLines(r, paragraph(r)) : quoteLines(r, blocks(r, depth + 1, 1 + int(r, 2))))],
-    [2, () => [...quoteLines(r, plainParagraph(r)), plainLine(r)]],
-    [1, () => [`> [!NOTE]`, `> ${plainLine(r)}`]],
-    [4, () => [`| ${w} | ${x} |`, '| --- | --- |', `| ${chance(r, 0.5) ? plainLine(r) : inlineLine(r)} | ${word(r)} |`]],
-    [1, () => [`| a | b |`, '| - | - |', `| \`${w} | <script>\` | ${x} |`]],
-    [6, () => pick(r, DEFINITIONS)(pick(r, LABELS), w, x)],
-    [2, () => [plainLine(r), `[g]: guide/${w}`]],
-    [10, () => pick(r, HTML_BLOCKS)(r, w, x)],
-    [9, () => pick(r, FENCES)(w, x, p)],
-    [3, () => [`    ${w}`, `    ${x}`]],
-    [1, () => [`\t${w}`]],
-    [1, () => [`\ufeff    ${w} ${x}`]],
-    [2, () => [plainLine(r), `    ${w}`]],
-    [2, () => [pick(r, ['---', '***', '* * *', '___'])]],
-    [2, () => ['---', plainLine(r)]],
-    [3, () => pick(r, FRONT_MATTER)(w, x, p)],
-    [1, () => [`import ${w} from './${x}'`]],
-    [1, () => [`>>> ${w}`, x]],
-    [1, () => [`::: tip`, p, ':::']],
-    [1, () => [`!!! note`, `    ${p}`]],
-    [1, () => [`Term ${w}`, `: ${p}`]],
-    [1, () => [`${pick(r, ['a', 'i', 'A', 'iv'])}. ${p}`]],
-    [1, () => [`${w}\r${pick(r, ['```', '- x', '# y'])}`, '', p]],
-    [1, () => [`${w} \u2028 ${x}`]],
-    [1, () => [`${w}\u00a0${x}`, `\u200b${p}`]]
-  ])();
-}
-function blocks(r, depth, count) {
-  const out = [];
-  for (let n = 0; n < count; n++) {
-    if (n > 0 && chance(r, 0.8)) out.push(chance(r, 0.04) ? pick(r, [' ', '\t', '\u00a0', '  ']) : '');
-    out.push(...block(r, depth));
-  }
-  return out;
-}
-function markdownDocument(r) {
-  wild = pick(r, [0.1, 0.35, 1, 1]);
-  const lines = [];
-  if (chance(r, 0.08)) lines.push(...pick(r, FRONT_MATTER)(word(r), word(r), plainLine(r)), ...(chance(r, 0.7) ? [''] : []));
-  lines.push(...blocks(r, 0, 1 + int(r, 6)));
-  let text = `${lines.join('\n')}\n`;
-  if (chance(r, 0.03)) text = `\ufeff${text}`;
-  if (chance(r, 0.03)) text = text.replace(/\n/g, '\r\n');
-  if (chance(r, 0.04)) text = text.replace(/\n$/, '');
-  return text;
-}
-
-// ---------------------------------------------------------------------------------------
-// The YAML generator (the ninth round): catalogue files as translators write them, nested
-// keys, lists, comments and quoted values, and, seldom, each thing that is no single-line
-// string in a `key: value` or `- value` line: a tag, an anchor, an alias, a flow collection,
-// a block scalar, a scalar over several lines, a document marker, a tab, a complex key, a
-// duplicate key, an indentation no mapping has.
-// ---------------------------------------------------------------------------------------
-
-const YAML_KEYS = ['title', 'save', 'cancel', 'greeting', 'help', 'menu', 'days', 'errors', 'one', 'other', 'label', 'hint', 'zero', 'many'];
-
-/** What stands behind a key or a `- `: mostly a string of the words an edit changes. */
-function yamlValue(r) {
-  const w = word(r);
-  const x = word(r);
-  return weighted(r, [
-    [30, () => `${w} ${x}`], [14, () => w], [10, () => `"${w} ${x}"`], [6, () => `'${w} ${x}'`], [4, () => `"${w}, ${x}!"`],
-    [3, () => `'${w}''s ${x}'`], [3, () => `"${w} \\"${x}\\""`], [2, () => `"${w}\\n${x}"`], [2, () => `"${w} \\x41 ${x}"`], [2, () => `${w} (${x})`],
-    [2, () => `${w} {name} ${x}`], [2, () => `${w} %s ${x}`], [2, () => `Caf\u00e9 ${w}`], [2, () => `${w}#${x}`], [2, () => `${w}  ${x}`],
-    [W(2), () => `!!str ${w}`], [W(2), () => `&a ${w}`], [W(2), () => '*a'], [W(2), () => `[${w}, ${x}]`], [W(2), () => `{ a: ${w} }`],
-    [W(2), () => '|'], [W(2), () => '>-'], [W(2), () => `${w} # ${x}`], [W(2), () => `${w}: ${x}`], [W(2), () => `${w}:`],
-    [W(2), () => `"${w}" ${x}`], [W(1), () => `'${w}`], [W(1), () => `"${w}`], [W(1), () => `- ${w}`], [W(1), () => `-${w}`],
-    [W(1), () => `? ${w}`], [W(1), () => `%${w}`], [W(1), () => `@${w}`], [W(2), () => pick(r, ['~', 'true', 'True', 'no', 'null', '.inf', '.NaN', '12', '1.5', '2026-10-09', '0x1F', '1e3', 'yes', 'on', 'off', 'y', 'n', 'Yes', 'NO', 'Off', 'Null'])],
-    [W(1), () => `\`${w}`], [W(1), () => `,${w}`],
-    [W(1), () => `"${w}\\q"`], [W(1), () => `${w}\t${x}`], [W(1), () => ''], [W(1), () => `${w} ${x}   `], [W(1), () => `:${w}`],
-    [W(1), () => `${w}:${x}`], [W(1), () => `#${w}`], [W(1), () => `"${w}"   # ${x}`], [W(1), () => `!${w}`], [W(1), () => `>${w}`],
-    [W(1), () => `[${w}`], [W(1), () => `${w}]`], [W(1), () => `{${w}}`], [W(1), () => `${w} \u2028 ${x}`], [W(1), () => `\u0007${w}`],
-    [W(1), () => `"${w}\\u0041"`], [W(1), () => `'${w}' '${x}'`], [W(1), () => `${w}, ${x}`], [W(1), () => `<<`], [W(1), () => `=`]
-  ])();
-}
-
-/** The lines of one mapping at an indentation: entries, nested mappings and lists, comments. */
-function yamlMapping(r, indent, depth) {
-  const pad = ' '.repeat(indent);
-  const lines = [];
-  const keys = YAML_KEYS.slice();
-  for (let n = 1 + int(r, 5); n > 0 && keys.length > 0; n--) {
-    const key = keys.splice(int(r, keys.length), 1)[0];
-    const w = word(r);
-    weighted(r, [
-      [50, () => lines.push(`${pad}${key}: ${yamlValue(r)}`)],
-      [depth < 3 ? 10 : 0, () => lines.push(`${pad}${key}:`, ...yamlMapping(r, indent + 2, depth + 1))],
-      [8, () => { lines.push(`${pad}${key}:`); for (let k = 1 + int(r, 3); k > 0; k--) lines.push(`${pad}  - ${yamlValue(r)}`); }],
-      [3, () => { lines.push(`${pad}${key}:`); for (let k = 1 + int(r, 3); k > 0; k--) lines.push(`${pad}- ${yamlValue(r)}`); }],
-      [3, () => lines.push(`${pad}# ${w}`, `${pad}${key}: ${yamlValue(r)}`)],
-      [2, () => lines.push('', `${pad}${key}: ${yamlValue(r)}`)],
-      [2, () => lines.push(`${pad}${key}:`)],
-      [W(2), () => lines.push(`${pad}${key}: |`, `${pad}  ${pick(r, YAML_KEYS)}: ${w}`, `${pad}  ${word(r)}`)],
-      [W(1), () => lines.push(`${pad}${key}: !!str |`, `${pad}  ${pick(r, YAML_KEYS)}: ${w}`)],
-      [W(1), () => lines.push(`${pad}${key}: &a |`, `${pad}  ${pick(r, YAML_KEYS)}: ${w}`)],
-      [W(1), () => lines.push(`${pad}${key}:\t|`, `${pad}  ${pick(r, YAML_KEYS)}: ${w}`)],
-      [W(1), () => lines.push(`${pad}${key}: >`, `${pad}  ${w} ${word(r)}`, '')],
-      [W(2), () => lines.push(`${pad}"${key}: ${w}": ${yamlValue(r)}`)],
-      [W(1), () => lines.push(`${pad}"${key}: ${w}": |`, `${pad}  ${pick(r, YAML_KEYS)}: ${word(r)}`)],
-      [W(1), () => lines.push(`${pad}'${key}': ${yamlValue(r)}`)],
-      [W(1), () => lines.push(`${pad}? ${key}`, `${pad}: ${yamlValue(r)}`)],
-      [W(1), () => lines.push(`${pad}${key} : ${yamlValue(r)}`)],
-      [W(1), () => lines.push(`${pad}${key}:${w}`)],
-      [W(1), () => lines.push(`${pad}${pick(r, ['yes', 'on', 'true', 'null', '404', '1.5', 'no'])}: ${yamlValue(r)}`)],
-      [W(2), () => lines.push(`${pad}${key}: ${w} ${word(r)}`, `${pad}  ${word(r)} more`)],
-      [W(2), () => lines.push(`${pad}${key}: "${w}`, `${pad}  ${pick(r, YAML_KEYS)}: ${word(r)}"`)],
-      [W(1), () => lines.push(`${pad}- "${w}`, `${pad}  ${pick(r, YAML_KEYS)}: ${word(r)}"`)],
-      [W(1), () => lines.push(`${pad}${key}: [${w},`, `${pad}  ${word(r)}]`)],
-      [W(1), () => lines.push(`${pad}- { a: ${w},`, `${pad}    b: ${word(r)} }`)],
-      [W(2), () => lines.push(`${pad}${key}: ${yamlValue(r)}`, `${pad}${key}: ${yamlValue(r)}`)],
-      [W(2), () => lines.push(`${pad}${key}: ${yamlValue(r)}`, `${pad}${pick(r, [' ', '   ', '\t'])}${pick(r, YAML_KEYS)}: ${yamlValue(r)}`)],
-      [W(1), () => lines.push(`${pad}${key}:`, `${pad}    ${pick(r, YAML_KEYS)}: ${w}`, `${pad}  ${pick(r, YAML_KEYS)}: ${word(r)}`)],
-      [W(1), () => lines.push(`${pad}- ${key}: ${yamlValue(r)}`)],
-      [W(1), () => lines.push(`${pad}${key}:`, `${pad}  - - ${w}`)],
-      [W(1), () => lines.push(`${pad}${key}:`, `${pad}  -`)],
-      [W(1), () => lines.push(`${pad}- ${yamlValue(r)}`)],
-      [W(1), () => lines.push(pick(r, ['---', '...', '%YAML 1.2', '--- # doc']))],
-      [W(1), () => lines.push(`${pad}${key}: &x ${w}`, `${pad}${pick(r, YAML_KEYS)}2: *x`)],
-      [W(1), () => lines.push(`${pad}<<: *x`)]
-    ])();
-  }
-  return lines;
-}
-
-/** One YAML catalogue: a mapping or a list at the top, sometimes behind a `---`. */
-function yamlDocument(r) {
-  wild = pick(r, [0.1, 0.35, 1, 1]);
-  let lines = chance(r, 0.88) ? yamlMapping(r, 0, 0) : Array.from({ length: 1 + int(r, 4) }, () => `- ${yamlValue(r)}`);
-  if (chance(r, 0.12)) lines = [pick(r, ['---', '---', '# Catalogue', '--- ', '%YAML 1.2\n---']), ...lines];
-  if (chance(r, 0.03 * wild)) lines.push(pick(r, ['...', '---', 'title: again']));
-  let text = `${lines.join('\n')}\n`;
-  if (chance(r, 0.03)) text = `\ufeff${text}`;
-  if (chance(r, 0.03)) text = text.replace(/\n/g, '\r\n');
-  if (chance(r, 0.04)) text = text.replace(/\n$/, '');
-  return text;
-}
-
-// ---------------------------------------------------------------------------------------
 // The CSS generator (the ninth round): rules, at-rules, nesting, comments, strings and
 // escapes; custom properties and what reads them; colour functions and keywords;
 // `!important`; shorthands; selectors that look like colours; and, seldom, each thing at
@@ -1211,21 +775,10 @@ const EDITS = ['a word replaced', 'a word deleted', 'a word added', 'a mark adde
   'lines joined', 'a line split', 'a line added', 'a line removed', 'leading or trailing spaces changed'];
 /** What an edit writes, per language: the marks, what it puts at a line start, and the lines it adds. */
 const EDIT_WORDS = {
-  markdown: {
-    marks: ['[', ']', '(', ')', '`', '*', '_', '#', '>', '|', '<', ':', '!'],
-    starts: ['- ', '> ', '# ', '1. ', ' ', '    ', 'a. ', '\t', '* ', '+ ', '[g]: ', ': ', '<', '```', '---', '| ', '! ', 'x', 'import ', 'i. '],
-    added: [(r) => plainLine(r), (r) => plainLine(r), () => '', () => '```', () => '---', () => '===', (r) => `- ${word(r)}`,
-      (r) => `> ${word(r)}`, (r) => `# ${word(r)}`, () => '<div>', () => '</div>', () => '<!--', () => '-->', (r) => `    ${word(r)}`, (r) => `[g]: /${word(r)}`]
-  },
   css: {
     marks: [';', '{', '}', '(', ')', ':', '\\', '"', '/', '*', '!', ',', '#', '-', '[', ']', '@', ' '],
     starts: ['}', '{', '/* ', '@', '  ', ' ', '\t', 'a { ', '--x: ', '*', '//'],
     added: [(r) => `a { color: ${cssColour(r)}; }`, () => '}', (r) => `/* ${word(r)} */`, () => '', (r) => `  color: ${cssColour(r)};`, () => '{', () => '@import "x.css";']
-  },
-  yaml: {
-    marks: [':', '#', '"', '\'', '-', '[', ']', '{', '}', '|', '>', '&', '*', '!', '%', '@', '?', ',', '\\', '\t', ' '],
-    starts: ['- ', '  ', '? ', '# ', '---', '\t', 'x: ', ' ', '...', '! ', '& ', '- - ', '"'],
-    added: [(r) => `${pick(r, YAML_KEYS)}: ${word(r)}`, (r) => `- ${word(r)}`, () => '', (r) => `# ${word(r)}`, () => '---', (r) => `  ${pick(r, YAML_KEYS)}: ${word(r)}`, (r) => `"q": ${word(r)}`]
   },
   html: {
     marks: ['<', '>', '&', '"', '\'', '=', '/', ';', '!', '-', '{', '`'],
@@ -1327,7 +880,7 @@ function hunksOf(oldText, newText) {
   return removed.length + added.length === 0 ? [] : [{ oldStart: p + 1, newStart: p + 1, removed, added }];
 }
 
-const FILES = { html: 'site/page.html', markdown: 'docs/page.md', yaml: 'locales/en.yml', css: 'site/page.css' };
+const FILES = { html: 'site/page.html', css: 'site/page.css' };
 
 /** What the rules say of one edit of the file at `rel`; `carried`: what else the change holds (its repository's top, the linked files). */
 function judgeAt(rel, oldText, newText, carried = {}) {
@@ -1436,74 +989,6 @@ function htmlOracle(oldText, newText) {
   return null;
 }
 
-/** The only elements a changed Markdown text node may stand in: a paragraph, and (since the ninth round) a list item. */
-const PROSE_ANCESTORS = new Set(['html', 'body', 'p', 'ul', 'ol', 'li']);
-
-/**
- * What the Markdown readers say about one edit of a Markdown document: null when, in every
- * configuration and with scripting enabled and disabled, the two rendered trees are
- * identical except for the data of text nodes whose ancestors are only `p`, `li`, `ul`, `ol`,
- * `body` and `html`; or the configuration and the first reason they are not.
- */
-function markdownOracle(oldText, newText) {
-  for (const [name, reader] of MARKDOWN_READERS) {
-    const oldHtml = reader.render(oldText);
-    const newHtml = reader.render(newText);
-    for (const scriptingEnabled of [true, false]) {
-      const changed = [];
-      const difference = treeDifference(parse5.parse(oldHtml, { scriptingEnabled }), parse5.parse(newHtml, { scriptingEnabled }), [], changed);
-      if (difference) return `${name}: ${difference}`;
-      for (const ancestors of changed) {
-        const holder = ancestors.find((el) => el.namespaceURI !== HTML_NAMESPACE || !PROSE_ANCESTORS.has(el.tagName));
-        if (holder) return `${name}: text inside <${holder.tagName}> changes`;
-      }
-    }
-  }
-  return null;
-}
-
-/**
- * Walk two values js-yaml loaded side by side. Returns the first difference that is no
- * string's text, as a sentence, or null; `state.strings` counts the strings that differ.
- */
-function yamlDifference(a, b, state) {
-  if (typeof a === 'string' && typeof b === 'string') {
-    if (a !== b) state.strings++;
-    return null;
-  }
-  if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') {
-    return Object.is(a, b) ? null : `a value that is no string differs, or its type does (${a === null ? 'null' : typeof a} and ${b === null ? 'null' : typeof b})`;
-  }
-  if (a instanceof Date || b instanceof Date) return a instanceof Date && b instanceof Date && a.getTime() === b.getTime() ? null : 'a date differs';
-  if (Array.isArray(a) !== Array.isArray(b)) return 'a list and a mapping stand in the same place';
-  const ka = Object.keys(a);
-  const kb = Object.keys(b);
-  if (ka.length !== kb.length || ka.some((k, i) => k !== kb[i])) return 'the keys differ, or their order';
-  for (const k of ka) {
-    const found = yamlDifference(a[k], b[k], state);
-    if (found) return found;
-  }
-  return null;
-}
-
-/**
- * What js-yaml says about one edit of a YAML catalogue: null when both sides load, to the
- * same shape, the same keys in the same order and the same types, and only string values
- * differ; or the first reason they do not.
- */
-function yamlOracle(oldText, newText) {
-  let a;
-  let b;
-  try {
-    a = yaml.load(oldText);
-    b = yaml.load(newText);
-  } catch (err) {
-    return `a side is no YAML for js-yaml (${String(err.reason || err.message).split('\n')[0]})`;
-  }
-  const state = { strings: 0 };
-  return yamlDifference(a, b, state) || (state.strings > 0 ? null : 'no string value differs');
-}
-
 /** The oracle's own copy of the named colours of CSS Color Module Level 4, and `transparent`. */
 const ORACLE_COLOUR_NAMES = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood '
   + 'cadetblue chartreuse chocolate coral cornflowerblue cornsilk crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki '
@@ -1558,8 +1043,8 @@ function cssDifference(a, b, changed) {
 /**
  * What postcss says about one edit of a stylesheet: null when both sides parse, the trees
  * are identical except for the value of exactly one declaration, that value is exactly one
- * colour on both sides, and its property is a real colour property or a custom property
- * named for a colour; or the first reason it is not.
+ * colour on both sides, and its property is a real colour property (never a custom
+ * property); or the first reason it is not.
  */
 function cssOracle(oldText, newText) {
   let a;
@@ -1575,26 +1060,15 @@ function cssOracle(oldText, newText) {
   if (difference) return difference;
   if (changed.length !== 1) return changed.length === 0 ? 'no declaration value differs' : 'more than one declaration value differs';
   const [before, after] = changed[0];
-  // postcss keeps the white space behind a custom property's value (`--color:red }`); a browser trims it, so the oracle does too.
   if (before.raws.value || after.raws.value || !oneColourValue(before.value.trim()) || !oneColourValue(after.value.trim())) return 'the changed value is not exactly one colour';
   const prop = before.prop;
-  if (prop.startsWith('--') ? !/colou?r/i.test(prop) : !(/(?:^|-)color$/i.test(prop) || ORACLE_SHORTHANDS.has(prop.toLowerCase()))) return `the property ${prop} holds no colour`;
+  if (prop.startsWith('--') || !(/(?:^|-)color$/i.test(prop) || ORACLE_SHORTHANDS.has(prop.toLowerCase()))) return `the property ${prop} holds no colour`;
   return null;
 }
 
-const ORACLES = { html: htmlOracle, markdown: markdownOracle, yaml: yamlOracle, css: cssOracle };
-/** Whether the default reader alone calls the edit a change to plain text and nothing else (for the count of refused plain edits). */
-const PLAIN = {
-  html: (o, n) => htmlOracle(o, n) === null,
-  markdown: (o, n) => {
-    const changed = [];
-    const [, reader] = MARKDOWN_READERS[0];
-    return treeDifference(parse5.parse(reader.render(o)), parse5.parse(reader.render(n)), [], changed) === null && changed.length > 0
-      && changed.every((ancestors) => ancestors.every((el) => PROSE_ANCESTORS.has(el.tagName)));
-  },
-  yaml: (o, n) => yamlOracle(o, n) === null,
-  css: (o, n) => cssOracle(o, n) === null
-};
+const ORACLES = { html: htmlOracle, css: cssOracle };
+/** Whether the real parser calls the edit a change to plain text, or to one colour, and nothing else (for the count of such edits the check refuses). */
+const PLAIN = { html: (o, n) => htmlOracle(o, n) === null, css: (o, n) => cssOracle(o, n) === null };
 
 // ---------------------------------------------------------------------------------------
 // The run.
@@ -1614,28 +1088,13 @@ function cssEdit(r, text) {
   return edit(r, text, EDIT_WORDS.css);
 }
 
-/**
- * What a YAML reader may take for something other than a string: a switch (to js-yaml, or only
- * to a reader of the older YAML such as PyYAML and Ruby's), nothing, or a number.
- */
-const YAML_SWITCHES = ['yes', 'no', 'on', 'off', 'y', 'n', 'true', 'false', 'null', '~', 'Yes', 'NO', 'Off', 'True', 'Null', '12', '1e3', '.inf'];
-const SWITCH_EDIT = 'a word replaced by a switch or a number';
-/** One edit of a YAML catalogue: one in ten replaces a word by a switch or a number, else one of the eleven kinds. */
-function yamlEdit(r, text) {
-  if (!chance(r, 0.1)) return edit(r, text, EDIT_WORDS.yaml);
-  const found = [...text.matchAll(WORD)];
-  if (found.length === 0) return null;
-  const m = pick(r, found);
-  return { newText: text.slice(0, m.index) + pick(r, YAML_SWITCHES) + text.slice(m.index + m[0].length), kind: SWITCH_EDIT };
-}
-
-const DOCUMENTS = { html: htmlDocument, markdown: markdownDocument, yaml: yamlDocument, css: cssDocument };
-/** Each kind has a stream of its own (the HTML and Markdown streams are those of the earlier rounds). */
-const SEED_OFFSET = { html: 0, markdown: 7919, yaml: 104729, css: 1299709 };
+const DOCUMENTS = { html: htmlDocument, css: cssDocument };
+/** Each kind has a stream of its own (those of the earlier rounds). */
+const SEED_OFFSET = { html: 0, css: 1299709 };
 function caseOf(kind, index, seed = SEED) {
   const r = stream(seed + SEED_OFFSET[kind], index);
   const oldText = DOCUMENTS[kind](r);
-  const e = kind === 'css' ? cssEdit(r, oldText) : kind === 'yaml' ? yamlEdit(r, oldText) : edit(r, oldText, EDIT_WORDS[kind]);
+  const e = kind === 'css' ? cssEdit(r, oldText) : edit(r, oldText, EDIT_WORDS[kind]);
   return e === null ? null : { oldText, newText: e.newText, edit: e.kind };
 }
 
@@ -1689,23 +1148,6 @@ const INGREDIENTS = {
     'html, head and body': /<html[\s\S]*<head[\s\S]*<body/, 'capitals in a tag name': /<[A-Z]/, 'a byte-order mark': /^\ufeff/,
     'a ruby': /<ruby/, 'an object, marquee or applet': /<(?:object|marquee|applet)\b/, 'white space after the body': /<\/body>\s/
   },
-  markdown: {
-    'a heading': /^#{1,6} /m, 'a list': /^(?:[-*+]|\d+[.)]) /m, 'a block quote': /^>/m, 'a table': /^\|.*\|$/m, 'a code fence': /^(?:```|~~~)/m,
-    'indented code': /^ {4}\S/m, 'front matter that is closed': /^---\n[^\n]+\n(?:---|\.\.\.)\n/, 'a link': /\]\(/, 'a code span': /`[^`\n]+`/,
-    'a tag in the document': /<[a-z]/, 'a tag inside a code span': /`[^`\n]*<[a-z][^`\n]*`/,
-    'a colon in a plain line': /^[A-Z"][^\n<>[\]`*_#|]*[a-z)"]: [^\n<>[\]`*_#|]*$/m, 'parentheses in a plain line': /^[A-Z"][^\n<>[\]`*_#|]*\([a-z ]+\)[^\n<>[\]`*_#|]*$/m,
-    'a plain list item': /^ {0,3}(?:[-*+]|\d{1,9}[.)]) {1,4}[A-Z"][^\n<>[\]`*_#|]*$/m, 'a second line under a list item': /^(?:[-*+]|\d{1,9}[.)]) [^\n]+\n {0,3}[A-Z"][^\n<>[\]`*_#|]*$/m,
-    'two plain paragraphs': /^[A-Z"][^\n<>[\]`*_#|:()]+\n\n[A-Z"][^\n<>[\]`*_#|:()]+\n/m,
-    'a line break of two spaces': / {2}\n\S/, 'a number': /\d/, 'typographic marks': /[\u2014\u2026\u201c]/, 'a thematic break': /^(?:\*\*\*|___|\* \* \*)$/m,
-    'a definition': /^\[[^\]]+\]: /m
-  },
-  yaml: {
-    'a nested mapping': /^[a-z]+:\n {2}[a-z]+: /m, 'a list under a key': /^ *[a-z]+:\n *- /m, 'a list at the top': /^- /, 'a comment': /^ *# /m,
-    'a double-quoted value': /: "[^"\n]*"$/m, 'a single-quoted value': /: '[^'\n]*'$/m, 'an escape': /\\[nx"]/, 'a document start': /^\ufeff?---\n/,
-    // No byte-order mark: the generator writes one in three files of a hundred, and the check
-    // refuses each (Ruby's YAML reader reads only the first entry behind one).
-    'an empty line': /\n\n/, 'a placeholder': /\{name\}|%s/, 'a key with no value': /^ *[a-z]+:\n(?! )/m, 'Windows line endings': /\r\n/
-  },
   css: {
     'an at-rule with a block': /@media|@supports|@container/, 'an at-rule without one': /@import|@charset|@layer/, 'a nested rule': /\{[^{}]*\{[^{}]*\{|&/, 'a comment': /\/\*/,
     'a string': /"/, 'an escape': /\\/, 'a custom property': /--[a-z-]+: /i, 'a custom property that is read': /var\(/, 'a colour function': /rgb|hsl/,
@@ -1715,11 +1157,9 @@ const INGREDIENTS = {
   }
 };
 
-/** The kinds of edit that add or remove a line; in Markdown also a change of the spaces around a line. No such edit may pass. */
+/** The kinds of edit that add or remove a line. No such edit may pass. */
 const NEVER_PASSES = {
   html: ['lines joined', 'a line split', 'a line added', 'a line removed'],
-  markdown: ['lines joined', 'a line split', 'a line added', 'a line removed', 'leading or trailing spaces changed'],
-  yaml: ['lines joined', 'a line split', 'a line added', 'a line removed', 'leading or trailing spaces changed'],
   // In a stylesheet nothing but a colour may change. Ten of the eleven kinds of edit never
   // pass; the eleventh, a mark removed, passes where the mark is a space inside a colour
   // function (`hsla(210, 50%, 40%, 0.9)` to `hsla(210, 50%,40%, 0.9)`): one colour written
@@ -1727,13 +1167,13 @@ const NEVER_PASSES = {
   css: EDITS.filter((name) => name !== 'a mark removed')
 };
 /** The kinds of edit of which the check must pass some, per language. */
-const MUST_PASS = { html: EDITS.slice(0, 3), markdown: EDITS.slice(0, 3), yaml: EDITS.slice(0, 3), css: ['a colour replaced'] };
+const MUST_PASS = { html: EDITS.slice(0, 3), css: ['a colour replaced'] };
 /**
  * The share of the generated edits the check must pass, per language: about half of the
  * share measured (the numbers are beside each test), so that a rule which
  * starts to refuse far more than it did fails here.
  */
-const PASS_FLOOR = { html: 0.03, markdown: 0.05, yaml: 0.10, css: 0.06 };
+const PASS_FLOOR = { html: 0.03, css: 0.03 };
 
 function run(kind, count) {
   const started = Date.now();
@@ -1745,7 +1185,7 @@ function run(kind, count) {
   const patterns = Object.entries(INGREDIENTS[kind]);
   const ingredients = new Map(patterns.map(([name]) => [name, 0]));
   /** @type {Map<string, number[]>} for each kind of edit: how many were made, and how many passed */
-  const byEdit = new Map([...EDITS, ...MUST_PASS[kind], ...(kind === 'yaml' ? [SWITCH_EDIT] : [])].map((name) => [name, [0, 0]]));
+  const byEdit = new Map([...EDITS, ...MUST_PASS[kind]].map((name) => [name, [0, 0]]));
   const shown = [];
   for (let index = FROM; index < FROM + count; index++) {
     const c = caseOf(kind, index);
@@ -1811,21 +1251,6 @@ test('HTML: every edit the check passes is a change to plain visible text for th
   assertRun(t, 'html', HTML_CASES);
 });
 
-// Measured on 2026-10-10, seed 20261009, default size: 20,871 edits, 2,154 passed (10.3%). (The
-// eighth round's generator passed 18.0%; the ninth round's writes list items, colons, brackets
-// and the raw start tags the reader now refuses a file for.)
-test('Markdown: every edit the check passes changes only the words of a paragraph, for markdown-it in four configurations', (t) => {
-  assertRun(t, 'markdown', MARKDOWN_CASES);
-});
-
-// Measured on 2026-10-10, seed 20261009, default size: 57,033 edits, 11,266 passed (19.8%). Beyond
-// this test, 120,000 passed edits were loaded with PyYAML 6.0.3 and Ruby's Psych 3.1.0, readers
-// of the older YAML (the plan's Execution Record): no disagreement once a byte-order mark and a
-// bare `=` or `<<` refused the file.
-test('YAML: every catalogue edit the check passes changes only string values for js-yaml', (t) => {
-  assertRun(t, 'yaml', YAML_CASES);
-});
-
 // Measured on 2026-10-10, seed 20261009, default size: 27,083 edits, 3,327 passed (12.3%). Beyond
 // this test, 120,000 passed edits were read by Chromium 156's own CSS parser (the plan's
 // Execution Record): in each, colour values of one rule changed, or nothing did.
@@ -1845,7 +1270,8 @@ test('CSS: every stylesheet edit the check passes changes exactly one colour for
 // becomes `zulu`. To prove that a witness bites, weaken its rule in a scratch copy of
 // `src/lib/hotfix-check.js` and run this test against the copy: that witness, and only
 // witnesses of that rule, must fail. The plan's Execution Record holds the last such run.
-const WITNESSES = [
+/** Refused because the page holds something outside the strict subset: "cannot read exactly", cause `unreadable`. */
+const SUBSET_WITNESSES = [
   // The tag reader.
   ['an attribute name cannot start with a quote, `<` or `=`', '<p>alpha</p><br "x">'],
   ['an attribute value in quotes must end', '<p>alpha</p><br title="x>'],
@@ -1880,7 +1306,6 @@ const WITNESSES = [
   ['inside a select only options are followed', '<select><b>x</b></select><p>alpha</p>'],
   ['after the body\'s end no tag follows', '<body><p>alpha</p></body><br>'],
   ['after the body\'s end no text follows', '<body><p>alpha</p></body>x'],
-  ['white space after the body\'s end is no wording', '<html><body><p>x</p></body> </html>', '<html><body><p>x</p></body>  </html>'],
   ['an end tag closes the element on top, or elements that may leave their end tag out', '<p>alpha</p></div>'],
   ['an end tag closes the element on top, or elements that may leave their end tag out', '<p>alpha</p><span></div></span>'],
   ['a frameset refuses the file', '<p>alpha</p><frameset></frameset>'],
@@ -1905,11 +1330,14 @@ const WITNESSES = [
   ['an element must be closed', '<div><p>alpha</p>'],
   ['an element must be closed', '<p>alpha</p><style>x'],
   ['an element must be closed', '<p>alpha</p><script>x'],
-  ['an element must be closed', '<p>alpha</p><title>x'],
+  ['an element must be closed', '<p>alpha</p><title>x']
+];
+/** Refused because the change is no change to plain visible text: "I do not recognise". */
+const UNRECOGNISED_WITNESSES = [
+  ['white space after the body\'s end is no wording', '<html><body><p>x</p></body> </html>', '<html><body><p>x</p></body>  </html>'],
   // What may change: text between two tags or comments, and nothing else.
   ['nothing but text between tags may change', '<p class="alpha">x</p>'],
   ['nothing but text between tags may change', '<p>x</p>', '<p>x<br></p>'],
-  ['nothing but text between tags may change', '<svg><text>alpha</text></svg>'],
   ['nothing but text between tags may change', '<script>alpha()</script>'],
   ['a group of changed lines keeps its number of lines', '<p>alpha\nbravo</p>\n', '<p>alpha bravo</p>\n'],
   ['a byte-order mark neither comes nor goes', '\ufeff<p>alpha</p>', '<p>alpha</p>'],
@@ -1917,8 +1345,6 @@ const WITNESSES = [
   ['text inside a template is not shown', '<template><p>alpha</p></template>'],
   ['an option without a value sends its text', '<datalist><option>alpha</option></datalist>'],
   ['inside a select only the text of an option with a value is wording', '<select>alpha<option value="x">y</option></select>'],
-  ['an element whose name is no HTML element holds its text', '<x-foo>alpha</x-foo>'],
-  ['an element with an `is` attribute holds its text', '<p is="x">alpha</p>'],
   ['the text of a noscript is not shown to every reader', '<noscript>alpha</noscript>'],
   ['changed text holds no character reference but the plain ones', '<p>alpha &commat;</p>'],
   ['changed text holds no control or format character', '<p>alpha\u200b</p>'],
@@ -1927,225 +1353,143 @@ const WITNESSES = [
   ['text read before the body, or directly inside a table, keeps its leading white space', '<html><head> alpha</head><body></body></html>', '<html><head>alpha</head><body></body></html>'],
   ['text read before the body, or directly inside a table, keeps its leading white space', '<table> alpha<tr><td>x</td></tr></table>', '<table>alpha<tr><td>x</td></tr></table>']
 ];
+/** Refused because the changed text stands where the check cannot vouch for it (a component, `<svg>`): "cannot read exactly", cause `unrecognised`. */
+const INEXACT_WITNESSES = [
+  ['nothing but text between tags may change', '<svg><text>alpha</text></svg>'],
+  ['an element whose name is no HTML element holds its text', '<x-foo>alpha</x-foo>'],
+  ['an element with an `is` attribute holds its text', '<p is="x">alpha</p>']
+];
 
-test('witnesses: every refusal rule of the HTML reader refuses the one document written for it', (t) => {
-  const passed = [];
-  for (const [rule, oldText, changed] of WITNESSES) {
-    const newText = changed === undefined ? oldText.replace('alpha', 'zulu') : changed;
-    assert.notEqual(newText, oldText, `${rule}: the witness holds an edit`);
-    if (judge('html', oldText, newText) === null) passed.push(`${rule}: ${JSON.stringify(oldText)}`);
+/**
+ * The reason a refusal gives, as one word (the tenth round: each witness asserts the reason it
+ * is refused for, so that a rule taken out is noticed also where another rule still refuses).
+ * @param {({clause: string, cause: string}|null)} refusal
+ */
+function reasonOf(refusal) {
+  if (refusal === null) return 'passed';
+  const { clause, cause } = refusal;
+  if (/cannot read exactly/.test(clause)) return cause === 'unreadable' ? 'subset' : 'inexact';
+  if (/^I do not recognise /.test(clause)) return 'unrecognised';
+  if (/^it changes a setting in /.test(clause)) return 'setting';
+  if (/holds something I cannot follow\)$/.test(clause)) return 'lost';
+  if (/ open\)$/.test(clause)) return 'open';
+  if (/ sits in an area named /.test(clause)) return `area ${/ named (\p{L}+),/u.exec(clause)[1]}`;
+  if (/^it changes a test /.test(clause)) return 'test';
+  if (/^the wording in /.test(clause)) return 'risk';
+  return clause;
+}
+
+test('witnesses: every refusal rule of the HTML reader refuses the one document written for it, for its own reason', (t) => {
+  const wrong = [];
+  const all = [['subset', SUBSET_WITNESSES], ['unrecognised', UNRECOGNISED_WITNESSES], ['inexact', INEXACT_WITNESSES]];
+  for (const [reason, witnesses] of all) {
+    for (const [rule, oldText, changed] of witnesses) {
+      const newText = changed === undefined ? oldText.replace('alpha', 'zulu') : changed;
+      assert.notEqual(newText, oldText, `${rule}: the witness holds an edit`);
+      const given = reasonOf(judge('html', oldText, newText));
+      if (given !== reason) wrong.push(`${rule}: ${JSON.stringify(oldText)} answered "${given}", not "${reason}"`);
+    }
   }
-  t.diagnostic(`${WITNESSES.length} witnesses for ${new Set(WITNESSES.map((w) => w[0])).size} rules`);
-  assert.deepEqual(passed, [], 'each of these rules no longer refuses its witness');
+  const rows = all.flatMap(([, witnesses]) => witnesses);
+  t.diagnostic(`${rows.length} witnesses for ${new Set(rows.map((w) => w[0])).size} rules`);
+  assert.deepEqual(wrong, [], 'each of these rules no longer refuses its witness, or no longer for its own reason');
 });
 
 // ---------------------------------------------------------------------------------------
-// The witnesses of the ninth round: one change per refusal rule the round added.
+// The witnesses of the ninth and tenth rounds: one change per refusal rule those rounds added.
 // ---------------------------------------------------------------------------------------
 //
-// As above, for the rules of 2026-10-09 about Markdown, catalogue files, the wording of a
-// catalogue value, stylesheets, paths, byte-order marks and line endings: the smallest change
-// that one rule, and no other, refuses. Each row is [the rule, the path, the old text, the new
-// text, what else the change carries]. Without a new text the word `alpha` becomes `zulu`,
-// or, in a file that holds no `alpha`, the colour `red` becomes `blue`. To prove that a
-// witness bites, weaken its rule in a scratch copy of `src/lib/hotfix-check.js` and run this
-// test against the copy: that witness must then pass the check, and fail here. The plan's
-// Execution Record holds the last such run. Where a rule only changes which refusal is given,
-// the row names the clause it must give.
-const MD = 'docs/page.md';
-const JSON_FILE = 'locales/en/app.json';
-const YAML_FILE = 'locales/en/app.yml';
-const PROPERTIES_FILE = 'locales/en/app.properties';
+// As above, for the rules about the wording of a page, stylesheets, paths, byte-order marks and
+// line endings: the smallest change that one rule, and no other, refuses. Each row is [the
+// rule, the reason it is refused for ({@link reasonOf}), the path, the old text, the new text].
+// Without a new text the word `alpha` becomes `zulu`, or, in a file that holds no `alpha`, the
+// colour `red` becomes `blue`. To prove that a witness bites, weaken its rule in a scratch copy
+// of `src/lib/hotfix-check.js` and run this test against the copy: that witness must then
+// answer otherwise, and fail here. (Until the tenth round this table also held the witnesses
+// of the Markdown, catalogue and custom-property rules; those kinds are taken out.)
 const CSS_FILE = 'site/page.css';
 const HTML_FILE = 'site/page.html';
 const PAGE = '<p>alpha</p>';
-const PROSE = 'Some alpha words.\n';
 const COLOUR = 'a { color: red }\n';
-const json = (value) => `${JSON.stringify(value, null, 2)}\n`;
 /** The plain change of each kind: every one of these passes, so a witness is refused for what it adds. */
-const PLAIN_CHANGES = [[MD, PROSE], [JSON_FILE, json({ save: 'alpha' })], [YAML_FILE, 'save: alpha\n'], [PROPERTIES_FILE, 'save=alpha\n'], [CSS_FILE, COLOUR],
-  [HTML_FILE, PAGE], ['docs/readme.pt-BR.txt', PROSE], ['src/styles/design-tokens.css', COLOUR], ['locales/messages_fr.properties', 'save=alpha\n']];
-const RAW_STARTS = ['<script>x</script>', '<style>x</style>', '<pre>x</pre>', '<textarea>x</textarea>', '<xmp>x</xmp>', '<plaintext>', '<title>x</title>',
-  '<noscript>x</noscript>', '<iframe></iframe>', '<!-- x -->', '<![CDATA[x]]>', '<?x?>'];
-/** Every word a bare YAML value may not become: a switch, nothing, or a number without a digit. */
-const YAML_SWITCH_WORDS = ['true', 'false', 'yes', 'no', 'on', 'off', 'y', 'n', 'null', '.inf', '+.inf', '.nan'];
-const YAML_INDICATORS = ['!', '&', '*', '[', ']', '{', '}', '|', '>', '?', '-', ':', ',', '#', '@', '`', '%'];
-const WITNESSES_9 = [
-  // Markdown and plain text.
-  ...RAW_STARTS.map((tag) => [`a raw start tag anywhere refuses the file: ${/^<(?:[a-z]+|!--|!\[CDATA\[|\?)/.exec(tag)[0]}`, MD, `${PROSE}\n${tag}\n`]),
-  ['a raw start tag in any letter case', MD, `${PROSE}\n<SCRIPT>x</SCRIPT>\n`],
-  ['only an empty line bounds a paragraph', MD, 'Some alpha words.\n \n---\n'],
-  ['a colon follows a letter, a digit, a closing quote or a closing bracket', MD, 'Intro words.\n\nSee alpha : here.\n'],
-  ['a colon stands before a space or the end of the line', MD, 'Intro words.\n\nAt alpha a:b here.\n'],
-  ['no colon in the first paragraph of the file', MD, 'Note: alpha words.\n'],
-  ['a list marker is followed by one to four spaces', MD, 'Intro words.\n\n-     alpha words\n'],
-  ['in a paragraph that holds an item no line starts with a list word', MD, 'Intro words.\n\n- item alpha\na. more words\n'],
-  ['a changed line keeps its item prefix', MD, 'Intro words.\n\n- alpha words\n', 'Intro words.\n\n+ alpha words\n'],
-  ['a language part is a language tag', 'docs/readme.zh-hans-cn.txt', PROSE],
-  // Which file is a catalogue.
-  ['a dependency name is no catalogue', 'locales/en/package.json', json({ name: 'alpha' })],
-  ['a build name is no catalogue', 'locales/en/docker-compose.yml', 'services:\n  web:\n    image: alpha\n'],
-  ['a settings name is no catalogue', 'locales/en/tsconfig.json', json({ extends: 'alpha' })],
-  ['a catalogue carries a language tag or a wording bundle\'s name', 'locales/common.json', json({ save: 'alpha' })],
-  ['a catalogue carries a language tag or a wording bundle\'s name', 'i18n/routes.yml', 'save: alpha\n'],
-  ['a catalogue carries a language tag or a wording bundle\'s name', 'lang/settings.properties', 'save=alpha\n'],
-  ['the language tag stands below the catalogue folder', 'en/locales/common.json', json({ save: 'alpha' })],
-  ['a wording bundle carries nothing but a language tag behind `_`', 'locales/messages_backup.properties', 'save=alpha\n'],
-  // JSON.
-  ['the file is what JSON.stringify writes: no key twice', JSON_FILE, '{\n  "save": "x",\n  "save": "alpha"\n}\n'],
-  ['the file is what JSON.stringify writes: no escape it would not write', JSON_FILE, '{\n  "save": "caf\\u00e9 alpha"\n}\n'],
-  ['the file is what JSON.stringify writes: a number as it writes it', JSON_FILE, '{\n  "save": "alpha",\n  "n": 1.0\n}\n'],
-  ['the file is what JSON.stringify writes: its spacing', JSON_FILE, '{\n  "save":"alpha"\n}\n'],
-  ['the file is what JSON.stringify writes: keys in the order JavaScript keeps', JSON_FILE, '{\n  "b": "alpha",\n  "1": "x"\n}\n'],
-  ['a JSON file has an indentation', JSON_FILE, '{"save":"alpha"}\n'],
-  ['only string values differ', JSON_FILE, json({ save: 'alpha', n: 1 }), json({ save: 'zulu', n: 2 })],
-  ['the same keys in the same order', JSON_FILE, json({ a: 'alpha', b: 'x' }), json({ b: 'x', a: 'zulu' })],
-  ['a list stays a list', JSON_FILE, json({ a: ['alpha'] }), json({ a: { 0: 'zulu' } })],
-  ['the same indentation on both sides', JSON_FILE, '{\n  "save": "alpha"\n}\n', '{\n    "save": "zulu"\n}\n'],
-  ['no key holds __proto__', JSON_FILE, '{\n  "__proto__": {\n    "save": "alpha"\n  }\n}\n'],
-  // YAML: the strict subset.
-  ...YAML_INDICATORS.map((c) => [`a plain value starts with none of YAML's indicators: ${c}`, YAML_FILE, `save: alpha\nx: ${c}y\n`]),
-  // Found with PyYAML 6.0.3 and Ruby's Psych 3.1.0 on 2026-10-09, in 120,000 edits the check
-  // passed: PyYAML loads no file with a bare `=` or `<<` as a value, and Psych reads only the
-  // first entry of a file that starts with a byte-order mark.
-  ['a plain value is no `=` and no `<<`', YAML_FILE, 'save: alpha\nx: =\n'],
-  ['a plain value is no `=` and no `<<`', YAML_FILE, 'save: alpha\nx: <<\n'],
-  // (In YAML the mark also makes the first line no key, so only the properties file shows this rule alone.)
-  ['a catalogue starts with no byte-order mark', PROPERTIES_FILE, 'BOMsave=alpha\n'],
-  ['no comment behind a value', YAML_FILE, 'save: alpha\nx: y # z\n'],
-  ['no `: ` inside a plain value', YAML_FILE, 'save: alpha\nx: y: z\n'],
-  ['a plain value does not end in a colon', YAML_FILE, 'save: alpha\nx: y:\n'],
-  ['a double-quoted value holds only escapes YAML knows', YAML_FILE, 'save: alpha\nx: "y\\qz"\n'],
-  ['a quoted value ends on its line', YAML_FILE, 'save: alpha\nx: "y\n'],
-  ['a quoted value ends on its line', YAML_FILE, 'save: alpha\nx: \'y\n'],
-  ['a quoted value ends on its line', YAML_FILE, 'save: alpha\nx: "y" z\n'],
-  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\nx: y\n  more\n'],
-  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\n---\nx: y\n'],
-  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\n...\n'],
-  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\n"x": y\n'],
-  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\nx : y\n'],
-  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\nx:y\n'],
-  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\n? x\n'],
-  ['every line is blank, a comment, a key or an item', YAML_FILE, 'save: alpha\nlist:\n  -\n'],
-  ['no tab, control character or line separator', YAML_FILE, 'save: alpha\nx: yTABz\n'],
-  ['no tab, control character or line separator', YAML_FILE, 'save: alpha\nx: yLSEPz\n'],
-  ['no key twice in one mapping', YAML_FILE, 'save: x\nsave: alpha\n'],
-  ['the indentation is a mapping\'s or a list\'s', YAML_FILE, 'save: alpha\n   x: y\n'],
-  ['the indentation is a mapping\'s or a list\'s', YAML_FILE, 'menu:\n  save: alpha\n - x\n'],
-  ['a key is none of YAML\'s switches', YAML_FILE, 'save: alpha\nyes: x\n'],
-  ['a key is none of YAML\'s switches', YAML_FILE, 'save: alpha\nno: x\n'],
-  ['a key is none of YAML\'s switches: y and n', YAML_FILE, 'save: alpha\ny: x\n'],
-  ['no key holds __proto__', YAML_FILE, 'save: alpha\n__proto__: x\n'],
-  ['a changed value is no switch', YAML_FILE, 'flag: yes\n', 'flag: no\n'],
-  ['a changed value is no switch: y and n', YAML_FILE, 'flag: y\n', 'flag: n\n'],
-  ...YAML_SWITCH_WORDS.map((w) => [`a changed value is none of the switches: ${w}`, YAML_FILE, 'flag: maybe\n', `flag: ${w}\n`]),
-  ...YAML_SWITCH_WORDS.map((w) => [`a switch in any letter case: ${w}`, YAML_FILE, 'flag: maybe\n', `flag: ${w.toUpperCase()}\n`]),
-  ['a changed line keeps its key', YAML_FILE, 'save: alpha\n', 'safe: zulu\n'],
-  ['a changed line keeps its quotes', YAML_FILE, 'save: "alpha"\n', 'save: \'zulu\'\n'],
-  ['a changed line keeps its trailing white space', YAML_FILE, 'save: alpha\n', 'save: zulu  \n'],
-  ['a line that carries no value does not change', YAML_FILE, 'save:\n  x: alpha\n', 'safe:\n  x: zulu\n'],
-  // Properties: the strict subset.
-  ['no line ends in a backslash', PROPERTIES_FILE, 'save=alpha\nlong=a \\\n  b\n'],
-  ['a key with a backslash carries no value that may change', PROPERTIES_FILE, 'a\\ b=alpha\n'],
-  ['white space alone ends no key of a line that may change', PROPERTIES_FILE, 'save x alpha\n'],
-  ['an escape Java does not know carries no value that may change', PROPERTIES_FILE, 'save=alpha\n', 'save=zulu\\uzzzz\n'],
-  ['no key holds __proto__', PROPERTIES_FILE, 'save=alpha\na.__proto__.b=x\n'],
-  // The wording of a catalogue value.
-  ['no number of any kind', JSON_FILE, json({ save: 'alpha CIRCLED' })],
-  ['no character nobody sees', JSON_FILE, json({ save: 'alphaZWSPbeta' })],
-  ['no bare host', JSON_FILE, json({ save: 'alpha at example.org' })],
-  ['no scheme anywhere', JSON_FILE, json({ save: 'alpha mailto:someone' })],
-  ['the same placeholders in the same order', JSON_FILE, json({ save: '{a} alpha {b}' }), json({ save: '{b} zulu {a}' })],
-  ['no start like a path', JSON_FILE, json({ save: '/alpha' })],
-  ['a letter outside the placeholders', JSON_FILE, json({ save: '{name}!' }), json({ save: '{name}?' })],
-  ['a value is read as it is written too', YAML_FILE, 'save: "alpha"\n', 'save: "zul\\x75"\n'],
-  ['a changed value differs as the program reads it', PROPERTIES_FILE, 'save=alpha\n', 'save=al\\pha\n'],
+const PLAIN_CHANGES = [[CSS_FILE, COLOUR], [HTML_FILE, PAGE], ['src/styles/design-tokens.css', COLOUR]];
+const LATER_WITNESSES = [
   // Byte-order marks and line endings.
-  ['a byte-order mark stands on both sides or on neither', CSS_FILE, COLOUR, 'BOMa { color: blue }\n'],
-  ['as many carriage returns', HTML_FILE, '<p>alpha beta</p>', '<p>zulu\rbeta</p>'],
-  ['the same ending on every line', CSS_FILE, 'a { color: red }\r\nb { margin: 0 }\n', 'a { color: blue }\nb { margin: 0 }\r\n'],
+  ['a byte-order mark stands on both sides or on neither', 'unrecognised', CSS_FILE, COLOUR, 'BOMa { color: blue }\n'],
+  ['as many carriage returns', 'unrecognised', HTML_FILE, '<p>alpha beta</p>', '<p>zulu\rbeta</p>'],
+  ['the same ending on every line', 'unrecognised', CSS_FILE, 'a { color: red }\r\nb { margin: 0 }\n', 'a { color: blue }\nb { margin: 0 }\r\n'],
   // Stylesheets: the strict subset.
-  ['a semicolon inside brackets ends no statement', CSS_FILE, 'a { --shape: (a; color: red; x: y) }\n'],
-  ['a semicolon inside brackets ends no statement', CSS_FILE, 'a { --shape: [a; color: red; x: y] }\n'],
-  ['a brace inside brackets cannot be followed', CSS_FILE, 'a { x: (b { c; } d); color: red }\n'],
-  ['a closing bracket matches the one open', CSS_FILE, 'a { x: (]; y: 0 } b { color: red }\n'],
-  ['a closing bracket matches the one open', CSS_FILE, 'a { x: 1) } b { color: red }\n'],
-  ['every bracket is closed at the end', CSS_FILE, 'a { color: red }\n@import (x\n'],
-  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'a { color: red; foo }\n'],
-  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'a { color: red } b\n'],
-  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'a { *zoom: 1; color: red }\n'],
-  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'margin: 0;\na { color: red }\n'],
-  ['a statement is a declaration, an at-rule or the head of a rule', CSS_FILE, 'a { "x"; color: red }\n'],
-  ['an at-rule has a name', CSS_FILE, '@ { } a { color: red }\n'],
-  ['the head of a block starts with no `--`', CSS_FILE, '--x: { a: b } a { color: red }\n'],
-  ['a value holds no colon outside round brackets', CSS_FILE, 'a { margin: 0 padding: 1px; } c { color: red }\n'],
-  ['a colon in square brackets counts', CSS_FILE, 'a { grid-area: [a: b]; color: red }\n'],
-  ['a string ends at a carriage return or a form feed', CSS_FILE, 'a { content: "x\f"; color: red }\n'],
-  ['a string ends at a carriage return or a form feed', CSS_FILE, 'a { content: "x\r"; color: red }\n'],
-  ['a changed declaration holds no backslash', CSS_FILE, 'a { background: \\75 rl(a;color:red;b) }\n', undefined, { clause: /^I do not recognise/ }],
-  ['an escaped brace, semicolon, quote or comment start cannot be followed', CSS_FILE, '.a\\{b { color: red }\n'],
-  ['an escaped brace, semicolon, quote or comment start cannot be followed', CSS_FILE, '.a\\;b { color: red }\n'],
-  ['an escaped brace, semicolon, quote or comment start cannot be followed', CSS_FILE, '.a\\\'b { color: red }\n'],
-  ['an escaped brace, semicolon, quote or comment start cannot be followed', CSS_FILE, '.a\\/* { color: red }\n'],
-  ['a backslash before a line break escapes nothing', CSS_FILE, 'a { color: red } b\\\n{ }\n'],
-  ['only colour properties read a colour-named custom property', CSS_FILE, ':root { --brand-color: red }\na { animation-name: var(--brand-color) }\n'],
-  ['only colour properties read a colour-named custom property', CSS_FILE, ':root { --brand-color: red; --other: var(--brand-color) }\n'],
-  ['only colour properties read a colour-named custom property', CSS_FILE, ':root { --brand-color: red }\na { width: calc(var(--brand-color) * 2) }\n'],
-  ['a colour-named custom property is named only in a var()', CSS_FILE, ':root { --brand-color: red }\n@container style(--brand-color: tan) { a { margin: 0 } }\n'],
-  ['a colour-named custom property is named only in a var()', CSS_FILE, ':root { --brand-color: red }\n@property --brand-color { syntax: "<color>"; inherits: false; initial-value: tan }\n'],
-  ['a colour-named custom property is named only in a var()', CSS_FILE, ':root { --brand-color: red }\na { color: xvar(--brand-color) }\n'],
-  ['an @charset rule names UTF-8', CSS_FILE, '@charset "shift_jis";\na { color: red }\n'],
-  ['a colour name is compared in ASCII letters', CSS_FILE, ':root { --brand-color: red }\n', ':root { --brand-color: blacKELVIN }\n'],
+  ['a semicolon inside round brackets ends no statement', 'unrecognised', CSS_FILE, 'a { grid-area: (a; color: red; x: y) }\n'],
+  ['a brace inside brackets cannot be followed', 'lost', CSS_FILE, 'a { x: (b { c; } d); color: red }\n'],
+  ['a closing bracket matches the one open', 'lost', CSS_FILE, 'a { x: (]; y: 0 } b { color: red }\n'],
+  ['a closing bracket matches the one open', 'lost', CSS_FILE, 'a { x: 1) } b { color: red }\n'],
+  ['every bracket is closed at the end', 'open', CSS_FILE, 'a { color: red }\n@import (x\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', 'lost', CSS_FILE, 'a { color: red; foo }\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', 'lost', CSS_FILE, 'a { color: red } b\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', 'lost', CSS_FILE, 'a { *zoom: 1; color: red }\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', 'lost', CSS_FILE, 'margin: 0;\na { color: red }\n'],
+  ['a statement is a declaration, an at-rule or the head of a rule', 'lost', CSS_FILE, 'a { "x"; color: red }\n'],
+  ['an at-rule has a name', 'lost', CSS_FILE, '@ { } a { color: red }\n'],
+  ['the head of a block starts with no `--`', 'lost', CSS_FILE, '--x: { a: b } a { color: red }\n'],
+  ['a value holds no colon outside round brackets', 'lost', CSS_FILE, 'a { margin: 0 padding: 1px; } c { color: red }\n'],
+  ['a colon in square brackets counts', 'lost', CSS_FILE, 'a { grid-area: [a: b]; color: red }\n'],
+  ['a string ends at a carriage return or a form feed', 'lost', CSS_FILE, 'a { content: "x\f"; color: red }\n'],
+  ['a string ends at a carriage return or a form feed', 'lost', CSS_FILE, 'a { content: "x\r"; color: red }\n'],
+  ['a changed declaration holds no backslash', 'unrecognised', CSS_FILE, 'a { background: \\75 rl(a;color:red;b) }\n'],
+  ['an escaped brace, semicolon, quote or comment start cannot be followed', 'lost', CSS_FILE, '.a\\{b { color: red }\n'],
+  ['an escaped brace, semicolon, quote or comment start cannot be followed', 'lost', CSS_FILE, '.a\\;b { color: red }\n'],
+  ['an escaped brace, semicolon, quote or comment start cannot be followed', 'lost', CSS_FILE, '.a\\\'b { color: red }\n'],
+  ['an escaped brace, semicolon, quote or comment start cannot be followed', 'lost', CSS_FILE, '.a\\/* { color: red }\n'],
+  ['a backslash before a line break escapes nothing', 'lost', CSS_FILE, 'a { color: red } b\\\n{ }\n'],
+  ['an @charset rule names UTF-8', 'lost', CSS_FILE, '@charset "shift_jis";\na { color: red }\n'],
+  ['a colour name is compared in ASCII letters', 'unrecognised', CSS_FILE, 'a { color: red }\n', 'a { color: blacKELVIN }\n'],
+  ['a property name holds ASCII letters and hyphens only', 'lost', CSS_FILE, 'a { stroKELVINe: red }\n'],
+  // Stylesheets: custom properties never qualify (the tenth round).
+  ['a changed custom property is a setting', 'setting', CSS_FILE, ':root { --brand-color: red }\n'],
+  ['a changed custom property is a setting', 'setting', CSS_FILE, ':root { --brand-color: red }\na { color: var(--brand-color) }\n'],
+  ['a changed custom property is a setting', 'setting', CSS_FILE, 'a { --shape: (a; color: red; x: y) }\n'],
+  ['a changed custom property is a setting', 'setting', CSS_FILE, ':root { --gap: 4px }\n', ':root { --gap: 8px }\n'],
   // Paths and names.
-  ['IRON_LOOP.md governs the work', 'docs/IRON_LOOP.md', PROSE],
-  ['SKILL.md governs the work', 'docs/SKILL.md', PROSE],
-  ['MEMORY.md governs the work', 'docs/MEMORY.md', PROSE],
-  ['a folder named prompts governs the work', 'prompts/page.md', PROSE],
-  ['a folder named output-styles governs the work', 'output-styles/page.md', PROSE],
-  ['a file an instruction file links to governs the work', 'docs/guide.md', PROSE, undefined, { top: os.tmpdir(), governed: new Set(['docs/guide.md']) }],
-  ['a linked file is found in every form of its path', 'docs/guiZWSPde.md', PROSE, undefined, { top: os.tmpdir(), governed: new Set(['docs/guide.md']) }],
-  ['a run of capitals ends where its last capital starts a word', 'src/APIKey/page.html', PAGE],
-  ['a path is asked as its letters read', 'src/payZWSPment/page.html', PAGE],
-  ['a path is asked as its letters read', 'src/pAACUTEyment/page.html', PAGE],
-  ['a path is asked as it is written', 'src/authZWSPlogin/page.html', PAGE],
-  ['a path is asked with compatibility letters as plain ones', 'src/FWAuthZWSPpanel/page.html', PAGE],
-  ['in a stylesheet\'s name only `tokens` keeps its plural', 'src/styles/payments.css', COLOUR],
-  ['a governing name is found in every form of the path', 'docs/FWAGENTS.md', PROSE],
-  ['a test folder is found in every form of the path', 'teZWSPsts/page.html', PAGE],
-  ['a dependency name is found in every form of the path', 'locales/en/pacZWSPkage.json', json({ name: 'alpha' })],
+  ['a folder named prompts governs the work', 'unrecognised', 'prompts/page.html', PAGE],
+  ['a folder named output-styles governs the work', 'unrecognised', 'output-styles/page.css', COLOUR],
+  ['a run of capitals ends where its last capital starts a word', 'area key', 'src/APIKey/page.html', PAGE],
+  ['a path is asked as its letters read', 'area payment', 'src/payZWSPment/page.html', PAGE],
+  ['a path is asked as its letters read', 'area payment', 'src/pAACUTEyment/page.html', PAGE],
+  ['a path is asked as it is written', 'area auth', 'src/authZWSPlogin/page.html', PAGE],
+  ['a path is asked with compatibility letters as plain ones', 'area auth', 'src/FWAuthZWSPpanel/page.html', PAGE],
+  ['in a stylesheet\'s name only `tokens` keeps its plural', 'area payment', 'src/styles/payments.css', COLOUR],
+  ['a test folder is found in every form of the path', 'test', 'teZWSPsts/page.html', PAGE],
+  ['a governing folder is found in every form of the path', 'unrecognised', 'promZWSPpts/page.html', PAGE],
+  ['a page or stylesheet is one as its name is written', 'unrecognised', 'site/page.htZWSPml', PAGE],
   // Markup: what the ninth round added.
-  ['a changed text is read as its references spell it', HTML_FILE, '<p>alpha&shy;beta</p>'],
-  ['a page names no character set but UTF-8', HTML_FILE, '<meta charset="shift_jis"><p>alpha</p>']
+  ['a changed text is read as its references spell it', 'risk', HTML_FILE, '<p>alpha&shy;beta</p>'],
+  ['a page names no character set but UTF-8', 'subset', HTML_FILE, '<meta charset="shift_jis"><p>alpha</p>']
 ];
-const SPELT = [['ZWSP', '\u200b'], ['LSEP', '\u2028'], ['TAB', '\t'], ['CIRCLED', '\u2461'], ['BOM', '\ufeff'], ['KELVIN', '\u212a'], ['AACUTE', '\u00e1'],
-  ['FWAGENTS', '\uff21\uff27\uff25\uff2e\uff34\uff33'], ['FWA', '\uff41']];
+const SPELT = [['ZWSP', '​'], ['BOM', '﻿'], ['KELVIN', 'K'], ['AACUTE', 'á'], ['FWA', 'ａ']];
 const spelt = (text) => SPELT.reduce((t, [name, character]) => t.replaceAll(name, character), text);
 
-test('witnesses of the ninth round: every refusal rule it added refuses the one change written for it', (t) => {
+test('witnesses of the ninth and tenth rounds: every refusal rule they added refuses the one change written for it, for its own reason', (t) => {
   for (const [rel, text] of PLAIN_CHANGES) {
     const edited = text.includes('alpha') ? text.replace('alpha', 'zulu') : text.replace('red', 'blue');
     assert.equal(judgeAt(rel, text, edited), null, `the plain change of ${rel} passes`);
   }
-  const passed = [];
-  const wrongClause = [];
-  for (const [rule, rel, before, after, more = {}] of WITNESSES_9) {
+  const wrong = [];
+  for (const [rule, reason, rel, before, after] of LATER_WITNESSES) {
     const oldText = spelt(before);
     const newText = spelt(after === undefined ? (before.includes('alpha') ? before.replace('alpha', 'zulu') : before.replace('red', 'blue')) : after);
     assert.notEqual(newText, oldText, `${rule}: the witness holds an edit`);
-    const { clause, ...carried } = more;
-    const refusal = judgeAt(spelt(rel), oldText, newText, carried);
-    if (refusal === null) passed.push(`${rule}: ${spelt(rel)} ${JSON.stringify(oldText)}`);
-    else if (clause && !clause.test(refusal.clause)) wrongClause.push(`${rule}: ${refusal.clause}`);
+    const given = reasonOf(judgeAt(spelt(rel), oldText, newText));
+    if (given !== reason) wrong.push(`${rule}: ${spelt(rel)} ${JSON.stringify(oldText)} answered "${given}", not "${reason}"`);
   }
-  t.diagnostic(`${WITNESSES_9.length} witnesses for ${new Set(WITNESSES_9.map((w) => w[0])).size} rules`);
-  assert.deepEqual(passed, [], 'each of these rules no longer refuses its witness');
-  assert.deepEqual(wrongClause, [], 'each of these rules no longer gives its own refusal');
+  t.diagnostic(`${LATER_WITNESSES.length} witnesses for ${new Set(LATER_WITNESSES.map((w) => w[0])).size} rules`);
+  assert.deepEqual(wrong, [], 'each of these rules no longer refuses its witness, or no longer for its own reason');
 });
 
 // ---------------------------------------------------------------------------------------
 // Documents written by hand: the classes the security runs of 2026-10-09 found, the cases
-// the readers' rules were reasoned from, and everyday shapes. Every word in each is edited
-// in turn; whatever the check passes must be plain text for the real parsers.
+// the readers' rules were reasoned from, and everyday shapes. In a page every word is edited
+// in turn, in a stylesheet every colour; whatever the check passes must be plain text, or one
+// colour, for the real parsers.
 // ---------------------------------------------------------------------------------------
 const BY_HAND = {
   html: [
@@ -2205,53 +1549,39 @@ const BY_HAND = {
     '<table><tr><td>alpha<template><td>bravo</td></template>charlie</td></tr></table>', '<p>alpha<template><p>bravo</template>charlie</p>',
     '<button>alpha<object><button>bravo</button></object>charlie</button>'
   ],
-  markdown: [
-    // Plain paragraphs: every edit passes.
-    'Read the alpha guide first.\n', 'The alpha way is well-known; it works,\nand bravo\'s safe.\n\nThen charlie.\n', '# Title\n\nThe alpha words.\n\n- an item\n',
-    'The alpha words.\n\n```sh\nbravo --charlie\n```\n\nThe delta words.\n', '---\ntitle: alpha\n---\n\nThe bravo words.\n', 'Use `<b>` now.\n\nThe alpha words.\n',
-    '<!-- alpha -->\n\nThe bravo words.\n', '```html\n<div>alpha</div>\n```\n\nThe bravo words.\n', 'The alpha words.\r\n\r\nThe bravo words.\r\n',
-    'The alpha words.  \nThe bravo words.\n', '> a quote\n\nThe alpha words.\n\n| a | b |\n| - | - |\n| charlie | delta |\n',
-    // The findings of the Markdown security run of 2026-10-09: nothing here may pass as wording
-    // that a renderer reads as a link, an attribute, code or structure.
-    '<div markdown="1">\n\nRead the alpha guide.\n\n</div>\n', '>> > \tamet alpha word\n', '```\nalpha\n```\u00a0\n\nRun bravo now.\n\n```\n',
-    '-   Install alpha:\n\n        bravo charlie\n', 'Read alpha](guide/bravo) first.\n', 'See the alpha guide\n[g]: guide/bravo\n', 'Visit alpha.com today.\n',
-    'Read alpha.md first.\n', '---js\n{ title: "alpha" }\n\nA plain bravo line\n\n---\n\nThe charlie words.\n', 'Intro alpha.\n\n---\ntheme: bravo\n\nA plain charlie line\n\n---\n',
-    'Template: alpha\n\nBody bravo.\n', '| a | b |\n| - | - |\n| `alpha | bravo` | charlie |\n', '## alpha !\n\nBody bravo.\n', '- [ ] Write the alpha guide\n',
-    '> [!NOTE]\n> Read alpha first.\n', '::: tip\nUse the alpha way\n:::\n', '!!! note\n    Use the alpha way\n', 'See [[alpha guide]] first.\n',
-    '\ufeff    pip install alpha\n', 'Use \\<script> tags.\n\nThe alpha words.\n', '- Install the alpha tool\nRun bravo then\n', 'Install the alpha tool\n===\n',
-    // What the differential test found against the rule as first written, and what Python-Markdown
-    // and pandoc read otherwise.
-    '- Step alpha.\n\n  The bravo words.\n', '1. Step alpha.\n\n   The bravo words.\n', '<div>\n\nThe alpha words.\n\n</div>\n', '<run-sql>\n\nSelect alpha from bravo\n\n</run-sql>\n',
-    '> <!-- alpha\n\n-->\n\nThe bravo words.\n', '- alpha\n\n  <!-- bravo\n\n-->\n\nThe charlie words.\n', 'alpha\r```\n\nThe bravo words.\n',
-    '1. Step alpha\n\n   ```\nbravo\n   ```\n\nThe charlie words.\n', '[ref]:\n```\nalpha\n```\n\nThe bravo words.\n', '```\nalpha\n````\n\nThe bravo words.\n\n```\n',
-    '``` foo bar\nalpha\n```\n\nThe bravo words.\n\n```\n', ' ```\nalpha\n```\n\nThe bravo words.\n\n```\n', '<script>\n</pre>\n\n`</script>`\n\nThe alpha words.\n',
-    '<pre>\n<!-- </pre> -->\n\nThe alpha words.\n', '<xmp>\n\n`</xmp>`\n\nThe alpha words.\n', '<!alpha\n\nThe bravo words.\n>\n', '<hr>\n<https://alpha.example/x>\n\nThe bravo words.\n',
-    '---\ntext: |\n  ```\n---\n\nThe alpha words.\n\n```\n', '---\ntitle: <hr>\n<https://alpha.example/x>\n---\n\nThe bravo words.\n', '---\nThe alpha: [\n---\nText bravo here\n\nMore charlie words.\n\n---\n',
-    '----\nRow alpha here\n\nRow bravo here\n----\n', '----------- -------\nFirst       alpha\n\nSecond bravo words\n\nThird charlie\n----------- -------\n',
-    'a. The alpha words.\n', 'import Chart from "alpha"\n', 'export default alpha\n', 'The fix landed in alpha last week.\n',
-    // The ninth round (decisions at review of 2026-10-09): plain lists, colons and parentheses
-    // qualify; a metadata reader takes `Key: value` in the first paragraph; a raw start tag
-    // anywhere refuses the file, the shape on which Python-Markdown gave four pages among them.
-    '- alpha item\n- bravo item\n', '1. Step alpha.\n2. Step bravo (the short one).\n   Then charlie.\n', 'The alpha steps\n- bravo item\ncharlie words\n',
-    '# Title\n\nNote: the alpha way works, and so does this: the bravo one.\n', 'Title: alpha\nAuthor: bravo\n\nThe charlie words.\n',
-    'The alpha way (the bravo one) works.\n', '- alpha `code` item\n- bravo item\n', '- [ ] alpha task\n- bravo item\n', '- alpha\n-\n- bravo\n',
-    '- alpha item\n===\n', '* alpha\n* * *\n* bravo\n', '- alpha:\n\n      bravo\n', 'Term alpha\n: bravo words\n', '- i. alpha words\n', '(a) alpha words\n',
-    'The alpha words here.\n\n> <script>\n> <!--<script>\n> </script>\n>\n> Bravo then.\n>\n</script>\n', 'The alpha words.\n\n<!-- bravo -->\n',
-    'Use `<script>` now.\n\nThe alpha words.\n', '1. alpha\n1. bravo\n8. charlie\n', '- alpha\n  - bravo\n    - charlie\n', '-    alpha\n     bravo\n',
-    'Intro alpha\n* bravo words\n* charlie words\n', 'Text.\n\n- alpha: bravo\n- charlie (delta): alpha\n',
-    // A line of spaces between a paragraph and an underline: marked 4.3.0 makes a heading of both.
-    'Alpha words.\nBravo charlie delta\n \n---\nThe alpha words then.\n', 'The alpha words.\n  \nBravo words.\n \n===\n'
+  css: [
+    // Everyday shapes: every colour that is the whole value of a colour property passes.
+    'a { color: red; }\n', '.btn {\n  color: #0a58ca;\n  background-color: #fff;\n  border-color: rgb(1, 2, 3);\n}\n',
+    'a { color: red !important; outline-color: hsla(210, 50%, 40%, 0.9) }\n', '@media (min-width: 10px) {\n  a { color: red; }\n}\n',
+    '/* brand: red */\n@import "x.css";\na { fill: red; stroke: blue; }\n', '.sm\\:flex, #fff, .red { COLOR : red }\n', 'a { color: RED; caret-color: Tomato }\n',
+    '﻿a { color: red; }\r\nb { margin: 0; }\r\n', '@supports (color: red) { a { color: blue; } }\n', 'a { color: red; & b { color: blue; } }\n',
+    // A colour that is not the whole value, or stands in no colour property.
+    'a { border: 1px solid red; box-shadow: 0 0 2px blue; }\n', 'a { background: url("red.png") red; }\n', 'a { background: linear-gradient(red, blue); }\n',
+    'a { animation: red 2s; animation-name: blue; }\n', 'a { width: #fff; content: "red"; }\n', '.red, #fff { margin: 0 }\n', '@keyframes red { from { color: red } to { color: blue } }\n',
+    'a[href^="#fff"]::before { content: "\\"; color: red; x: \\""; }\n', 'a { color: var(--brand-color, red); }\n',
+    // Custom properties: never a colour, whatever they hold and whatever reads them.
+    ':root { --brand-color: red; --accent-colour: #fff; --mode: blue; }\n', ':root { --brand-color: red }\na { color: var(--brand-color); background-color: blue }\n',
+    ':root { --brand-color: red }\n@container style(--brand-color: red) { a { color: blue } }\n', '@property --brand-color { syntax: "<color>"; inherits: false; initial-value: red }\n',
+    'a { --shape: (a; color: red; b); color: blue }\n',
+    // Where a hand-written reader and a real parser part ways.
+    'a { color: red; foo }\n', 'a { color: red } b\n', 'a { *zoom: 1; color: red }\n', 'margin: 0;\na { color: red }\n', 'a { color: red; }\n}\n', 'a { color: red; }\n/* open\n',
+    'a { grid-area: [a; color: red; b] }\n', 'a { background: \\75 rl(a;color:red;b) }\n', 'a { x: (b { c; } d); color: red }\n', '.a\\{b { color: red }\n',
+    'a { color: red } b\\\n{ }\n', 'a { content: "x\r"; color: red }\n', '@charset "shift_jis";\na { color: red }\n', '<!-- a { color: red } -->\n',
+    'a { color: rgb(1 2 3 / 50%); background-color: hsl(210 50% 40%) }\n', 'a { color: rgb(10, 20, 30%); background-color: hsl(10, 20, 30) }\n',
+    'a { color /* c */ : red }\n', 'a {\n  /* brand */\n  color: red;\n}\n', 'a { color: red; ; color: blue;; }\n', 'a { c\\6f lor: red; color: blue\\9 }\n'
   ]
 };
+/** The edits of a hand-written document: in a page each word becomes another, in a stylesheet each colour. */
+const HAND_EDITS = { html: [WORD, 'zulu'], css: [CSS_COLOUR_TOKEN, 'green'] };
 
 test('documents written by hand: the classes found, and everyday shapes', (t) => {
   const wrong = [];
-  const counts = { html: [0, 0], markdown: [0, 0] };
-  for (const kind of ['html', 'markdown']) {
+  const counts = { html: [0, 0], css: [0, 0] };
+  for (const kind of ['html', 'css']) {
+    const [pattern, replacement] = HAND_EDITS[kind];
     for (const oldText of BY_HAND[kind]) {
-      WORD.lastIndex = 0;
-      for (let m = WORD.exec(oldText); m; m = WORD.exec(oldText)) {
-        const newText = `${oldText.slice(0, m.index)}zulu${oldText.slice(m.index + m[0].length)}`;
+      for (const m of oldText.matchAll(pattern)) {
+        const newText = `${oldText.slice(0, m.index)}${replacement}${oldText.slice(m.index + m[0].length)}`;
         counts[kind][0]++;
         if (judge(kind, oldText, newText) !== null) continue;
         counts[kind][1]++;
@@ -2261,18 +1591,18 @@ test('documents written by hand: the classes found, and everyday shapes', (t) =>
     }
   }
   t.diagnostic(`HTML: ${counts.html[1]} of ${counts.html[0]} edits passed in ${BY_HAND.html.length} documents; `
-    + `Markdown: ${counts.markdown[1]} of ${counts.markdown[0]} in ${BY_HAND.markdown.length}`);
+    + `CSS: ${counts.css[1]} of ${counts.css[0]} in ${BY_HAND.css.length}`);
   assert.deepEqual(wrong, []);
-  for (const kind of ['html', 'markdown']) {
+  for (const kind of ['html', 'css']) {
     assert.ok(counts[kind][1] > counts[kind][0] / 6, `the check passes edits in the everyday ${kind} shapes (${counts[kind][1]} of ${counts[kind][0]})`);
   }
 });
 
 test('the real menu route answers a sample of the generated edits as the rules do', async (t) => {
   // The sample is made here, from a seed of its own, so that this test stands alone: the
-  // first four edits the rules pass and the first four they refuse, of each language.
+  // first four edits the rules pass and the first four they refuse, of pages and of stylesheets.
   const sample = [];
-  for (const kind of ['html', 'markdown']) {
+  for (const kind of ['html', 'css']) {
     const kept = { passed: 0, refused: 0 };
     for (let index = 0; kept.passed + kept.refused < 8 && index < 20000; index++) {
       const c = caseOf(kind, index, 4242);
@@ -2292,7 +1622,7 @@ test('the real menu route answers a sample of the generated edits as the rules d
   const git = (args) => {
     // `maintenance.auto=false` and `gc.auto=0`: git 2.54 starts a detached maintenance run after a commit.
     const r = spawnSync('git', ['-c', 'user.name=Hotfix Test', '-c', 'user.email=hotfix@test.invalid',
-      '-c', 'commit.gpgsign=false', '-c', 'core.autocrlf=false', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0', ...args], { cwd: root, encoding: 'utf8' });
+      '-c', 'commit.gpgsign=false', '-c', 'core.autocrlf=false', '-c', 'maintenance.auto=false', '-c', 'gc.auto=0', ...args], { cwd: root, encoding: 'utf8', timeout: 60000 });
     if (r.status !== 0) throw new Error(`git ${args.join(' ')} failed: ${r.stderr}`);
   };
   try {
