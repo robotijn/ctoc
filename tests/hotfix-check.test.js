@@ -1522,7 +1522,8 @@ test('finding 2a: the first failing test is read from blank lines in linear time
 
 test('finding 2c: a colour change in a one-line stylesheet is judged in linear time', async (t) => {
   const many = (n) => '.a { color: red; } '.repeat(100 * n);
-  const long = (n) => `.a { box-shadow:${' red'.repeat(400 * n)}; }`;
+  // (A `box-shadow` until the re-check of 2026-10-10, when it stopped being a colour shorthand.)
+  const long = (n) => `.a { background:${' red'.repeat(400 * n)}; }`;
   const shapes = [
     ['short declarations, the last colour changed', many, (base) => `${base.slice(0, base.lastIndexOf('red'))}blue; } `, null],
     // Since the sixth round a colour passes only as the whole value of its property (the
@@ -2035,7 +2036,8 @@ test('round 6: folded paths, colours that are no whole value, the cannot-read-ex
     // The functional plan's fifth case: a colour that is not the whole value of a colour
     // property. (A custom property is a setting since the tenth round, whatever its name.)
     row('colour', 'src/styles/border.css', '.save { border: 1px solid @; }\n', ['#0a58ca', '#0b5ed7'], exact('src/styles/border.css')),
-    row('colour', 'src/styles/shadow.css', 'a { box-shadow: 0 0 2px @; }\n', ['red', 'blue'], exact('src/styles/shadow.css')),
+    // `box-shadow` is no colour shorthand since the re-check of 2026-10-10 (a bare colour is no valid value of it).
+    row('colour', 'src/styles/shadow.css', 'a { box-shadow: 0 0 2px @; }\n', ['red', 'blue'], un('src/styles/shadow.css')),
     row('colour', 'src/styles/two-tokens.css', ':root { --brand-color: @; }\n', ['red', 'red url(x)'], setting('src/styles/two-tokens.css')),
     row('colour', 'src/styles/color-mode.css', ':root { --color-mode: @; }\n', ['dark', 'light'], setting('src/styles/color-mode.css')),
     row('colour', 'src/styles/enabled.css', ':root { --enabled: @; }\n', ['green', 'red'], setting('src/styles/enabled.css')),
@@ -2820,7 +2822,9 @@ test('round 10, B9 and B10: a sensitive word anywhere inside a part of the path,
   // What stays: a part that is exactly `author` or `authors`; `ci` inside a longer part; a
   // stylesheet's own name part that is exactly `tokens`.
   for (const part of ['author', 'Authors', 'circle', 'pencil', 'special', 'home']) assert.equal(page(`src/${part}/site.css`), 'passed', part);
-  for (const rel of ['src/styles/tokens.css', 'src/styles/design-tokens.css', 'src/styles/Tokens.dark.css']) assert.equal(sheet(rel), 'passed', rel);
+  for (const rel of ['src/styles/tokens.css', 'src/styles/design-tokens.css', 'src/styles/tokens.dark.css']) assert.equal(sheet(rel), 'passed', rel);
+  // Since the re-check of 2026-10-10 the exception holds only for `tokens` as written.
+  assert.equal(sheet('src/styles/Tokens.dark.css'), area('src/styles/Tokens.dark.css', 'token'));
   // B10. A part of the path that holds `prompt` governs the work.
   for (const rel of ['src/llm/system_prompt.css', 'src/llm/SystemPrompt.css', 'src/prompting/site.css', 'src/my-prompts-old/site.css']) assert.equal(page(rel), un(rel), rel);
   assert.equal(sheet('src/styles/Prompt.css'), un('src/styles/Prompt.css'));
@@ -2852,7 +2856,8 @@ test('round 10, B9: whatever the earlier matcher refused is still refused (a wor
   const capital = (word) => word[0].toUpperCase() + word.slice(1);
   for (const word of words) {
     for (const part of [word, `${word}s`, `${word}es`, word.toUpperCase(), `my${capital(word)}`, `${word}Panel`, `API${capital(word)}`, `x-${word}_y`]) {
-      const answer = page(`src/${part}/site.css`);
+      // A folder named `migration` is a database folder, with a clause of its own: that word stands in the file name.
+      const answer = page(word === 'migration' ? `src/styles/${part}.css` : `src/${part}/site.css`);
       assert.match(answer, / sits in an area named \p{L}+, and such areas are never a hotfix$/u, `${part}: ${answer}`);
     }
   }
@@ -2919,4 +2924,82 @@ test('after the re-check: every extension the module ever recognised but `.css` 
   // A path that holds a character nobody sees is refused (the Hangul filler is a letter to Unicode).
   const unseen = `src/ad${String.fromCharCode(0x3164)}min/site.css`;
   assert.notEqual(ruleRefusal(changeOf(unseen, texts.colour[0], texts.colour[1])), null, 'a path with a Hangul filler');
+});
+
+// After the re-check of 2026-10-10, part 2: small fixes in what stays. Each witness was seen
+// failing on a51fa396 before its fix.
+test('after the re-check: shadows, the `tokens` exception as written, sensitive words across separators, and a database folder', () => {
+  const css = (rel, before, after) => reasonOf(ruleRefusal(changeOf(rel, before, after)));
+  const sheet = (rel) => css(rel, 'a { color: red; }\n', 'a { color: blue; }\n');
+  const area = (rel, word) => `${rel} sits in an area named ${word}, and such areas are never a hotfix`;
+  // `box-shadow` and `text-shadow` take no bare colour: a browser reads `box-shadow: red` as invalid.
+  for (const prop of ['box-shadow', 'text-shadow']) {
+    assert.equal(css('src/styles/site.css', `a { ${prop}: red; }\n`, `a { ${prop}: blue; }\n`), 'I do not recognise src/styles/site.css as wording or a colour', prop);
+  }
+  assert.equal(css('src/styles/site.css', 'a { outline: red; }\n', 'a { outline: blue; }\n'), 'passed', 'a real shorthand still takes one');
+  // The stylesheet exception holds only for a part written exactly `tokens`.
+  assert.equal(sheet('styles/tokens.css'), 'passed');
+  assert.equal(sheet('styles/tokenS.css'), area('styles/tokenS.css', 'token'));
+  assert.equal(sheet('styles/Tokens.css'), area('styles/Tokens.css', 'token'));
+  // A word of four letters or more is found in the path with every character that is no letter taken out.
+  for (const [rel, word] of [['log-in/site.css', 'login'], ['pages/log_out.css', 'logout'], ['check-out/site.css', 'checkout'], ['pass-word/site.css', 'password'],
+    ['data-base/site.css', 'database'], ['work-flow/site.css', 'workflow'], ['styles/pay.ment.css', 'payment'], ['se-ssion/site.css', 'session']]) {
+    assert.equal(sheet(rel), area(rel, word), rel);
+  }
+  // The stems of words whose other forms the earlier matchers missed.
+  for (const [rel, word] of [['licensing/site.css', 'licens'], ['licences/site.css', 'licenc'], ['invoicing/site.css', 'invoic']]) {
+    assert.equal(sheet(rel), area(rel, word), rel);
+  }
+  // A database folder is named as one for a stylesheet too.
+  assert.equal(sheet('db/migrate/notes.css'), 'it changes stored data in db/migrate/notes.css');
+  assert.equal(sheet('src/migrations/site.css'), 'it changes stored data in src/migrations/site.css');
+  // Guards: no word, nothing refused.
+  for (const rel of ['src/styles/site.css', 'web/ui/button.css', 'styles/author/site.css']) assert.equal(sheet(rel), 'passed', rel);
+});
+
+test('after the re-check: a test run passes only when no failure or skip counter in its output is above zero, and its count is the sum of every summary', async () => {
+  const printer = (text) => `process.stdout.write(${JSON.stringify(text)});\n`;
+  const run = async (files, script) => {
+    const root = makeRepo({ 'src/styles/home.css': HOME, ...files }, { testScript: script });
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+    return check(root, '--run-tests', 'src/styles/home.css');
+  };
+  const passing = (n) => Array.from({ length: n }, (_, i) => `test('passes ${i}', () => {});`).join('\n');
+  const head = "const test = require('node:test');\n";
+  // Two node:test runs in a row, the first failing: the exit code is the second's.
+  const twice = await run({ 'tests/a.test.js': `${head}test('fails', () => { throw new Error('no'); });\n`, 'tests/b.test.js': `${head}${passing(1)}\n` },
+    'node --test tests/a.test.js; node --test tests/b.test.js');
+  assert.equal(twice.verdict, 'refused', JSON.stringify(twice));
+  assert.match(twice.text, /the existing tests fail/);
+  // What other runners print, with exit code 0.
+  const summaries = [
+    ['vitest', ' Test Files  1 failed (1)\n      Tests  1 failed | 3 passed (4)\n', /the existing tests fail/],
+    ['pytest, an error', '===== 2 passed, 1 error in 0.12s =====\n', /the existing tests fail/],
+    ['pytest, xfailed and deselected', '===== 2 passed, 1 xfailed, 2 deselected in 0.12s =====\n', /skipped|nothing confirms/],
+    ['cargo, ignored', 'test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out\n', /skipped|nothing confirms/],
+    ['cargo, FAILED', 'test result: FAILED. 3 passed; 1 failed; 0 ignored\n', /the existing tests fail/],
+    ['cargo, filtered out', 'test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out\n', /skipped|nothing confirms/],
+    ['deno, ignored', 'ok | 3 passed | 0 failed | 1 ignored (12ms)\n', /skipped|nothing confirms/],
+    ['playwright, flaky', '  1 flaky\n  3 passed (2.1s)\n', /skipped|nothing confirms|the existing tests fail/],
+    ['failed: N', 'passed: 3\nfailed: 2\n', /the existing tests fail/],
+    ['# fail N', '# pass 3\n# fail 1\n', /the existing tests fail/],
+    ['a FAILED line', '3 passed\nFAILED tests/x.py::test_a - AssertionError\n', /the existing tests fail/]
+  ];
+  for (const [name, text] of summaries) {
+    const res = await run({ 'print.js': printer(text) }, 'node print.js');
+    assert.equal(res.verdict, 'refused', `${name}: ${JSON.stringify(res)}`);
+    assert.match(res.text, text.length ? summaries.find((x) => x[0] === name)[2] : /x/, name);
+  }
+  // Two runs that pass: the count shown is the sum of both summaries.
+  const sum = await run({ 'tests/a.test.js': `${head}${passing(5)}\n`, 'tests/b.test.js': `${head}${passing(1)}\n` },
+    'node --test tests/a.test.js && node --test tests/b.test.js');
+  assertPass(sum, ['src/styles/home.css']);
+  assert.equal(sum.tests, '6 tests passed.');
+  // Counters at zero, and a passing test whose name holds such words, are no failure.
+  const clean = await run({ 'print.js': printer('test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n') }, 'node print.js');
+  assertPass(clean, ['src/styles/home.css']);
+  assert.equal(clean.tests, '4 tests passed.');
+  const named = await run({ 'tests/a.test.js': `${head}test('reports 3 failed logins', () => {});\ntest('FAILED is a word here', () => {});\n` }, SCRIPT);
+  assertPass(named, ['src/styles/home.css']);
+  assert.equal(named.tests, '2 tests passed.');
 });

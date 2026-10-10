@@ -1034,6 +1034,8 @@ async function runFullTests(tools, options = {}) {
   let totalPassed = 0;
   let totalFailed = 0;
   let totalSkipped = 0;
+  /** @type {string[]} the output of every command that ran, for a reader that reads more than the counters here */
+  const outputs = [];
 
   const limits = { ...(options.timeout !== undefined ? { timeout: options.timeout } : {}), ...(options.wholeTree ? { wholeTree: true } : {}) };
   for (const [lang, langTools] of distinctCommands(tools, 'test')) {
@@ -1097,6 +1099,7 @@ async function runFullTests(tools, options = {}) {
       };
     }
 
+    outputs.push(String(result.output || ''));
     totalPassed += counters.passCount;
     totalSkipped += counters.skipped;
   }
@@ -1110,7 +1113,10 @@ async function runFullTests(tools, options = {}) {
     // module's job; the "0 skipped" contract is enforced at Step 14 VERIFY, whose
     // threshold this plan deliberately does not touch.
     skipped: totalSkipped,
-    flaky: 0
+    flaky: 0,
+    // The whole output of a passing run, so that a caller can read every summary in it (the
+    // hotfix check: a runner may print a failure and still exit with 0).
+    output: outputs.join('\n')
   };
 }
 

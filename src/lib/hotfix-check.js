@@ -381,11 +381,15 @@ const CODE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.py', '
 const SENSITIVE_WORDS = ['auth', 'login', 'logout', 'password', 'session', 'token', 'secret', 'security',
   'credential', 'key', 'permission', 'role', 'admin', 'payment', 'billing', 'checkout', 'price', 'pricing',
   'invoice', 'tax', 'legal', 'terms', 'privacy', 'consent', 'cookie', 'gdpr', 'license', 'migration',
-  'schema', 'database', 'sql', 'deploy', 'workflow', 'ci'];
+  'schema', 'database', 'sql', 'deploy', 'workflow', 'ci',
+  // Stems, so that the other forms of a word count too (`licensing`, `licences`, `invoicing`).
+  'licens', 'licenc', 'invoic'];
 /** The shorthand properties that may carry a colour; every property ending in `color` may too. */
 const COLOUR_SHORTHANDS = new Set(['background', 'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
   'border-block', 'border-block-start', 'border-block-end', 'border-inline', 'border-inline-start', 'border-inline-end',
-  'outline', 'column-rule', 'fill', 'stroke', 'box-shadow', 'text-shadow', 'text-decoration', 'text-emphasis']);
+  'outline', 'column-rule', 'fill', 'stroke', 'text-decoration', 'text-emphasis']);
+// (`box-shadow` and `text-shadow` were in this list until the re-check of 2026-10-10: a bare
+// colour is no valid value of either, so a browser drops `box-shadow: red` on both sides.)
 /** The 148 named colours of CSS Color Module Level 4, plus `transparent`. */
 const NAMED_COLOURS = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black '
   + 'blanchedalmond blue blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue '
@@ -1403,6 +1407,8 @@ function kindAs(f, spelt) {
   if (named === null) {
     if (ext === '.css') kind = 'colour';
   }
+  // A database folder is named as one, for a stylesheet too (the re-check of 2026-10-10).
+  if (kind !== null && topFolders.some((p) => DATABASE_FOLDERS.has(p))) return { clause: `it changes stored data in ${d}`, cause: 'stored-data' };
   if (kind !== null && governing) return unrecognised;
   // A side emptied, or filled from empty, holds the content of a removal or an addition.
   if (kind !== null && (f.oldText === '') !== (f.newText === '')) return unrecognised;
@@ -1523,7 +1529,7 @@ function ruleSensitiveArea(f, ctoc) {
     for (const form of PATH_FORMS) {
       for (const run of form(text).split(/\P{L}+/u)) {
         const part = run.toLowerCase();
-        if (stylesheet && part === 'tokens') continue;
+        if (stylesheet && run === 'tokens') continue; // only as written: `tokenS.css` names its area
         // The part itself, then each camel-case sub-word of it: where a capital follows a small
         // letter, and where the last capital of a run of capitals starts a word.
         const found = sensitiveWord(part)
@@ -1533,7 +1539,23 @@ function ruleSensitiveArea(f, ctoc) {
     }
     return null;
   };
-  let word = wordIn(f.topRel.slice(0, nameAt), false) || wordIn(f.topRel.slice(nameAt), nameParts(f).ext === '.css');
+  /**
+   * @param {string} text the path in one form @returns {string|null} the first word of four
+   * letters or more in the path's letters joined, every character that is no letter taken
+   * out (`log-in`, `pass_word`, `data.base`; the re-check of 2026-10-10). A part that is
+   * exactly `author` or `authors`, and a stylesheet's own name part written exactly `tokens`,
+   * are left out first, as the other matchers leave them.
+   */
+  const stylesheet = nameParts(f).ext === '.css';
+  const joinedWord = (text) => {
+    const at = text.lastIndexOf('/') + 1;
+    const keep = (part) => !/^authors?$/i.test(part);
+    const joined = [...text.slice(0, at).split(/\P{L}+/u).filter(keep),
+      ...text.slice(at).split(/\P{L}+/u).filter((part) => keep(part) && !(stylesheet && part === 'tokens'))].join('').toLowerCase();
+    return SENSITIVE_WORDS.find((w) => w.length >= 4 && joined.includes(w)) || null;
+  };
+  let word = wordIn(f.topRel.slice(0, nameAt), false) || wordIn(f.topRel.slice(nameAt), stylesheet)
+    || PATH_FORMS.map((form) => joinedWord(form(f.topRel))).find(Boolean) || null;
   if (!word && PATH_FORMS.some((form) => isSecretTarget(form(f.topRel)))) word = 'secret';
   if (!word && ctoc && PATH_FORMS.some((form) => isProtectedEnforcementPath(form(f.topRel)) || isProtectedEnforcementPath(form(f.topRel).toLowerCase()))) word = 'enforcement';
   if (word) return { clause: `${f.display} sits in an area named ${word}, and such areas are never a hotfix`, cause: 'sensitive-area' };
@@ -1650,6 +1672,53 @@ function firstFailingTest(output, root) {
   if (name !== null) name = clean(name);
   if (file && name) return `${file}: ${name}`;
   return file || name || 'the test command reported a failure';
+}
+
+/**
+ * The counters of a failure (`fail`, `failed`, `failures`, `error`, `errors`) and of a test
+ * that ran nothing (`skipped`, `ignored`, `todo`, `pending`, `flaky`, `xfailed`, `xpassed`,
+ * `deselected`, `cancelled`, `filtered out`), in either order: `3 failed`, `# fail 3`,
+ * `failed: 3`.
+ */
+const FAIL_COUNTER = /(\d+)[ \t]+(?:fail|failed|failures|errors?)\b|\b(?:fail|failed|failures|errors?)[ \t]*[:=]?[ \t]*(\d+)(?![\d.])/gi;
+const SKIP_COUNTER = /(\d+)[ \t]+(?:skipped|ignored|todo|pending|flaky|xfailed|xpassed|deselected|cancelled|filtered[ \t]+out)\b|\b(?:skipped|ignored|todo|pending|flaky|xfailed|xpassed|deselected|cancelled)[ \t]*[:=]?[ \t]*(\d+)(?![\d.])/gi;
+/** The pass counter of a summary: `5 passed`, `5 passing`, `# pass 5`, `ℹ pass 5`, `passed: 5`. */
+const PASS_COUNTER = /(\d+)[ \t]+pass(?:ed|ing)\b|(?:^|[ \t])(?:#|\u2139)[ \t]+pass[ \t]+(\d+)|\bpassed[ \t]*:[ \t]*(\d+)/gi;
+
+/**
+ * Rule 8 — a passing run's whole output, read once more (the re-check of 2026-10-10): a run
+ * passes only with no failure or skip counter above zero ANYWHERE in it, and no line that holds
+ * `FAILED`; the count shown is the sum of the pass counts of every summary. Two summaries come
+ * from two runners in one command (`node --test a; node --test b`, whose exit code is the
+ * second's). Not read: a line that reports one passing test (`✔ …`, `ok 3 - …`), whose name may
+ * hold such words; and a summary of test FILES or SUITES (`Test Files  1 passed`), counted
+ * apart from the tests. One pass over the lines.
+ * @param {string} output standard output and standard error of every command that ran
+ * @returns {{failed: boolean, skipped: number, passed: number}}
+ */
+function readRunOutput(output) {
+  let failed = false;
+  let skipped = 0;
+  let passed = 0;
+  const sum = (re, line) => {
+    let n = 0;
+    re.lastIndex = 0;
+    for (let m = re.exec(line); m !== null; m = re.exec(line)) n += Number(m[1] || m[2] || m[3] || 0);
+    return n;
+  };
+  for (const raw of output.replace(ANSI, '').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (/^(?:\u2714|ok[ \t]+\d+[ \t]+-)/.test(line)) continue; // one passing test, by its name
+    if (/FAILED/.test(line)) failed = true;
+    if (/^(?:Test Files|Test Suites)\b/i.test(line)) {
+      if (sum(FAIL_COUNTER, line) > 0) failed = true;
+      continue;
+    }
+    if (sum(FAIL_COUNTER, line) > 0) failed = true;
+    skipped += sum(SKIP_COUNTER, line);
+    passed += sum(PASS_COUNTER, line);
+  }
+  return { failed, skipped, passed };
 }
 
 /** @returns {'junction'|'dir'} a link that needs no administrator rights on Windows, read at each call */
@@ -1813,11 +1882,17 @@ async function ruleTestsInCopy(change, ctx) {
   }
 
   if (run === null) return NO_TEST_RAN;
-  // A skipped test confirms nothing (the tenth round): the change may be exactly what it would have caught.
-  if (run.passed === true && run.skipped > 0) {
-    return { clause: `${run.skipped} ${run.skipped === 1 ? 'test was' : 'tests were'} skipped, so nothing confirms the change`, cause: 'no-test-ran' };
+  if (run.passed === true) {
+    // The runner's claim is read once more, in the whole output (the re-check of 2026-10-10):
+    // one command may run several runners, and each prints a summary of its own.
+    const read = readRunOutput(String(run.output || ''));
+    if (read.failed) return { clause: `the existing tests fail (${firstFailingTest(run.output, copyRoot)})`, cause: 'tests-fail' };
+    // A skipped test confirms nothing (the tenth round): the change may be exactly what it would have caught.
+    const skipped = Math.max(read.skipped, Number(run.skipped) || 0);
+    if (skipped > 0) return { clause: `${skipped} ${skipped === 1 ? 'test was' : 'tests were'} skipped, so nothing confirms the change`, cause: 'no-test-ran' };
+    const passed = Math.max(read.passed, Number(run.passCount) || 0);
+    if (passed > 0) return { tests: `${passed} ${passed === 1 ? 'test' : 'tests'} passed.` };
   }
-  if (run.passed === true && run.passCount > 0) return { tests: `${run.passCount} ${run.passCount === 1 ? 'test' : 'tests'} passed.` };
   // A run that never started, could not be read, or whose command was refused before it ran
   // (shell structure in a tracked quality setting) is "no test ran", never a failing test.
   if (run.passed === true || run.undetermined || run.refused) return NO_TEST_RAN;

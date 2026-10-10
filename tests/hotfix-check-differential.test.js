@@ -334,7 +334,7 @@ const ORACLE_COLOUR_NAMES = new Set(('aliceblue antiquewhite aqua aquamarine azu
 assert.equal(ORACLE_COLOUR_NAMES.size, 149);
 const ORACLE_COLOUR_FUNCTIONS = new Set(['rgb', 'rgba', 'hsl', 'hsla', 'hwb', 'lab', 'lch', 'oklab', 'oklch', 'color']);
 const ORACLE_SHORTHANDS = new Set(['background', 'border', 'border-top', 'border-right', 'border-bottom', 'border-left', 'border-block', 'border-block-start',
-  'border-block-end', 'border-inline', 'border-inline-start', 'border-inline-end', 'outline', 'column-rule', 'fill', 'stroke', 'box-shadow', 'text-shadow',
+  'border-block-end', 'border-inline', 'border-inline-start', 'border-inline-end', 'outline', 'column-rule', 'fill', 'stroke',
   'text-decoration', 'text-emphasis']);
 
 /** @param {string} text @returns {string} lower case as a browser compares a CSS name: the ASCII letters only (the Kelvin sign is no `k`) */
