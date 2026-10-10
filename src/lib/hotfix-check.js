@@ -64,7 +64,9 @@
  *                                          `.clinerules/`, `.roo/`, `.kiro/`, `.junie/`, `.amazonq/`,
  *                                          `.continue/`, `agents/`, `skills/`, `commands/`, `plans/`,
  *                                          `prompts/`, `output-styles/`, GitHub's assistant folders,
- *                                          any folder or file name that holds `prompt`), nor in a
+ *                                          any folder or file name that holds `prompt`), nor when an
+ *                                          instruction file of the last commit names it (a plain
+ *                                          search for its base name in their text), nor in a
  *                                          build folder (`.github/`, `.changeset/`, ...), nor in any
  *                                          other dot-folder.
  *                                          EACH KIND IS JUDGED WHOLE, one scanner per side:
@@ -160,6 +162,8 @@
  *   a path split at every character that    only the rules that refuse read the parts (a sensitive
  *   is no letter, and at capitals; each     word, CTOC's protected paths); a part and each sub-word
  *   part in lower case                      are both asked, and either refuses
+ *   instruction text in lower case, its     only to find a judged file's name in it, which refuses;
+ *   backslashes out, percent-escapes read   the text is searched as written and as decoded
  *   a character reference decoded           rule 6 and the two-scripts rule read the text as written
  *                                           and as decoded; only a short list of plain references
  *                                           may stand in changed text
@@ -442,10 +446,11 @@ const ANSI = /\u001b\[[0-9;:<=>?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|
  * @property {(string|null)} [oldText]
  * @property {(string|null)} [newText]
  * @property {Hunk[]} [hunks]
+ * @property {boolean} [named] an instruction file of the last commit names it
  * @property {string} [kind] the qualifying kind rule 4 placed it in
  * @property {string[]} [runs] the old and new wording rule 6 reads
  */
-/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string, top?: string}} Change */
+/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string, top?: string, instructions?: string}} Change `instructions`: the text of the last commit's instruction files ({@link instructionText}); a change read from a repository always carries it */
 /**
  * The check's own state for one call: the repository it reads, and everything rule 8
  * made, so that {@link removeCopy} can take it away on every path.
@@ -688,6 +693,71 @@ function copyIndex(ctx) {
   safeFs.cpSync(index, ctx.repoIndex, { preserveTimestamps: true });
 }
 
+/** The endings of instruction, rule, prompt and chat-mode files, wherever they sit. */
+const GOVERNING_ENDINGS = ['.mdc', '.instructions.md', '.prompt.md', '.chatmode.md'];
+/**
+ * The instruction files coding assistants read, by name, at any depth: `AGENTS.md`,
+ * `CONVENTIONS.md`, `copilot-instructions.md`, `.cursorrules`, `.windsurfrules`,
+ * `IRON_LOOP.md`, `SKILL.md`, `MEMORY.md`, any `CLAUDE*.md` or `GEMINI*.md`, and any name
+ * ending in `.mdc`, `.instructions.md`, `.prompt.md` or `.chatmode.md`. Such a file is itself
+ * no kind the check reads; its TEXT says which pages and stylesheets govern the work
+ * ({@link instructionText}).
+ * @param {string} lower the base name, lower case @returns {boolean}
+ */
+function governingName(lower) {
+  return ['agents.md', 'conventions.md', 'copilot-instructions.md', '.cursorrules', '.windsurfrules', 'iron_loop.md', 'skill.md', 'memory.md'].includes(lower)
+    || ((lower.startsWith('claude') || lower.startsWith('gemini')) && lower.endsWith('.md'))
+    || GOVERNING_ENDINGS.some((x) => lower.endsWith(x));
+}
+
+/**
+ * Rule 4, a page or stylesheet that an instruction file NAMES (the session coordinator's
+ * decision of 2026-10-10, B21). The text of every file of the LAST COMMIT that is governing
+ * by its name ({@link governingName}), in lower case and with every backslash taken out
+ * (`my\_rules.html`), each as it is written and with its percent-escapes read as the
+ * characters they spell (`my%20rules.html`). A judged page or stylesheet whose base name
+ * occurs anywhere in it never qualifies ({@link ruleRefusal}). A PLAIN SEARCH: no link, import
+ * or tag syntax is read, so a name in a sentence counts like a name in a link. The working
+ * folder's copies are never read. All blobs are read in one git call.
+ * KNOWN LIMIT: a folder an instruction file names does not make the files below it governing.
+ * @param {Context} ctx
+ * @returns {string}
+ */
+function instructionText(ctx) {
+  const top = /** @type {string} */ (ctx.top);
+  const ids = [];
+  for (const line of gitOut(ctx, top, ['ls-tree', '-r', '-z', '--full-tree', /** @type {string} */ (ctx.head)]).toString('utf8').split('\0')) {
+    const tab = line.indexOf('\t');
+    if (tab < 0) continue;
+    const [mode, type, id] = line.slice(0, tab).split(' ');
+    const base = path.posix.basename(line.slice(tab + 1));
+    if (type === 'blob' && mode !== '160000' && PATH_FORMS.some((form) => governingName(form(base).toLowerCase()))) ids.push(id);
+  }
+  if (ids.length === 0) return '';
+  // `cat-file --batch` answers each id with `<id> blob <size>`, a line feed, the bytes and a line feed.
+  const out = gitOut(ctx, top, ['cat-file', '--batch'], { input: Buffer.from(`${ids.join('\n')}\n`) });
+  const texts = [];
+  let at = 0;
+  for (let k = 0; k < ids.length; k++) {
+    const eol = out.indexOf(10, at);
+    const size = Number(out.toString('latin1', at, eol).split(' ')[2]);
+    if (eol < 0 || !Number.isInteger(size)) throw new Error('git cat-file answered in a form the check does not know');
+    const text = out.toString('utf8', eol + 1, eol + 1 + size).toLowerCase().replace(/\\/g, '');
+    texts.push(text, text.replace(/(?:%[0-9a-f][0-9a-f])+/g, percentRead));
+    at = eol + 1 + size + 1;
+  }
+  return texts.join('\n');
+}
+
+/** @param {string} run percent-escapes in a row @returns {string} the characters they spell, in lower case; a run that spells no UTF-8 stays as it is written */
+function percentRead(run) {
+  try {
+    return decodeURIComponent(run).toLowerCase();
+  } catch {
+    return run;
+  }
+}
+
 /**
  * Rule 1 — read the change: which files, their old and new text, and their changed-line
  * groups; in the `--run-tests` call also each file's first hash, taken before any rule
@@ -762,12 +832,13 @@ function readChange(root, named, ctx, runTests) {
   const hidden = files.find((f) => marked.has(f.topRel));
   if (hidden) throw new Unreadable(`${hidden.display} is marked in git's index as unchanged or skipped`);
 
+  const instructions = instructionText(ctx);
   // An added or a deleted path is refused by rule 2 whatever it holds, so nothing is staged
   // for such a change (the decision at review of 2026-10-09): `add --all` writes every file
   // it stages into the repository's object store, and a call that names no file would write
   // every untracked file there. Only the count of changed lines is still read, for the log.
   if (files.some((f) => f.status === 'A' || f.status === 'D')) {
-    return { files, lineCount: unstagedLineCount(ctx, files), root: realRoot, rootFromTop, top };
+    return { files, lineCount: unstagedLineCount(ctx, files), root: realRoot, rootFromTop, top, instructions };
   }
 
   // The judged bytes are exactly what `git add` stages: a temporary index holding the last
@@ -805,7 +876,7 @@ function readChange(root, named, ctx, runTests) {
     f.hunks = groups.get(f.topRel) || [];
     for (const h of f.hunks) lineCount += h.removed.length + h.added.length;
   }
-  return { files, lineCount, root: realRoot, rootFromTop, top };
+  return { files, lineCount, root: realRoot, rootFromTop, top, instructions };
 }
 
 /**
@@ -2107,10 +2178,11 @@ function kindAs(f, spelt) {
   const unrecognised = unrecognisedRefusal(d);
   const build = { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
   const named = namedKind(lowerBase, ext, topFolders);
-  // A place that governs the work: a governing folder, GitHub's assistant folders, and any
-  // folder or file name that holds `prompt` (`src/llm/system_prompt.html`: the tenth round).
+  // What governs the work: a governing folder, GitHub's assistant folders, any folder or file
+  // name that holds `prompt` (`src/llm/system_prompt.html`), and a file that an instruction
+  // file of the last commit names (the tenth round).
   const governing = topFolders.some((p, i) => GOVERNING_FOLDERS.has(p) || p.includes('prompt') || (p === '.github' && GITHUB_GOVERNING.has(topFolders[i + 1])))
-    || lowerBase.includes('prompt');
+    || lowerBase.includes('prompt') || f.named === true;
   const buildFolder = topFolders.some((p) => BUILD_FOLDERS.has(p));
 
   let kind = null;
@@ -2307,7 +2379,13 @@ function ruleRefusal(change) {
       if (r) return r;
     }
   }
+  // A change read from a repository carries the text of its instruction files; one that does
+  // not was read by nothing this check knows, and is never judged without it.
+  const instructions = change.instructions;
+  if (change.top && typeof instructions !== 'string') throw new Error('the change carries no text of the instruction files');
   for (const f of change.files) {
+    const base = path.posix.basename(f.topRel);
+    f.named = typeof instructions === 'string' && PATH_FORMS.some((form) => instructions.includes(form(base).toLowerCase()));
     const r = kindOf(f);
     if ('clause' in r) return r;
     f.kind = r.kind;

@@ -2506,12 +2506,14 @@ test('round 9: paths and names — governing folders, sensitive words in every s
     ['governing folder', 'site/output-styles/page.html', PAGE, un],
     ['governing folder', 'site/skills/page.html', PAGE, un],
     ['governing folder', '.claude/theme/page.css', COLOUR, un],
-    // 2. A file an instruction file links to. Until the tenth round such a file governed the
-    // work; the reader of links is taken out with the Markdown reader, a Markdown file is
-    // refused by its extension, and a linked page or stylesheet is judged like any other.
-    ['linked', 'docs/linked.md', ['Some words here.\n', 'Some other words here.\n'], un],
-    ['linked', 'site/linked page.html', PAGE, null],
-    ['linked', 'src/styles/linked.css', COLOUR, null],
+    // 2. A file an instruction file of the last commit names governs the work (B21: a plain
+    // search for its base name; the reader of link syntax is gone with the Markdown reader).
+    ['named', 'docs/linked.md', ['Some words here.\n', 'Some other words here.\n'], un],
+    ['named', 'site/linked one.html', PAGE, un],
+    ['named', 'src/styles/linked.css', COLOUR, un],
+    // The search is for the base name anywhere: `one.html` ends the name above, so it is named too.
+    ['named', 'site/one.html', PAGE, un],
+    ['named', 'site/unnamed.html', PAGE, null],
     // 3. A sensitive word behind capitals, a mark or a character nobody sees (red: `checking`).
     ['sensitive word', 'src/APIKey/page.html', PAGE, area('key')],
     ['sensitive word', 'src/SSOLogin/page.html', PAGE, area('login')],
@@ -2534,7 +2536,7 @@ test('round 9: paths and names — governing folders, sensitive words in every s
     ['mark and line ending', 'src/styles/ending.css', ['a { color: red; }\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n'], un],
     ['mark and line ending', 'src/styles/both.css', ['\ufeffa { color: red; }\r\n', '\ufeffa { color: blue; }\r\n'], null]
   ];
-  const base = { 'CLAUDE.md': '# Instructions\n\nRead [the guide](docs/linked.md) and [the page](<site/linked page.html>).\n@src/styles/linked.css\n',
+  const base = { 'CLAUDE.md': '# Instructions\n\nRead [the guide](docs/linked.md) and [the page](<site/linked one.html>).\n@src/styles/linked.css\n',
     'AGENTS.md': 'Follow [the colours](src/styles/linked.css).\n' };
   for (const [, p, [before]] of rows) base[p] = before;
   const root = makeRepo(base);
@@ -3159,4 +3161,54 @@ test('round 10, B12 and B14: a skipped test confirms nothing, and the test run i
   assertPass(await check(root, '--run-tests', 'src/pages/home.html'), ['src/pages/home.html']);
   t.mock.restoreAll();
   assert.deepEqual(asked, [{ wholeTree: true }, { wholeTree: true }, { wholeTree: true }], 'B14: the whole process tree ends at the time limit');
+});
+
+// B21 (the session coordinator, 2026-10-10, after the automated review of 63f0b47a): a page or
+// stylesheet an instruction file NAMES governs the work. A plain search: the file's base name
+// occurs anywhere in the last commit's text of a file that is governing by its name, compared
+// in lower case, with backslashes removed and percent-escapes decoded in the instruction text.
+// No link or import syntax is read. KNOWN LIMIT: a folder an instruction file names does not
+// make the files below it governing.
+test('round 10, B21: through the real menu process, a page or stylesheet that an instruction file names is refused, and one it does not name passes', () => {
+  const root = tmpDir();
+  git(root, ['init', '-q']);
+  const env = { ...process.env, TMPDIR: PRIVATE_TMP, TEMP: PRIVATE_TMP, TMP: PRIVATE_TMP };
+  delete env.CLAUDE_PROJECT_DIR;
+  delete env.NODE_TEST_CONTEXT;
+  assert.equal(spawnSync(NODE, [START], { cwd: root, encoding: 'utf8', env, timeout: 60000 }).status, 0);
+  const named = ['docs/rules.html', 'docs/linked.html', 'docs/anchor.html', 'docs/my_rules.html', 'docs/my rules.html', 'docs/plain.html', 'docs/cased.html',
+    'web/sheet.css', 'web/deep.html', 'docs/x%ffy.html'];
+  const free = ['docs/free.html', 'docs/folder/inside.html', 'web/free.css'];
+  const files = {
+    'CLAUDE.md': ['# Instructions', '', '@docs/rules.html', 'Read [the rules](docs/linked.html) and <a href="docs/anchor.html">this</a>.',
+      'Escaped: docs/my\\_rules.html and docs/my%20rules.html. Keep plain.html as it is, and DOCS/CASED.HTML too.', 'The folder docs/folder/ holds more.', 'Bytes that spell nothing stay as written: docs/x%FFy.html.', ''].join('\n'),
+    'web/sub/AGENTS.md': 'Colours live in sheet.css.\n',
+    'web/rules/style.mdc': 'See deep.html.\n',
+    'docs/notes.md': 'This file governs nothing: free.html and free.css are only mentioned here.\n'
+  };
+  for (const rel of [...named, ...free]) files[rel] = rel.endsWith('.css') ? 'a { color: red; }\n' : HOME;
+  writeFiles(root, files);
+  git(root, ['add', '-A']);
+  git(root, ['commit', '-q', '-m', 'base']);
+  const ask = (rel) => {
+    fs.writeFileSync(path.join(root, ...rel.split('/')), rel.endsWith('.css') ? 'a { color: blue; }\n' : HOME_STORE);
+    const run = spawnSync(NODE, [START, 'hotfix', 'check', rel], { cwd: root, encoding: 'utf8', env, timeout: 60000 });
+    assert.equal(run.status, 0, run.stderr);
+    return JSON.parse(run.stdout);
+  };
+  for (const rel of named) assert.equal(ask(rel).text, refusal(gone(rel)), rel);
+  for (const rel of free) assertChecking(ask(rel), [rel]);
+  // The text is the last commit's: a name taken out of the working folder's copy still counts, one added there does not.
+  fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# Instructions\n\nNow free.html is named.\n');
+  assert.equal(ask('docs/rules.html').text, refusal(gone('docs/rules.html')));
+  assertChecking(ask('docs/free.html'), ['docs/free.html']);
+});
+
+test('round 10, B21: a change read from a repository is never judged without the text of its instruction files', () => {
+  const change = () => changeOf('site/page.html', HOME, HOME_STORE);
+  assert.equal(ruleRefusal(change()), null, 'a change built by hand, with no repository, names none');
+  assert.throws(() => ruleRefusal({ ...change(), top: os.tmpdir() }), /no text of the instruction files/);
+  assert.throws(() => ruleRefusal({ ...change(), top: os.tmpdir(), instructions: ['page.html'] }), /no text of the instruction files/);
+  assert.equal(ruleRefusal({ ...change(), top: os.tmpdir(), instructions: 'nothing here' }), null);
+  assert.equal(reasonOf(ruleRefusal({ ...change(), top: os.tmpdir(), instructions: 'see page.html' })), 'I do not recognise site/page.html as wording or a colour');
 });

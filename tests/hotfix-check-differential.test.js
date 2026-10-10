@@ -1407,7 +1407,8 @@ test('witnesses: every refusal rule of the HTML reader refuses the one document 
 //
 // As above, for the rules about the wording of a page, stylesheets, paths, byte-order marks and
 // line endings: the smallest change that one rule, and no other, refuses. Each row is [the
-// rule, the reason it is refused for ({@link reasonOf}), the path, the old text, the new text].
+// rule, the reason it is refused for ({@link reasonOf}), the path, the old text, the new text,
+// what else the change carries].
 // Without a new text the word `alpha` becomes `zulu`, or, in a file that holds no `alpha`, the
 // colour `red` becomes `blue`. To prove that a witness bites, weaken its rule in a scratch copy
 // of `src/lib/hotfix-check.js` and run this test against the copy: that witness must then
@@ -1473,6 +1474,8 @@ const LATER_WITNESSES = [
   ['a sensitive word counts anywhere inside a part of the path', 'area deploy', 'src/pages/deployment.html', PAGE],
   ['security is a sensitive word', 'area security', 'src/security/page.html', PAGE],
   ['a part of the path that holds `prompt` governs the work', 'unrecognised', 'src/llm/system_prompt.html', PAGE],
+  ['a file an instruction file names governs the work', 'unrecognised', 'docs/rules.html', PAGE, undefined, { top: os.tmpdir(), instructions: 'read docs/rules.html first' }],
+  ['a file an instruction file names governs the work', 'unrecognised', 'docs/Rules.css', COLOUR, undefined, { top: os.tmpdir(), instructions: '@docs/rules.css' }],
   ['a page or stylesheet in a dot-folder never qualifies', 'unrecognised', '.storybook/page.html', PAGE],
   ['a path is asked as its letters read', 'area payment', 'src/payZWSPment/page.html', PAGE],
   ['a path is asked as its letters read', 'area payment', 'src/pAACUTEyment/page.html', PAGE],
@@ -1506,11 +1509,11 @@ test('witnesses of the ninth and tenth rounds: every refusal rule they added ref
     assert.equal(judgeAt(rel, text, edited), null, `the plain change of ${rel} passes`);
   }
   const wrong = [];
-  for (const [rule, reason, rel, before, after] of LATER_WITNESSES) {
+  for (const [rule, reason, rel, before, after, carried = {}] of LATER_WITNESSES) {
     const oldText = spelt(before);
     const newText = spelt(after === undefined ? (before.includes('alpha') ? before.replace('alpha', 'zulu') : before.replace('red', 'blue')) : after);
     assert.notEqual(newText, oldText, `${rule}: the witness holds an edit`);
-    const given = reasonOf(judgeAt(spelt(rel), oldText, newText));
+    const given = reasonOf(judgeAt(spelt(rel), oldText, newText, carried));
     if (given !== reason) wrong.push(`${rule}: ${spelt(rel)} ${JSON.stringify(oldText)} answered "${given}", not "${reason}"`);
   }
   t.diagnostic(`${LATER_WITNESSES.length} witnesses for ${new Set(LATER_WITNESSES.map((w) => w[0])).size} rules`);

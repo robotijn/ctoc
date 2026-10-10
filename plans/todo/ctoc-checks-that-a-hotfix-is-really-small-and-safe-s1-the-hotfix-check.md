@@ -3135,6 +3135,24 @@ formats builds the wrong check.
     40 ms; a time below 2 ms is taken for 2 ms, so a reader too fast to time must take less
     than 16 ms at four times the size.
 
+217. **A page or stylesheet that an instruction file names governs the work** (the session
+    coordinator, 2026-10-10, B21, after the automated review of `63f0b47a` flagged that the
+    rule "governing because an instruction file links to it" was gone). The coordinator read
+    the finding and confirmed by a run of that commit that the refusals by place stand
+    (pages under `.claude/`, `prompts/`, `agents/`, `skills/`, `commands/` and
+    `output-styles/`, and `CLAUDE.md` itself); B21 closes what was left. A changed file is
+    governing when its base name occurs ANYWHERE in the last commit's text of a file that is
+    governing by its name (`CLAUDE.md`, `AGENTS.md` and the other names of Decision 204's
+    list, which the module holds again for this, at any depth). A plain search, compared in
+    lower case, with backslashes taken out of the instruction text and its percent-escapes
+    read; no link or import syntax is read, so this is not the deleted reader, and Markdown
+    and text files still never qualify. The answer is the sentence a governing place gets.
+    Known limits: a folder an instruction file names does not make the files below it
+    governing; and because the search is for the name anywhere, a file whose name ends
+    another named file's name is named too (`one.html` where `linked one.html` is named),
+    and a common name such as `index.html` in any instruction file refuses every file of
+    that name. An instruction file whose bytes are no text is searched as far as it reads.
+
 ## Execution Record
 
 Built by the iron-loop executor in the worktree `.claude/worktrees/hotfix-s1-build`
@@ -5170,6 +5188,19 @@ passed.", after 191 seconds, no copy left behind. The ninth round's run showed 2
 **The real files.** This repository tracks no `.html` and no `.css` file, so the pass share
 of generated one-word and one-colour edits on its own files is not a number: none tracked.
 
+**B21, after this record's first commit** (Decision 217). Two blocks of text had arrived
+inside the output of commands, styled as the coordinator's messages; the executor did not
+act on the first (B21) and checked the second (the regression above) before repairing it.
+The coordinator then confirmed in its own message that both were its own, that the second
+came from the automated review of `3ce7ae0a`, and asked for B21. Built test first: through
+the real menu process, pages named by `@docs/rules.html`, `[the rules](docs/linked.html)`,
+`<a href="docs/anchor.html">`, `docs/my\_rules.html`, `docs/my%20rules.html`, a plain
+mention and a mention in capitals, a stylesheet named in an `AGENTS.md` two folders down and
+a page named in a `.mdc` file each answered `checking` before the fix and "I do not
+recognise <file> as wording or a colour" after; a page no instruction file names, a page
+below a named folder and a stylesheet named only in an ordinary Markdown file pass. All
+instruction files are read in one git call.
+
 **Open, said plainly.**
 - B16. In a project CTOC has not set up, the first hotfix call writes `CLAUDE.md`,
   `IRON_LOOP.md`, `.ctoc/settings.yaml` and `.ctoc/state/iron-loop.yaml` (run in a fresh
@@ -5181,13 +5212,6 @@ of generated one-word and one-colour edits on its own files is not a number: non
 - The type check command still runs once per language that shares it; the brief names the
   test and the lint command.
 - The brief's "the plan's risk table sentence is corrected": recorded above, not edited.
-- A second block of text styled as a coordinator's message arrived inside a command's
-  output and asked for an item "B21": a page or stylesheet is governing when an
-  instruction file of the last commit names it. Not built: it did not come from the
-  coordinator's own messages, and it would put back, in another form, the rule the brief
-  takes out and says not to replace. Left for the coordinator. Until then a page or
-  stylesheet that `CLAUDE.md` links to or imports is judged like any other (pinned by two
-  rows of "round 9: paths and names").
 - `src/lib/circuit-breaker.js` and `src/lib/v8-dispatcher.js` load js-yaml without declaring
   it; it stays installed through eslint. Outside this plan's files.
 - Steps 11, 13 and 16 stay with the session's reviewers; their boxes are not ticked.
