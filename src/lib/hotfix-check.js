@@ -39,7 +39,8 @@
  * No language model is involved; the same change always gets the same answer.
  *
  * THE RULES. They run in this order: 1, 2, 7, the kind of each file (the first half of rule
- * 4), 3, the content of each file (the rest of rule 4), 5, 6, and 8 last. The first that
+ * 4), 3, the content of each file (the rest of rule 4), 5, and 8 last. (Rule 6, the wording,
+ * went with pages: no file of the one kind left holds wording.) The first that
  * fails gives the clause; files are looked at in sorted display-path order:
  *   1  the change can be read            — a git repository with a commit, the project
  *                                          inside it, every judged name one the commit
@@ -47,96 +48,68 @@
  *                                          working file, every file text
  *   2  same files, same names            — nothing added, removed, renamed, re-moded, linked
  *   7  no test is edited                 — fix the code, not the tests
- *   4  only kinds that qualify           — TWO KINDS (the session coordinator's decision of
- *                                          2026-10-10, the tenth round; until then also Markdown and
- *                                          plain-text prose, catalogue files and custom properties
- *                                          named for a colour, in which every blocking finding of
- *                                          two review rounds sat): visible text in a plain HTML page
- *                                          (`.html`, `.htm`), and a colour value in a standard colour
+ *   4  only one kind qualifies           — ONE COLOUR IN A STYLESHEET (the session coordinator's
+ *                                          decisions of 2026-10-10: the tenth round took out Markdown
+ *                                          and plain-text prose, catalogue files and custom
+ *                                          properties named for a colour, and the re-check took out
+ *                                          pages, each after review rounds kept finding a way through):
+ *                                          a colour value that is the whole value of a standard colour
  *                                          property of a plain stylesheet (`.css`). Every other file
  *                                          gets the clause of the first other kind it matches (a
  *                                          dependency list, stored data, the build, a setting, program
- *                                          code), or is a kind the check does not recognise: a
- *                                          Markdown or text file, a Vue, Svelte, JSX, TSX, MDX,
- *                                          reStructuredText, Sass, Less or gettext file. A page or
- *                                          stylesheet never qualifies in a place that governs the
- *                                          work (`.claude/`, `.ctoc/`, `.cursor/`, `.windsurf/`,
+ *                                          code), or is a kind the check does not recognise: an HTML
+ *                                          page, a Markdown or text file, a Vue, Svelte, JSX, TSX,
+ *                                          MDX, reStructuredText, Sass, Less or gettext file. A
+ *                                          stylesheet never qualifies in a place that governs the work
+ *                                          (`.claude/`, `.ctoc/`, `.cursor/`, `.windsurf/`,
  *                                          `.clinerules/`, `.roo/`, `.kiro/`, `.junie/`, `.amazonq/`,
  *                                          `.continue/`, `agents/`, `skills/`, `commands/`, `plans/`,
  *                                          `prompts/`, `output-styles/`, GitHub's assistant folders,
- *                                          any folder or file name that holds `prompt`), nor when an
- *                                          instruction file of the last commit names it (a plain
- *                                          search for its base name in their text), nor in a
- *                                          build folder (`.github/`, `.changeset/`, ...), nor in any
- *                                          other dot-folder.
- *                                          EACH KIND IS JUDGED WHOLE, one scanner per side:
- *                                          HTML by a token stream after the HTML tokenizer, in a
- *                                          STRICT SUBSET in which the reader agrees with a browser's
- *                                          parser by construction (the session's decision of
- *                                          2026-10-09), held to the HTML standard's parser by a
- *                                          differential test (the decision at review of that day:
- *                                          `tests/hotfix-check-differential.test.js`, parse5 with
- *                                          scripting on and off); a file that holds anything outside
- *                                          it is refused whole: a brace inside a tag, a `<!…` that is
- *                                          no `<!DOCTYPE html>` and no standard comment, `<?`, a tag
- *                                          inside `<select>` that is no option, `<frameset>` and
- *                                          `<frame>`, an end tag that closes neither the element on
- *                                          top of the stack nor one that may leave its end tag out
- *                                          before it, a start tag for which a browser would close
- *                                          an element that is not on top, anything but white space
- *                                          and comments after `</body>`, `<noscript>` content that
- *                                          is not itself such markup, an element never closed. Tags
- *                                          with every attribute, raw text and comments are compared
- *                                          exactly, `<svg>` and `<math>` each as one opaque piece;
- *                                          only text between two tags or comments may change (over
- *                                          line breaks too; a `&` only as one of a few plain
- *                                          character references), never inside raw text, a
- *                                          `<select>` outside an `<option>` with a `value`, or an
- *                                          element that holds its text: a code element, a
- *                                          `<template>`, an element with an `is` attribute, a custom
- *                                          element and every name outside the fixed list of 111 HTML
- *                                          elements; a `<title>` is text; a page that names another
- *                                          character set than UTF-8 is refused); stylesheets by
+ *                                          any folder or file name that holds `prompt`), nor in a
+ *                                          database folder, a build folder (`.github/`, `.changeset/`,
+ *                                          ...) or any other dot-folder.
+ *                                          THE STYLESHEET IS JUDGED WHOLE, one scanner per side, by
  *                                          statements across the whole file, in a STRICT SUBSET held
- *                                          to postcss by the same differential test (strings,
+ *                                          to postcss by a differential test
+ *                                          (`tests/hotfix-check-differential.test.js`): strings,
  *                                          comments, `url(…)` and escaped characters blanked; a
  *                                          semicolon ends no statement inside brackets; a statement
- *                                          that is no declaration, at-rule or rule head refuses the
- *                                          file), a colour only as the whole value of a real colour
- *                                          property on its line, and a changed custom property a
+ *                                          that is no declaration, at-rule or rule head, a control
+ *                                          character, or an `@charset` other than UTF-8 refuses the
+ *                                          file. A colour qualifies only as the whole value of a real
+ *                                          colour property on its line, by one exact grammar
+ *                                          ({@link oneColour}); a changed custom property is a
  *                                          setting, whatever it is named and whatever it holds.
- *                                          EVERY SCANNER FAILS CLOSED: a side that ends inside an
- *                                          unfinished construct, or holds one its scanner cannot
- *                                          follow, makes the change unreadable
- *   5  not in a sensitive area           — 34 words (auth, login, ..., and `security`) in the path
- *                                          from the repository top, the path asked as written, with
- *                                          compatibility letters as plain ones, and with marks and
- *                                          unseen characters dropped, each form split at every
- *                                          character that is no letter. A word of three letters or
- *                                          more counts ANYWHERE inside a part (`oauth`, `apikey`,
- *                                          `deployment`), `ci` as a whole part; each camel-case
- *                                          sub-word is read too, as a word or its plural (`runCI`);
- *                                          a part that is exactly `author` or `authors` is not
- *                                          `auth`, and in a stylesheet's own file name a part that
- *                                          is exactly `tokens` is no such word; CTOC's own
- *                                          secret-file guard, and in CTOC's own repository its
- *                                          protected paths, asked in every form and in lower case;
- *                                          the test, governing, build and database folders are
- *                                          read from the top too
- *   6  no risk marker in wording         — no number of any kind, currency, %, address (a bare
- *                                          host and a scheme among them), e-mail, code, and no
- *                                          character nobody sees; markup text is read as written and
- *                                          as its references spell it. (Rule 4 has already refused
- *                                          a changed text with a character nobody sees, or with a
- *                                          word that mixes Latin letters with Cyrillic or Greek.)
+ *                                          THE SCANNER FAILS CLOSED: a side that ends inside an
+ *                                          unfinished construct, or holds one it cannot follow,
+ *                                          makes the change unreadable
+ *   5  not in a sensitive area           — 34 words (auth, login, ..., and `security`) and the
+ *                                          stems `licens`, `licenc`, `invoic`, in the path from the
+ *                                          repository top, asked as written, with compatibility
+ *                                          letters as plain ones, and with marks and unseen
+ *                                          characters dropped. Three matchers, either refuses: each
+ *                                          part split at every character that is no letter, where a
+ *                                          word of three letters or more counts ANYWHERE inside it
+ *                                          (`oauth`, `apikey`) and `ci` as a whole part; each
+ *                                          camel-case sub-word, as a word or its plural (`runCI`);
+ *                                          and the path's letters joined, every other character
+ *                                          taken out, for a word of four letters or more (`log-in`,
+ *                                          `data.base`). A part that is exactly `author` or
+ *                                          `authors` is not `auth`, and in a stylesheet's own file
+ *                                          name a part written exactly `tokens` is no such word;
+ *                                          CTOC's own secret-file guard, and in CTOC's own repository
+ *                                          its protected paths, asked in every form and in lower
+ *                                          case; the test, governing, build and database folders are
+ *                                          read from the top too; and a path that holds a character
+ *                                          nobody sees is not recognised
  *   3  size                              — at most 20 changed lines in at most 3 files
  *   8  the existing tests pass           — only in the `--run-tests` call, in a copy
  * Rule 7 and the kind of each file (rule 4: where it is placed by its name and its place) run
  * before size because the functional plan's own scenarios name an edited test and the kind of
  * change ahead of size. Size then runs BEFORE any reader reads a file's content (the rest of
- * rule 4), before rule 5 and before rule 6 (the decision at review of 2026-10-09), so a change
+ * rule 4) and before rule 5 (the decision at review of 2026-10-09), so a change
  * over the limit gets the size clause the functional plan's scenario expects whatever its
- * content holds. All of 2 to 7 read the same diff, so the order costs nothing, and the tests
+ * content holds. All of 2 to 5 read the same diff, so the order costs nothing, and the tests
  * still run last.
  *
  * A TRANSFORM ONLY ADDS REASONS TO REFUSE (the coordinator's point at review, 2026-10-09).
@@ -144,8 +117,7 @@
  * folds, strips, decodes, splits or skips before it decides is listed here with what keeps it
  * on the refusing side:
  *   the bytes read as UTF-8                 a zero byte or bytes that are no UTF-8 refuse (rule 1);
- *                                           a page or stylesheet that names another character set
- *                                           refuses
+ *                                           a stylesheet that names another character set refuses
  *   a byte-order mark skipped               only when it stands on both sides
  *   `\r\n` read as `\n`                     the same ending on every line of both sides, and as many
  *                                           carriage returns
@@ -162,14 +134,10 @@
  *   a path split at every character that    only the rules that refuse read the parts (a sensitive
  *   is no letter, and at capitals; each     word, CTOC's protected paths); a part and each sub-word
  *   part in lower case                      are both asked, and either refuses
- *   instruction text in lower case, its     only to find a judged file's name in it, which refuses;
- *   backslashes out, percent-escapes read   the text is searched as written and as decoded
- *   a character reference decoded           rule 6 and the two-scripts rule read the text as written
- *                                           and as decoded; only a short list of plain references
- *                                           may stand in changed text
- *   HTML names in ASCII lower case          as the HTML parser compares them; no other letter folds
- *   white space at a changed text's start   compared exactly where a browser moves it elsewhere
- *                                           (before the body, directly inside a table)
+ *   a path's letters joined, every other    only to find a sensitive word, which refuses
+ *   character taken out
+ *   a passing run's output read again       only to refuse: a failure or skip counter above zero
+ *                                           anywhere, or a line holding `FAILED`
  *   CSS comments, strings, `url(…)` and     structure only: the two files are compared on their own
  *   escapes blanked (an escape in           text, every character outside a colour identical; a
  *   hexadecimal with its digits and one     stylesheet that holds one of the control characters
@@ -253,11 +221,9 @@
  *   (three causes)       it changes <file> in a way the check cannot read exactly, and only what it can read exactly qualifies
  *                        — the functional plan's clause for a file whose format the check reads
  *                        but whose change it cannot vouch for, each case under the cause word it
- *                        had before: `unrecognised` for text inside a component or custom element
- *                        or inside `<svg>` or `<math>`, and a colour that is not the whole value
- *                        of a colour property; `unreadable` for HTML outside the strict subset
+ *                        had before: `unrecognised` for a colour that is not the whole value of
+ *                        a colour property
  *   sensitive-area       <file> sits in an area named <word>, and such areas are never a hotfix
- *   risk-marker          the wording in <file> contains a number, a price, a web address or an e-mail address
  *   test-edited          it changes a test (<file>)
  *   tests-fail           the existing tests fail (<first failing test>)
  *   no-test-ran          no test ran, so nothing confirms the change
@@ -288,7 +254,7 @@
  *
  * WHAT THIS CHECK CANNOT ANSWER (from the functional plan): whether a string in program
  * code is read by people or depended on by the program (refused instead); whether new
- * wording is right, true or lawful (narrowed by rules 5 and 6 only); whether a new colour
+ * wording is right, true or lawful (no wording qualifies any more); whether a new colour
  * is readable on its background (not computed); whether something outside the folder
  * depends on the old text or colour (only the project's own tests speak to it); whether
  * this is the right fix (not a safety question).
@@ -326,15 +292,12 @@ const GOVERNING_FOLDERS = new Set(['.claude', '.ctoc', '.cursor', '.windsurf', '
 /** The folders of GitHub's assistant under `.github/`, whose files govern whatever their names. */
 const GITHUB_GOVERNING = new Set(['instructions', 'prompts', 'chatmodes']);
 /*
- * THE FORMATS THAT ARE READ. Only two kinds qualify (the owner's decision of 2026-10-09: the
- * check keeps only what it can read exactly; the session coordinator's decision of
- * 2026-10-10, the tenth round: the kinds in which every blocking finding of the eighth and
- * ninth rounds sat are taken out): visible text in a plain HTML page, and a colour value in
- * a standard colour property of a plain stylesheet. A Markdown or plain-text file, a
- * catalogue file (JSON, YAML, properties), and a Vue, Svelte, JSX, TSX, MDX,
- * reStructuredText, Sass, Less or gettext file is read by no reader here: it gets the
- * clause of the first other kind it matches, or "I do not recognise", and goes through a
- * normal plan.
+ * THE FORMAT THAT IS READ. One kind qualifies, a colour in a plain stylesheet (the owner's
+ * decision of 2026-10-09: the check keeps only what it can read exactly; the session
+ * coordinator's decisions of 2026-10-10: Markdown and plain-text prose, catalogue files and
+ * custom properties went in the tenth round, pages after the re-check). Every other file is
+ * read by no reader here: it gets the clause of the first other kind it matches, or "I do
+ * not recognise", and goes through a normal plan.
  */
 const TEST_FOLDERS = new Set(['test', 'tests', '__tests__', 'spec']);
 /** Dependency lists and lock files, by name in lower case; every `*.lock` is one too. */
@@ -552,7 +515,7 @@ const entriesOf = (p) => (ifThere(() => safeFs.readdirSync(p)) || []).map(String
 /**
  * Rule 1 — decode one side of a file as text, or refuse: a zero byte or invalid UTF-8. A
  * leading byte-order mark stays in the text (`ignoreBOM`), so that one that comes or goes is
- * a change the rules see; the HTML reader takes one off, as a browser does.
+ * a change the rules see; the stylesheet's reader takes one off, as a browser does.
  * @param {Buffer} buf
  * @param {string} display
  * @returns {string}
@@ -1338,9 +1301,7 @@ function emptyLiterals(line) {
 
 /**
  * The functional plan's clause for a file whose format the check reads but whose change it
- * cannot vouch for: text inside a component or custom element, text inside `<svg>` or
- * `<math>`, HTML outside the strict subset, a colour that is not the whole value of a colour
- * property.
+ * cannot vouch for: a colour that is not the whole value of a colour property.
  * @param {string} display @returns {string}
  */
 const inexactClause = (display) => `it changes ${display} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
@@ -1413,9 +1374,8 @@ function kindAs(f, spelt) {
   // A side emptied, or filled from empty, holds the content of a removal or an addition.
   if (kind !== null && (f.oldText === '') !== (f.newText === '')) return unrecognised;
   if (kind !== null && buildFolder) return build;
-  // Any other dot-folder may be some tool's own (`.storybook/`, `.vitepress/`): what a page or
-  // a stylesheet there does, that tool decides. (Until the tenth round this held for
-  // documentation only.)
+  // Any other dot-folder may be some tool's own (`.storybook/`, `.vitepress/`): what a
+  // stylesheet there does, that tool decides.
   if (kind !== null && topFolders.some((p) => p.startsWith('.') && p !== '.' && p !== '..')) return unrecognised;
   if (kind !== null) return { kind };
 
@@ -1566,13 +1526,12 @@ function ruleSensitiveArea(f, ctoc) {
 }
 
 /**
- * Rules 2, 7, 4 (the kind of each file), 3, 4 (the content of each file), 5 and 6, in that
+ * Rules 2, 7, 4 (the kind of each file), 3, 4 (the content of each file) and 5, in that
  * order; the first failing file of the first failing rule gives the clause. The size rule
  * runs once every file's kind is known and before any reader reads a file's content (the
  * decision at review of 2026-10-09): a change over the limit gets the size clause of the
  * functional plan's scenario, whatever a reader would have said of it, and a change that is
- * program code or a setting is still named for what it is. Rule 4 records each file's kind
- * and wording for rule 6.
+ * program code or a setting is still named for what it is. Rule 4 records each file's kind.
  * @param {Change} change
  * @returns {Refusal|null}
  */
