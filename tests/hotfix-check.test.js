@@ -2929,3 +2929,90 @@ test('round 10: through the real menu process, an imported instruction file, a c
     }
   }
 });
+
+// The tenth round, fixes in what stays (the session coordinator's brief of 2026-10-10, part B).
+// Each case was written, run and seen failing before its fix; the plan's record ("Fix round
+// 10") holds what each answered before.
+const pageWith = (text) => HOME.replace('Save', text);
+const reasonOf = (refused) => (refused === null ? 'passed' : refused.clause);
+const NOT_WORDING = 'I do not recognise src/pages/home.html as wording or a colour';
+const RISK = 'the wording in src/pages/home.html contains a number, a price, a web address or an e-mail address';
+
+test('round 10, B1 to B3: a character nobody sees, letters of two scripts in one word, and a price', () => {
+  const judgeText = (before, after) => reasonOf(ruleRefusal(changeOf('src/pages/home.html', pageWith(before), pageWith(after))));
+  // B1. A character nobody sees: default-ignorable code points (the Hangul filler, the combining
+  // grapheme joiner, a variation selector), a lone surrogate, a private-use and an unassigned
+  // code point, the line and paragraph separators, the blank Braille pattern, two non-characters.
+  const unseen = { 'the Hangul filler': 'ㅤ', 'the combining grapheme joiner': '͏', 'a variation selector': '\u{e0101}', 'a lone surrogate': '\ud800',
+    'a private-use character': '', 'an unassigned code point': '͸', 'the line separator': ' ', 'the paragraph separator': ' ',
+    'the blank Braille pattern': '⠀', 'the non-character U+FFFE': '￾', 'the non-character U+FFFF': '￿', 'a zero-width space': '​' };
+  for (const [name, character] of Object.entries(unseen)) {
+    assert.equal(judgeText('Save', `Sa${character}ve`), NOT_WORDING, `${name} in the new text`);
+    assert.equal(judgeText(`Sa${character}ve`, 'Save'), NOT_WORDING, `${name} in the old text`);
+  }
+  // B2. A run of letters that mixes Latin with Cyrillic or Greek.
+  assert.equal(judgeText('Pay', 'Pаy'), NOT_WORDING, 'a Cyrillic letter in a Latin word');
+  assert.equal(judgeText('Pay', 'Ρay'), NOT_WORDING, 'a Greek letter in a Latin word');
+  assert.equal(judgeText('Pay', 'Páу'), NOT_WORDING, 'a mark between them does not part the word');
+  // One script per word passes, in any script, and so do two words of two scripts.
+  for (const text of ['Привет', 'Καλημέρα', 'Save Привет', 'café naïve', 'Save-мир']) {
+    assert.equal(judgeText('Save', text), 'passed', text);
+  }
+  // B3. `$` is decided once, by the number-and-price rule, as `€` is.
+  assert.equal(judgeText('Only five', 'Only $5'), RISK);
+  assert.equal(judgeText('Only five', 'Only €5'), RISK);
+  assert.equal(judgeText('Only five', 'Only $five'), RISK);
+});
+
+test('round 10, B4: guards closed by construction', async (t) => {
+  const page = () => changeOf('src/pages/home.html', HOME, HOME_STORE);
+  await t.test('a kind no reader is written for stops the check, never another reader', () => {
+    for (const kind of ['catalogue', 'documentation', 'toString', undefined]) {
+      const change = page();
+      Object.defineProperty(change.files[0], 'kind', { get: () => kind, set() {} });
+      assert.throws(() => ruleRefusal(change), /no reader for the kind/, String(kind));
+    }
+  });
+  await t.test('a page with no changed text is no pass of nothing', () => {
+    // git gives no such change; a caller that hands over changed lines beside equal texts gets a refusal.
+    const change = page();
+    change.files[0].newText = HOME;
+    assert.equal(reasonOf(ruleRefusal(change)), NOT_WORDING);
+  });
+  await t.test('CTOC\'s protected paths are asked in every form of the path, and without regard to letter case', async () => {
+    const files = { 'package.json': '{ "name": "ctoc" }\n', 'CLAUDE.md': '# CTOC Project Instructions\n', '.ctoc/keep.json': '{}\n' };
+    const area = (f) => refusal(`${f} sits in an area named enforcement, and such areas are never a hotfix`);
+    for (const rel of ['src/hooks/notes.html', 'src/Hooks/notes.html', 'SRC/HOOKS/notes.html', 'src/hoo​ks/notes.html', 'src/ｈooks/notes.html']) {
+      const root = makeRepo({ ...files, [rel]: HOME });
+      fs.writeFileSync(path.join(root, ...rel.split('/')), HOME_STORE);
+      assert.equal((await check(root, rel)).text, area(rel), JSON.stringify(rel));
+    }
+  });
+  await t.test('a package folder that cannot be listed, or an install record that cannot be read, stops the check: only "does not exist" passes', async () => {
+    const denied = () => { throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' }); };
+    const site = process.platform === 'win32' ? ['.venv', 'Lib', 'site-packages'] : ['.venv', 'lib', 'python3.12', 'site-packages'];
+    const root = workspaceProject('greet', 'greet', { '.gitignore': 'node_modules/\n.venv/\n' });
+    writeFiles(root, { '.venv/pyvenv.cfg': 'home = /usr/bin\n', [`${site.join('/')}/_x.pth`]: '# nothing\n' });
+    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+    const real = { readdir: safeFs.readdirSync, read: safeFs.readFileSync, lstat: safeFs.lstatSync };
+    const inWorkingFolder = (p) => String(p).startsWith(root);
+    const faults = [
+      ['the folder of installed packages cannot be listed', () => t.mock.method(safeFs, 'readdirSync', (p, ...rest) => (inWorkingFolder(p) && String(p).endsWith('node_modules') ? denied() : real.readdir(p, ...rest)))],
+      ['an install record cannot be read', () => t.mock.method(safeFs, 'readFileSync', (p, ...rest) => (String(p).endsWith('_x.pth') ? denied() : real.read(p, ...rest)))],
+      ['an entry of the folder cannot be looked at', () => t.mock.method(safeFs, 'lstatSync', (p, ...rest) => (inWorkingFolder(p) && String(p).endsWith(path.join('node_modules', 'greet')) ? denied() : real.lstat(p, ...rest)))]
+    ];
+    for (const [what, inject] of faults) {
+      inject();
+      let res;
+      try {
+        res = await check(root, '--run-tests', 'src/pages/home.html');
+      } finally {
+        t.mock.restoreAll();
+      }
+      assert.equal(res.text, unreadable('the check stopped'), what);
+      assert.match(res.detail, /EACCES/, what);
+    }
+    // With nothing injected the same change passes: what does not exist is no fault.
+    assertPass(await check(root, '--run-tests', 'src/pages/home.html'), ['src/pages/home.html']);
+  });
+});

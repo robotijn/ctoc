@@ -1461,6 +1461,17 @@ const LATER_WITNESSES = [
   ['a test folder is found in every form of the path', 'test', 'teZWSPsts/page.html', PAGE],
   ['a governing folder is found in every form of the path', 'unrecognised', 'promZWSPpts/page.html', PAGE],
   ['a page or stylesheet is one as its name is written', 'unrecognised', 'site/page.htZWSPml', PAGE],
+  // Markup: what the tenth round added.
+  ['a default-ignorable character is one nobody sees: the Hangul filler', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u3164</p>'],
+  ['a default-ignorable character is one nobody sees: the combining grapheme joiner', 'unrecognised', HTML_FILE, PAGE, '<p>zu\u034flu</p>'],
+  ['a default-ignorable character is one nobody sees: a variation selector', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u{e0101}</p>'],
+  ['a private-use or unassigned code point is a character nobody sees', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\ue000</p>'],
+  ['a private-use or unassigned code point is a character nobody sees', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u0378</p>'],
+  ['a line or paragraph separator is a character nobody sees', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u2028</p>'],
+  ['the blank Braille pattern is a character nobody sees', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u2800</p>'],
+  ['no word mixes Latin letters with Cyrillic or Greek ones', 'unrecognised', HTML_FILE, PAGE, '<p>zul\u0430</p>'],
+  ['no word mixes Latin letters with Cyrillic or Greek ones', 'unrecognised', HTML_FILE, PAGE, '<p>\u0396ulu</p>'],
+  ['a dollar sign is a price: rule 6 says so', 'risk', HTML_FILE, PAGE, '<p>$zulu</p>'],
   // Markup: what the ninth round added.
   ['a changed text is read as its references spell it', 'risk', HTML_FILE, '<p>alpha&shy;beta</p>'],
   ['a page names no character set but UTF-8', 'subset', HTML_FILE, '<meta charset="shift_jis"><p>alpha</p>']

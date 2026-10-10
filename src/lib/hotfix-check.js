@@ -502,30 +502,31 @@ const clean = (s) => String(s).replace(CONTROL_CHARS, ' ').trim().slice(0, 200);
 /** @param {*} err @returns {string} */
 const messageOf = (err) => (err && err.message ? err.message : String(err));
 
-/** @param {string} p @returns {(import('fs').Stats|null)} the entry itself (a link is not followed), or null */
-function lstatOrNull(p) {
+/**
+ * @param {*} err @returns {boolean} the failure says the path does not exist (no such entry, or
+ * a part of the path is no folder). ONLY THAT passes a guard that asks whether something is
+ * there (the code review of the ninth round): a folder that cannot be listed or an entry that
+ * cannot be looked at is a fault, and the check stops.
+ */
+const doesNotExist = (err) => Boolean(err) && (err.code === 'ENOENT' || err.code === 'ENOTDIR');
+/**
+ * @template T @param {() => T} look @returns {(T|null)} what `look` answers, or null when the path
+ * does not exist ({@link doesNotExist}); every other failure is thrown on
+ */
+function ifThere(look) {
   try {
-    return safeFs.lstatSync(p);
-  } catch {
-    return null;
+    return look();
+  } catch (err) {
+    if (doesNotExist(err)) return null;
+    throw err;
   }
 }
-/** @param {string} p @returns {(import('fs').Stats|null)} what the path leads to (a link is followed), or null */
-function statOrNull(p) {
-  try {
-    return safeFs.statSync(p);
-  } catch {
-    return null;
-  }
-}
-/** @param {string} p @returns {string[]} the folder's entries, or none */
-function entriesOf(p) {
-  try {
-    return safeFs.readdirSync(p).map(String);
-  } catch {
-    return [];
-  }
-}
+/** @param {string} p @returns {(import('fs').Stats|null)} the entry itself (a link is not followed), or null when there is none */
+const lstatOrNull = (p) => ifThere(() => safeFs.lstatSync(p));
+/** @param {string} p @returns {(import('fs').Stats|null)} what the path leads to (a link is followed), or null when it leads nowhere */
+const statOrNull = (p) => ifThere(() => safeFs.statSync(p));
+/** @param {string} p @returns {string[]} the folder's entries, or none when there is no such folder */
+const entriesOf = (p) => (ifThere(() => safeFs.readdirSync(p)) || []).map(String);
 
 /**
  * Rule 1 — decode one side of a file as text, or refuse: a zero byte or invalid UTF-8. A
@@ -1563,14 +1564,37 @@ function changedTexts(a, b, wording) {
   return { runs, inexact: false };
 }
 
-/** Characters a markup text token never holds when it changes (template and script starts, a lone `<`). */
-const MARKUP_TEXT_BAD = /[{}$`<]/;
+/** Characters a markup text token never holds when it changes (template and script starts, a lone `<`). `$` is not among them: rule 6 decides it, with its own sentence, as it decides `€`. */
+const MARKUP_TEXT_BAD = /[{}`<]/;
 /**
- * A character of the control or format categories other than a tab, line feed, form feed or
- * carriage return: an escape, a right-to-left override, a zero-width or a tag character. A
- * changed text token holds none: a reader does not see them, and a terminal or a browser acts on them.
+ * A CHARACTER NOBODY SEES. A changed text token holds none: a reader does not see them, and a
+ * terminal, a browser or a search acts on them. Every control and format character other than
+ * a tab, line feed, form feed or carriage return (an escape, a right-to-left override, a
+ * zero-width or a tag character); every default-ignorable code point (the Hangul fillers, the
+ * combining grapheme joiner, the variation selectors); a lone surrogate, a private-use and an
+ * unassigned code point (the non-characters U+FFFE and U+FFFF among them); the line and the
+ * paragraph separator; and the blank Braille pattern, which is drawn as nothing.
  */
-const UNSEEN_CHARACTER = /(?![\t\n\f\r])[\p{Cc}\p{Cf}]/u;
+const UNSEEN_CHARACTER = /(?![\t\n\f\r])[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Default_Ignorable_Code_Point}\u2028\u2029\u2800]/u;
+const LATIN_LETTER = /\p{Script=Latin}/u;
+const LOOKALIKE_LETTER = /[\p{Script=Cyrillic}\p{Script=Greek}]/u;
+const LETTER_OR_MARK = /[\p{L}\p{M}]/u;
+/**
+ * @param {string} text @returns {boolean} one run of letters (marks between them do not part
+ * it) mixes Latin letters with Cyrillic or Greek ones: `Pаy` with a Cyrillic `а` reads as
+ * `Pay` and is another word to every program. One pass, one character at a time.
+ */
+function mixedScripts(text) {
+  let latin = false;
+  let other = false;
+  for (const ch of text) {
+    if (!LETTER_OR_MARK.test(ch)) latin = other = false;
+    else if (LATIN_LETTER.test(ch)) latin = true;
+    else if (LOOKALIKE_LETTER.test(ch)) other = true;
+    if (latin && other) return true;
+  }
+  return false;
+}
 /**
  * The character references a changed markup text token may hold, each written in full with
  * its semicolon: punctuation and spacing a sentence is written with. Any other `&` refuses,
@@ -1596,7 +1620,8 @@ const OTHER_CSS_CHARSET = /@charset(?![ \t\n]*["']utf-?8["'])/i;
 
 /**
  * Rule 4 (markup) — a changed text token is visible text: not quiet, without template or
- * script characters and without a control or format character ({@link UNSEEN_CHARACTER}),
+ * script characters, without a character nobody sees ({@link UNSEEN_CHARACTER}) and without a
+ * word that mixes Latin letters with Cyrillic or Greek ones ({@link mixedScripts}),
  * every `&` in it one of the plain references ({@link PLAIN_REFERENCE}), between two tags or
  * comments. It may run over several lines (the decision at review of 2026-10-09: a text node
  * is one node however many lines it is written on).
@@ -1604,7 +1629,7 @@ const OTHER_CSS_CHARSET = /@charset(?![ \t\n]*["']utf-?8["'])/i;
  */
 function markupWording(toks, k) {
   const t = toks[k];
-  if (t.quiet || MARKUP_TEXT_BAD.test(t.v) || UNSEEN_CHARACTER.test(t.v) || t.v.replace(PLAIN_REFERENCE, '').includes('&')) return false;
+  if (t.quiet || MARKUP_TEXT_BAD.test(t.v) || UNSEEN_CHARACTER.test(t.v) || mixedScripts(referencesRead(t.v)) || t.v.replace(PLAIN_REFERENCE, '').includes('&')) return false;
   const beside = (x) => Boolean(x) && (x.k === 'tag' || x.k === 'comment');
   return beside(toks[k - 1]) && beside(toks[k + 1]);
 }
@@ -2089,7 +2114,6 @@ function readKind(f) {
   const d = f.display;
   const kind = f.kind;
   const unrecognised = unrecognisedRefusal(d);
-  const inexact = { clause: inexactClause(d), cause: 'unrecognised' };
   // A byte-order mark stands on both sides or on neither, and the number of carriage returns
   // stays (the decision at review of 2026-10-09): the diff the size is counted from ignores a
   // carriage return at a line's end, so neither may come or go unseen. A reader takes one
@@ -2105,25 +2129,40 @@ function readKind(f) {
   // one that moves from a line to another is a change the diff does not show either.
   if (marked(oldText) !== marked(newText) || returns(oldText) !== returns(newText) || (oldEnds.length === newEnds.length && oldEnds !== newEnds)) return unrecognised;
   const body = (text) => lineFeeds(text).slice(marked(text) ? 1 : 0);
-  if (kind === 'markup') {
+  // One reader per kind, looked up by the kind's own name: a kind no reader is written for
+  // stops the check, never a fall-back to another reader (and no name an object carries by
+  // itself, `toString` say, is a kind).
+  const reader = Object.prototype.hasOwnProperty.call(READERS, String(kind)) ? READERS[/** @type {keyof READERS} */ (kind)] : null;
+  if (reader === null) throw new Error(`no reader for the kind ${kind}`);
+  return reader(f, body(oldText), body(newText));
+}
+
+/** @typedef {(f: ChangedFile, o: string, n: string) => ({runs: string[]}|Refusal)} Reader the two sides without a byte-order mark, line feeds only */
+const READERS = {
+  /** @type {Reader} a page: the old and new values of its changed text tokens */
+  markup(f, o, n) {
+    const unrecognised = unrecognisedRefusal(f.display);
     if (!equalHunks(f.hunks)) return unrecognised;
     // The bytes were read as UTF-8; a page that names another character set is read otherwise by a browser.
-    if (OTHER_CHARSET.test(oldText) || OTHER_CHARSET.test(newText)) outside();
-    const texts = changedTexts(scanMarkup(body(oldText)), scanMarkup(body(newText)), markupWording);
+    if (OTHER_CHARSET.test(/** @type {string} */ (f.oldText)) || OTHER_CHARSET.test(/** @type {string} */ (f.newText))) outside();
+    const texts = changedTexts(scanMarkup(o), scanMarkup(n), markupWording);
+    if (texts.runs === null) return texts.inexact ? { clause: inexactClause(f.display), cause: 'unrecognised' } : unrecognised;
+    // A page in which no text changed is no pass of nothing.
+    if (texts.runs.length === 0) return unrecognised;
     // Rule 6 reads each changed text as written and as its character references spell it.
-    return texts.runs ? { runs: [...texts.runs, ...texts.runs.map(referencesRead)] } : texts.inexact ? inexact : unrecognised;
+    return { runs: [...texts.runs, ...texts.runs.map(referencesRead)] };
+  },
+  /** @type {Reader} a stylesheet: no wording, so no runs */
+  colour(f, o, n) {
+    const oldRead = readCss(o);
+    const newRead = readCss(n);
+    // A changed custom property is a setting, whatever it is named and whatever it holds.
+    if (customDeclarations(o, oldRead) !== customDeclarations(n, newRead)) return settingRefusal(f.display);
+    if (!equalHunks(f.hunks)) return unrecognisedRefusal(f.display);
+    const edit = colourEdit(o, n, oldRead, newRead);
+    return edit === true ? { runs: [] } : edit === 'inexact' ? { clause: inexactClause(f.display), cause: 'unrecognised' } : unrecognisedRefusal(f.display);
   }
-  if (kind !== 'colour') throw new Error(`no reader for the kind ${kind}`); // never a fall-back to another reader
-  const o = body(oldText);
-  const n = body(newText);
-  const oldRead = readCss(o);
-  const newRead = readCss(n);
-  // A changed custom property is a setting, whatever it is named and whatever it holds.
-  if (customDeclarations(o, oldRead) !== customDeclarations(n, newRead)) return settingRefusal(d);
-  if (!equalHunks(f.hunks)) return unrecognised;
-  const edit = colourEdit(o, n, oldRead, newRead);
-  return edit === true ? { runs: [] } : edit === 'inexact' ? inexact : unrecognised;
-}
+};
 
 /** @param {string} part a letter run, lower case @returns {string|null} the sensitive word it is, also in the plural (`s`, `es`) */
 function sensitiveWord(part) {
@@ -2149,7 +2188,8 @@ function sensitiveWord(part) {
  * word `secret`), asked with the path in every form, and, in CTOC's own
  * repository only, no part of CTOC's enforcement by its protected-paths list
  * (`isProtectedEnforcementPath`: the word `enforcement`), which names CTOC's own files
- * (`src/hooks/`, ...), not another project's. Both lists are CTOC's, read where they live,
+ * (`src/hooks/`, ...), not another project's; that list is asked with the path in every
+ * form too, each also in lower case (a file system that folds case opens `src/Hooks/`). Both lists are CTOC's, read where they live,
  * never copied.
  * @param {ChangedFile} f @param {boolean} ctoc the repository is CTOC's own source
  * @returns {Refusal|null}
@@ -2171,7 +2211,7 @@ function ruleSensitiveArea(f, ctoc) {
   };
   let word = wordIn(f.topRel.slice(0, nameAt), false) || wordIn(f.topRel.slice(nameAt), nameParts(f).ext === '.css');
   if (!word && PATH_FORMS.some((form) => isSecretTarget(form(f.topRel)))) word = 'secret';
-  if (!word && ctoc && isProtectedEnforcementPath(f.topRel)) word = 'enforcement';
+  if (!word && ctoc && PATH_FORMS.some((form) => isProtectedEnforcementPath(form(f.topRel)) || isProtectedEnforcementPath(form(f.topRel).toLowerCase()))) word = 'enforcement';
   return word ? { clause: `${f.display} sits in an area named ${word}, and such areas are never a hotfix`, cause: 'sensitive-area' } : null;
 }
 
@@ -2351,9 +2391,8 @@ function linkInstalledPackages(ctx, tree) {
 function installedTargets(top, linked) {
   const targets = new Set();
   const add = (p) => {
-    let real;
-    try { real = realPath(p); } catch { return; } // a link or path that leads nowhere
-    if (within(top, real)) targets.add(real);
+    const real = ifThere(() => realPath(p)); // null: a link or path that leads nowhere
+    if (real !== null && within(top, real)) targets.add(real);
   };
   const isLink = (p) => { const st = lstatOrNull(p); return Boolean(st && st.isSymbolicLink()); };
   for (const nm of linked.nodeModules) {
@@ -2372,8 +2411,8 @@ function installedTargets(top, linked) {
         const file = path.join(site, name);
         const isPth = name.endsWith('.pth');
         if (!isPth && !/^__editable__.*finder\.py$/.test(name)) continue;
-        let text;
-        try { text = safeFs.readFileSync(file, 'utf8'); } catch { continue; }
+        const text = ifThere(() => String(safeFs.readFileSync(file, 'utf8')));
+        if (text === null) continue;
         const candidates = isPth
           ? text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#') && !/^import[ \t]/.test(l))
           : [...text.matchAll(/'((?:[^'\\\r\n]|\\.)*)'|"((?:[^"\\\r\n]|\\.)*)"/g)].map((m) => (m[1] !== undefined ? m[1] : m[2]).replace(/\\\\/g, '\\'));
@@ -2493,11 +2532,7 @@ function removeCopy(ctx) {
         continue; // its folder is gone, and the link with it
       }
       if (!within(tmp, folder)) throw new Error("a link's folder moved outside it");
-      try {
-        safeFs.unlinkSync(link);
-      } catch (err) {
-        if (/** @type {NodeJS.ErrnoException} */ (err).code !== 'ENOENT') throw err;
-      }
+      ifThere(() => safeFs.unlinkSync(link)); // already gone counts as removed
     }
     openFolders(tmp);
     if (ctx.worktree) gitOut(ctx, /** @type {string} */ (ctx.top), ['worktree', 'remove', '--force', ctx.worktree]);
