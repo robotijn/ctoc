@@ -5200,6 +5200,12 @@ written:
   99.38`; `hotfix-check.js | 100.00 | 98.90 | 98.90`; `quality-agent.js | 100.00 | 94.35 |
   100.00`; `[CTOC test-gate] coverage 99.88% (threshold 99%), skipped 0, failed 0`;
   `[CTOC test-gate] PASS`; 118 seconds.
+- `npm test` twice in a row on `34190ca9`, the commit that holds this record (its code and
+  tests are `026dc740`'s); these lines were added after those runs. Both: `tests 13131 |
+  pass 13131 | fail 0 | skipped 0`; `hotfix-check.js | 100.00 | 98.90 | 98.90`;
+  `[CTOC test-gate] coverage 99.88% (threshold 99%), skipped 0, failed 0`; `[CTOC
+  test-gate] PASS`; `all files | 99.88 | 93.77 | 99.38` and `| 99.88 | 93.75 | 99.38`; 129
+  seconds each.
 
 ## Execution Plan (Steps 8-16)
 
