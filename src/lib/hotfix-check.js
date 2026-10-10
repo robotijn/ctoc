@@ -2180,6 +2180,19 @@ function sensitiveWord(part) {
 }
 
 /**
+ * @param {string} piece a part of a path, or a camel-case sub-word of one, lower case
+ * @returns {string|null} the sensitive word it IS, also in the plural (`s`, `es`): the
+ * matcher of the rounds before the tenth, kept beside {@link sensitiveWord} so that nothing
+ * it refused passes (`runCI`, `ciConfig` and `cis` hold `ci`, which is no word inside a part)
+ */
+function wholeSensitiveWord(piece) {
+  for (const word of [piece, piece.endsWith('es') ? piece.slice(0, -2) : '', piece.endsWith('s') ? piece.slice(0, -1) : '']) {
+    if (SENSITIVE_WORDS.includes(word)) return word;
+  }
+  return null;
+}
+
+/**
  * Rule 5 — not in a sensitive area: no part of the path from the repository top holds a
  * sensitive word ({@link sensitiveWord}; the tenth round: anywhere inside the part, where
  * until then the part, or a camel-case sub-word of it, had to be the word or its plural, so
@@ -2188,7 +2201,8 @@ function sensitiveWord(part) {
  * with compatibility letters as plain ones, and as its letters read
  * (`pay<zero-width space>ment` and a `payment` written with an accent read as `payment`);
  * a word in any form refuses. Each form is split at every character that is no letter, and
- * each part is read in lower case. In a stylesheet's own file name a part that is exactly
+ * each part is read in lower case; a part's camel-case sub-words are read too, each as a
+ * whole word or its plural ({@link wholeSensitiveWord}), as before the tenth round. In a stylesheet's own file name a part that is exactly
  * `tokens` is no such word (`tokens.css` and `design-tokens.css` hold design tokens;
  * `accessTokens.css`, `payments.css` and `keys.css` name their area).
  * The path is no secret-bearing file by CTOC's own secret-file guard (`isSecretTarget`: the
@@ -2208,7 +2222,11 @@ function ruleSensitiveArea(f, ctoc) {
     for (const form of PATH_FORMS) {
       for (const run of form(text).split(/\P{L}+/u)) {
         const part = run.toLowerCase();
-        const found = stylesheet && part === 'tokens' ? null : sensitiveWord(part);
+        if (stylesheet && part === 'tokens') continue;
+        // The part itself, then each camel-case sub-word of it: where a capital follows a small
+        // letter, and where the last capital of a run of capitals starts a word.
+        const found = sensitiveWord(part)
+          || [run, ...run.split(/(?<=\p{Ll})(?=\p{Lu})|(?<=\p{Lu})(?=\p{Lu}\p{Ll})/u)].map((piece) => wholeSensitiveWord(piece.toLowerCase())).find(Boolean);
         if (found) return found;
       }
     }

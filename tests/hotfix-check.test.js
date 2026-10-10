@@ -3090,3 +3090,31 @@ test('round 10, B9 and B10: a sensitive word anywhere inside a part of the path,
   assert.equal(page('docs/a.b/page.html'), 'passed', 'a dot inside a folder name is no dot-folder');
   assert.equal(page('.github/pages/index.html'), 'it changes how the project is built or shipped in .github/pages/index.html', 'a build folder is named as one');
 });
+
+// Found after the B9 commit (3ce7ae0a) by comparing it with the round's base commit: reading
+// each part of a path whole and in lower case lost the split at capitals, so `ci` as a
+// camel-case sub-word, and its plural, passed where they were refused. Nothing the earlier
+// matcher refused may pass: the refusal is what either matcher finds.
+test('round 10, B9: whatever the earlier matcher refused is still refused (a word as a camel-case sub-word, or in the plural)', () => {
+  const sheet = (rel) => reasonOf(ruleRefusal(changeOf(rel, 'a { color: red; }\n', 'a { color: blue; }\n')));
+  const page = (rel) => reasonOf(ruleRefusal(changeOf(rel, HOME, HOME_STORE)));
+  const area = (rel, word) => `${rel} sits in an area named ${word}, and such areas are never a hotfix`;
+  for (const rel of ['src/runCI/site.css', 'src/ui/runCI.css', 'src/ciConfig/site.css', 'src/ui/ciConfig.css', 'src/githubCI/site.css', 'src/ui/githubCI.css',
+    'src/myCi/site.css', 'src/ui/myCi.css', 'src/cis/site.css', 'src/CIs/site.css']) {
+    assert.equal(sheet(rel), area(rel, 'ci'), rel);
+  }
+  // Every word of the list, as the earlier matcher found it: whole, in the plural, as a
+  // camel-case sub-word, and where the last capital of a run of capitals starts it.
+  const words = ['auth', 'login', 'logout', 'password', 'session', 'token', 'secret', 'credential', 'key', 'permission', 'role', 'admin', 'payment', 'billing',
+    'checkout', 'price', 'pricing', 'invoice', 'tax', 'legal', 'terms', 'privacy', 'consent', 'cookie', 'gdpr', 'license', 'migration', 'schema', 'database', 'sql',
+    'deploy', 'workflow', 'ci'];
+  const capital = (word) => word[0].toUpperCase() + word.slice(1);
+  for (const word of words) {
+    for (const part of [word, `${word}s`, `${word}es`, word.toUpperCase(), `my${capital(word)}`, `${word}Panel`, `API${capital(word)}`, `x-${word}_y`]) {
+      const answer = page(`src/${part}/page.html`);
+      assert.match(answer, / sits in an area named \p{L}+, and such areas are never a hotfix$/u, `${part}: ${answer}`);
+    }
+  }
+  // What passed then passes now, where the tenth round did not decide otherwise.
+  for (const part of ['circle', 'Author', 'ui', 'special', 'site']) assert.equal(page(`src/${part}/page.html`), 'passed', part);
+});
