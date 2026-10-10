@@ -1646,6 +1646,8 @@ function* linePairs(hunks) {
   }
 }
 
+/** A control character other than a tab, a line feed, a form feed and a carriage return: no stylesheet this reader follows holds one. */
+const CSS_CONTROL = /(?![\t\n\f\r])\p{Cc}/u;
 /** What a blanked stylesheet holds in place of a comment: white space to its structure, and no part of a value that is one colour. */
 const CSS_COMMENT = '\u0002';
 /** What a blanked stylesheet holds in place of a string, an unquoted `url(…)` and an escaped character: something, and no structure. */
@@ -1657,7 +1659,9 @@ const CSS_HELD = '\u0003';
  * of the same length (line breaks kept), so neither a `;`, `{` or `}` nor a colour inside
  * them counts, and an escaped bracket or colon (`.w-\[calc\(1px\)\]`, `.sm\:flex`) is no
  * structure. The backslash itself stays (a declaration that holds one is not read:
- * {@link escapedStatement}). A backslash cannot be followed before a line break or the end
+ * {@link escapedStatement}). `url(` is one only where no name runs into it: a letter, a
+ * digit, `_`, `-`, a character above U+007F or an escape right before it makes it the end of
+ * another function's name (`éurl(`, `\41 url(`), whose brackets are read as brackets. A backslash cannot be followed before a line break or the end
  * of the file, where it escapes nothing, and before a brace, a semicolon, a quote or the
  * `/` of `/*`: what this reader's earlier form read as structure may not be escaped. One pass.
  * @param {string} s @returns {string}
@@ -1667,6 +1671,8 @@ function blankCss(s) {
   const n = s.length;
   let at = 0;
   let i = 0;
+  let nameEnd = -1; // where the last escape ends: what stands there goes on the name the escape is part of
+  const hex = (/** @type {(string|undefined)} */ ch) => ch !== undefined && /[0-9A-Fa-f]/.test(ch);
   while (i < n) {
     const c = s[i];
     let end = -1;
@@ -1675,8 +1681,15 @@ function blankCss(s) {
       const x = s[i + 1];
       const held = x !== undefined && x !== '\n';
       if (!held || '{};"\''.includes(x) || (x === '/' && s[i + 2] === '*')) fault('lost');
-      parts.push(s.slice(at, i + 1), held ? CSS_HELD : '');
-      i += held ? 2 : 1;
+      let past = i + (held ? 2 : 1);
+      // An escape in hexadecimal runs over up to six digits and one white space behind them.
+      if (hex(x)) {
+        while (past < i + 7 && hex(s[past])) past++;
+        if (s[past] === ' ' || s[past] === '\t') past++;
+      }
+      parts.push(s.slice(at, i + 1), CSS_HELD.repeat(past - i - 1));
+      nameEnd = isSpace(s[past] || '') ? past + 1 : past; // a line break may end the escape too, and stays a line break
+      i = past;
       at = i;
       continue;
     }
@@ -1687,7 +1700,7 @@ function blankCss(s) {
       end = e < 0 ? n : e + 2;
     } else if (c === '"' || c === "'") {
       end = Math.min(skipString(s, i), n);
-    } else if ((c === 'u' || c === 'U') && asciiLower(s.slice(i, i + 4)) === 'url(' && !/[\w-]/.test(s[i - 1] || '')) {
+    } else if ((c === 'u' || c === 'U') && asciiLower(s.slice(i, i + 4)) === 'url(' && i !== nameEnd && !/[\w\-\u0080-\uffff]/.test(s[i - 1] || '')) {
       let j = i + 4;
       while (j < n && isSpace(s[j])) j++;
       if (s[j] !== '"' && s[j] !== "'") {
@@ -1795,6 +1808,9 @@ function cssStatements(blank) {
  */
 function readCss(text) {
   if (OTHER_CSS_CHARSET.test(text)) fault('lost'); // read as UTF-8 here, and as something else by a browser
+  // No control character but white space: this reader writes three of them in the place of
+  // comments, strings and colours, and a stylesheet that holds one itself could forge the comparison.
+  if (CSS_CONTROL.test(text)) fault('lost');
   const blank = blankCss(text);
   const statements = cssStatements(blank);
   const head = /([\s\u0002]*)(--[\w-]+|[A-Za-z-]+)([\s\u0002]*):/y;
@@ -1845,8 +1861,8 @@ function escapedStatement(blank, st) {
  * a selector or a rule's head, wherever its `{` stands; a declaration starts with `name:`,
  * and at depth 0 only a custom property (`--x`) is one. The property's name must stand on
  * the token's own line. `whole`: the token is the declaration's whole value (an `!important`
- * after it aside). `escaped`: its statement holds a backslash. A colour function is read
- * only in its written forms ({@link colourFunction}). One forward pass.
+ * after it aside). `escaped`: its statement holds a backslash. What a colour is, one
+ * function says ({@link oneColour}). One forward pass.
  * @param {{blank: string, statements: CssStatement[]}} read the stylesheet as {@link readCss} read it
  * @returns {Array<{t: string, i: number, j: number, prop: (string|null), whole: boolean, escaped: boolean}>}
  */
@@ -1863,7 +1879,7 @@ function colourSlots({ blank, statements }) {
     const j = i + t.length;
     if (i > 0 && !/[\s:,(]/.test(blank[i - 1])) continue;
     if (j < blank.length && !/[\s;,)}!]/.test(blank[j])) continue;
-    if (!oneColour(t)) continue; // the one reader of what a colour is, as for a custom property's value
+    if (!oneColour(t)) continue; // the one reader of what a colour is
     while (nextBreak !== -1 && nextBreak < i) {
       lineStart = nextBreak + 1;
       nextBreak = blank.indexOf('\n', lineStart);
@@ -1877,62 +1893,39 @@ function colourSlots({ blank, statements }) {
   return out;
 }
 
-/**
- * Rule 4 (colour) — one number of a colour function: an optional sign, digits with an
- * optional fraction, and an optional `%` or angle unit; or `none`. Read by hand, one pass.
- * @param {string} x @returns {boolean}
+/*
+ * A COLOUR VALUE, BY AN EXACT GRAMMAR AND NOTHING ELSE (the tenth round). One function,
+ * {@link oneColour}, decides every colour value this check passes:
+ *   - a hexadecimal colour of 3, 4, 6 or 8 digits;
+ *   - one of the named colours ({@link NAMED_COLOURS}), its ASCII letters in any case;
+ *   - `rgb(…)` or `rgba(…)` in the comma form: three integers or three percentages, never
+ *     mixed, and an optional alpha (a number or a percentage);
+ *   - `hsl(…)` or `hsla(…)` in the comma form: a number, then two percentages, and an optional
+ *     alpha.
+ * A number is an optional sign and digits, with an optional fraction (`1.5`, `.5`); white
+ * space may stand beside a comma and a bracket. Everything else is not recognised: the forms
+ * written with spaces, `hwb`, `lab`, `lch`, `oklab`, `oklch` and `color()`, a unit, `none`, an
+ * exponent, a function name in capitals. A browser reads many of those as colours too; this
+ * check vouches only for what it reads exactly.
  */
-function colourNumber(x) {
-  if (asciiLower(x) === 'none') return true;
-  let i = x[0] === '+' || x[0] === '-' ? 1 : 0;
-  const from = i;
-  while (i < x.length && x[i] >= '0' && x[i] <= '9') i++;
-  let digits = i - from;
-  if (x[i] === '.') {
-    const fraction = ++i;
-    while (i < x.length && x[i] >= '0' && x[i] <= '9') i++;
-    digits += i - fraction;
-  }
-  return digits > 0 && ['', '%', 'deg', 'rad', 'grad', 'turn'].includes(asciiLower(x.slice(i)));
-}
-
-/** The colour functions that may also be written with commas. */
-const COMMA_COLOURS = new Set(['rgb', 'rgba', 'hsl', 'hsla']);
-/** The colour functions written with spaces only; `color(…)` names a colour space first. */
-const SPACE_COLOURS = new Set(['hwb', 'lab', 'lch', 'oklab', 'oklch', 'color']);
-
+const HEX_COLOUR = /^#(?:[0-9A-Fa-f]{3,4}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})$/;
+const COLOUR_INTEGER = /^[+-]?\d+$/;
+const COLOUR_NUMBER = /^[+-]?(?:\d+|\d*\.\d+)$/;
+const COLOUR_PERCENTAGE = /^[+-]?(?:\d+|\d*\.\d+)%$/;
 /**
- * Rule 4 (colour) — a colour function in one of its written forms: for `rgb`, `rgba`, `hsl`
- * and `hsla`, three or four comma-separated numbers; for those and for `hwb`, `lab`, `lch`,
- * `oklab`, `oklch` and `color` (after its colour space's name), three space-separated
- * numbers with an optional `/ alpha` ({@link colourNumber} each). So `rgb(<11, 94, 215)`
- * and `rgb(var(--x))` are no colour.
- * @param {string} t `name(…)`, no bracket inside @returns {boolean}
- */
-function colourFunction(t) {
-  const name = asciiLower(t.slice(0, t.indexOf('(')));
-  const inner = t.slice(t.indexOf('(') + 1, -1).trim();
-  if (COMMA_COLOURS.has(name) && inner.includes(',')) {
-    const parts = inner.split(',');
-    return (parts.length === 3 || parts.length === 4) && parts.every((x) => colourNumber(x.trim()));
-  }
-  if (!COMMA_COLOURS.has(name) && !SPACE_COLOURS.has(name)) return false;
-  const [main, alpha, extra] = inner.split('/');
-  const parts = main.trim().split(/\s+/);
-  if (name === 'color' && !/^[A-Za-z][A-Za-z0-9-]*$/.test(/** @type {string} */ (parts.shift()))) return false;
-  return extra === undefined && parts.length === 3 && parts.every((x) => colourNumber(x))
-    && (alpha === undefined || colourNumber(alpha.trim()));
-}
-
-/**
- * @param {string} v a custom property's whole value, trimmed @returns {boolean} it is
- * exactly one colour: a hexadecimal colour, a named colour, or one colour function
- * ({@link colourFunction}); nothing beside it, so no `var()`, no `url()`, no second token,
- * no comment and no `!important`
+ * @param {string} v a value, or a token of one, trimmed @returns {boolean} it is exactly one
+ * colour, by the grammar above. The parts of a function are read one by one, each whole.
  */
 function oneColour(v) {
-  if (v[0] === '#') return [4, 5, 7, 9].includes(v.length) && /^#[0-9A-Fa-f]+$/.test(v);
-  return NAMED_COLOURS.has(asciiLower(v)) || (/^[A-Za-z]+\([^()]*\)$/.test(v) && colourFunction(v));
+  if (v[0] === '#') return HEX_COLOUR.test(v);
+  const fn = /^(rgba?|hsla?)\(([^()]*)\)$/.exec(v);
+  if (fn === null) return NAMED_COLOURS.has(asciiLower(v));
+  const parts = fn[2].split(',').map((part) => part.replace(/^[ \t\n\f\r]+|[ \t\n\f\r]+$/g, ''));
+  const is = (/** @type {RegExp} */ form) => (/** @type {string} */ part) => form.test(part);
+  if (parts.length !== 3 && !(parts.length === 4 && (COLOUR_NUMBER.test(parts[3]) || COLOUR_PERCENTAGE.test(parts[3])))) return false;
+  const [first, second, third] = parts;
+  if (fn[1][0] === 'h') return COLOUR_NUMBER.test(first) && COLOUR_PERCENTAGE.test(second) && COLOUR_PERCENTAGE.test(third);
+  return [first, second, third].every(is(COLOUR_INTEGER)) || [first, second, third].every(is(COLOUR_PERCENTAGE));
 }
 
 /**

@@ -1217,11 +1217,11 @@ test('a file that is not valid UTF-8 is not text', async () => {
 
 test('a name with spaces, a star and letters beyond ASCII passes, and commit.add stages exactly it', async () => {
   // A star cannot stand in a Windows file name; there the name keeps its space and letters.
-  const name = process.platform === 'win32' ? 'docs/a plan é.html' : 'docs/a plan é *.html';
-  const root = makeRepo({ [name]: '<p>Old wording.</p>\n', 'docs/a plan é x.html': '<p>Other.</p>\n',
+  const name = process.platform === 'win32' ? 'docs/a plan \u00e9.html' : 'docs/a plan \u00e9 *.html';
+  const root = makeRepo({ [name]: '<p>Old wording.</p>\n', 'docs/a plan \u00e9 x.html': '<p>Other.</p>\n',
     'tests/any.test.js': nodeTest('runs', '  assert.ok(true);') }, { testScript: SCRIPT });
   fs.writeFileSync(path.join(root, ...name.split('/')), '<p>New wording.</p>\n');
-  fs.writeFileSync(path.join(root, 'docs', 'a plan é x.html'), '<p>Other, changed.</p>\n');
+  fs.writeFileSync(path.join(root, 'docs', 'a plan \u00e9 x.html'), '<p>Other, changed.</p>\n');
   assertChecking(await check(root, name), [name]);
   const res = await check(root, '--run-tests', name);
   assertPass(res, [name]);
@@ -1932,7 +1932,9 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
     // A CDATA section inside `<svg>`: outside the strict subset.
     ['src/pages/cdata.html', '<svg><![CDATA[ a > <b>Save</b> ]]></svg>\n', '<svg><![CDATA[ a > <b>Store</b> ]]></svg>\n', inexact('src/pages/cdata.html')],
     // Stylesheets: a colour function in its space form, a string, a colour beside a `url(…)`.
-    ['src/styles/space.css', 'a { color: rgb(1 2 3 / 50%); }\n', 'a { color: rgb(1 2 4 / 50%); }\n', null],
+    // A pass until the tenth round: a colour function is read in its comma form only.
+    ['src/styles/space.css', 'a { color: rgb(1 2 3 / 50%); }\n', 'a { color: rgb(1 2 4 / 50%); }\n', un('src/styles/space.css')],
+    ['src/styles/comma.css', 'a { color: rgba(1, 2, 3, 50%); }\n', 'a { color: rgba(1, 2, 4, 50%); }\n', null],
     ['src/styles/badfn.css', 'a { color: rgb(1 2 3); }\n', 'a { color: rgb(1 2 3 / 4 / 5); }\n', un('src/styles/badfn.css')],
     ['src/styles/str.css', 'a { color: red; content: "x"; }\n', 'a { color: red; content: "y"; }\n', un('src/styles/str.css')],
     // A pass until the sixth round: the colour is not the whole value of its property, which
@@ -2943,24 +2945,24 @@ test('round 10, B1 to B3: a character nobody sees, letters of two scripts in one
   // B1. A character nobody sees: default-ignorable code points (the Hangul filler, the combining
   // grapheme joiner, a variation selector), a lone surrogate, a private-use and an unassigned
   // code point, the line and paragraph separators, the blank Braille pattern, two non-characters.
-  const unseen = { 'the Hangul filler': 'ㅤ', 'the combining grapheme joiner': '͏', 'a variation selector': '\u{e0101}', 'a lone surrogate': '\ud800',
-    'a private-use character': '', 'an unassigned code point': '͸', 'the line separator': ' ', 'the paragraph separator': ' ',
-    'the blank Braille pattern': '⠀', 'the non-character U+FFFE': '￾', 'the non-character U+FFFF': '￿', 'a zero-width space': '​' };
+  const unseen = { 'the Hangul filler': '\u3164', 'the combining grapheme joiner': '\u034f', 'a variation selector': '\u{e0101}', 'a lone surrogate': '\ud800',
+    'a private-use character': '\ue000', 'an unassigned code point': '\u0378', 'the line separator': '\u2028', 'the paragraph separator': '\u2029',
+    'the blank Braille pattern': '\u2800', 'the non-character U+FFFE': '\ufffe', 'the non-character U+FFFF': '\uffff', 'a zero-width space': '\u200b' };
   for (const [name, character] of Object.entries(unseen)) {
     assert.equal(judgeText('Save', `Sa${character}ve`), NOT_WORDING, `${name} in the new text`);
     assert.equal(judgeText(`Sa${character}ve`, 'Save'), NOT_WORDING, `${name} in the old text`);
   }
   // B2. A run of letters that mixes Latin with Cyrillic or Greek.
-  assert.equal(judgeText('Pay', 'Pаy'), NOT_WORDING, 'a Cyrillic letter in a Latin word');
-  assert.equal(judgeText('Pay', 'Ρay'), NOT_WORDING, 'a Greek letter in a Latin word');
-  assert.equal(judgeText('Pay', 'Páу'), NOT_WORDING, 'a mark between them does not part the word');
+  assert.equal(judgeText('Pay', 'P\u0430y'), NOT_WORDING, 'a Cyrillic letter in a Latin word');
+  assert.equal(judgeText('Pay', '\u03a1ay'), NOT_WORDING, 'a Greek letter in a Latin word');
+  assert.equal(judgeText('Pay', 'Pa\u0301\u0443'), NOT_WORDING, 'a mark between them does not part the word');
   // One script per word passes, in any script, and so do two words of two scripts.
-  for (const text of ['Привет', 'Καλημέρα', 'Save Привет', 'café naïve', 'Save-мир']) {
+  for (const text of ['\u041f\u0440\u0438\u0432\u0435\u0442', '\u039a\u03b1\u03bb\u03b7\u03bc\u03ad\u03c1\u03b1', 'Save \u041f\u0440\u0438\u0432\u0435\u0442', 'caf\u00e9 na\u00efve', 'Save-\u043c\u0438\u0440']) {
     assert.equal(judgeText('Save', text), 'passed', text);
   }
   // B3. `$` is decided once, by the number-and-price rule, as `€` is.
   assert.equal(judgeText('Only five', 'Only $5'), RISK);
-  assert.equal(judgeText('Only five', 'Only €5'), RISK);
+  assert.equal(judgeText('Only five', 'Only \u20ac5'), RISK);
   assert.equal(judgeText('Only five', 'Only $five'), RISK);
 });
 
@@ -2982,7 +2984,7 @@ test('round 10, B4: guards closed by construction', async (t) => {
   await t.test('CTOC\'s protected paths are asked in every form of the path, and without regard to letter case', async () => {
     const files = { 'package.json': '{ "name": "ctoc" }\n', 'CLAUDE.md': '# CTOC Project Instructions\n', '.ctoc/keep.json': '{}\n' };
     const area = (f) => refusal(`${f} sits in an area named enforcement, and such areas are never a hotfix`);
-    for (const rel of ['src/hooks/notes.html', 'src/Hooks/notes.html', 'SRC/HOOKS/notes.html', 'src/hoo​ks/notes.html', 'src/ｈooks/notes.html']) {
+    for (const rel of ['src/hooks/notes.html', 'src/Hooks/notes.html', 'SRC/HOOKS/notes.html', 'src/hoo\u200bks/notes.html', 'src/\uff48ooks/notes.html']) {
       const root = makeRepo({ ...files, [rel]: HOME });
       fs.writeFileSync(path.join(root, ...rel.split('/')), HOME_STORE);
       assert.equal((await check(root, rel)).text, area(rel), JSON.stringify(rel));
@@ -3015,4 +3017,41 @@ test('round 10, B4: guards closed by construction', async (t) => {
     // With nothing injected the same change passes: what does not exist is no fault.
     assertPass(await check(root, '--run-tests', 'src/pages/home.html'), ['src/pages/home.html']);
   });
+});
+
+test('round 10, B5 to B7: a control character in a stylesheet, the exact grammar of a colour value, and a name before `url(`', () => {
+  const css = (before, after) => reasonOf(ruleRefusal(changeOf('src/styles/site.css', before, after)));
+  const NOT_COLOUR = 'I do not recognise src/styles/site.css as wording or a colour';
+  const LOST = 'I could not read the change (src/styles/site.css holds something I cannot follow)';
+  // B5. The comparison writes one control character in the place of every colour. A stylesheet
+  // that holds that character itself could move a value from one declaration to another unseen.
+  assert.equal(css('a { color: red; animation-name: \u0001; outline-style: tan }\n', 'a { color: blue; animation-name: tan; outline-style: \u0001 }\n'), LOST);
+  for (const control of ['\u0000', '\u0001', '\u0002', '\u0003', '\u0008', '\u000b', '\u001b', '\u007f', '\u0085', '\u009f']) {
+    assert.equal(css(`a { color: red } /* ${control} */\n`, `a { color: blue } /* ${control} */\n`), LOST, `U+${control.charCodeAt(0).toString(16)}`);
+  }
+  assert.equal(css('a {\tcolor: red;\f}\r\n', 'a {\tcolor: blue;\f}\r\n'), 'passed', 'a tab, a form feed and a carriage return are white space');
+  // B6. One function decides every colour value, by an exact grammar.
+  const value = (before, after) => css(`a { color: ${before} }\n`, `a { color: ${after} }\n`);
+  const colours = ['#abc', '#abcd', '#aabbcc', '#AABBCC80', 'tomato', 'Transparent', 'rgb(10, 20, 30)', 'rgb(10,20,30)', 'rgb( 10 , 20 , 30 )', 'rgb(10%, 20%, 30%)',
+    'rgba(10, 20, 30, 0.5)', 'rgba(10, 20, 30, 50%)', 'rgb(10, 20, 30, .5)', 'rgb(-1, +2, 300)', 'rgb(1.5%, 20%, 30%)', 'hsl(210, 50%, 40%)', 'hsl(-210.5, 50%, 40%)',
+    'hsla(210, 50%, 40%, 0.9)', 'hsl(210, 50%, 40%, 90%)'];
+  for (const colour of colours) assert.equal(value('red', colour), 'passed', colour);
+  // The brief's two witnesses first; then every form the grammar does not hold.
+  assert.equal(value('rgb(10, 20, 30%)', 'rgb(10, 20, 40%)'), NOT_COLOUR, 'integers and a percentage, mixed');
+  assert.equal(value('hsl(10, 20, 30)', 'hsl(10, 20, 40)'), NOT_COLOUR, 'a saturation and a lightness that are no percentages');
+  const none = ['#ab', '#abcde', '#abcdefg', '#abcdefghi', '#ggg', 'rgb(10, 20)', 'rgb(10, 20, 30, 0.5, 1)', 'rgb(10 20 30)', 'rgb(10 20 30 / 50%)', 'rgb(10%, 20, 30)',
+    'rgb(1.5, 2, 3)', 'rgb(none, 20, 30)', 'rgb(10, 20, 30,)', 'rgb(, 20, 30)', 'rgb(10, 20, 30deg)', 'rgb(1e2, 20, 30)', 'hsl(210deg, 50%, 40%)', 'hsl(210 50% 40%)',
+    'hsl(210%, 50%, 40%)', 'hsl(210, 50, 40%)', 'hsl(210, 50%, 40%, x)', 'hwb(120 0% 0%)', 'lab(50% 40 59)', 'oklch(60% 0.2 240)', 'color(display-p3 1 0.5 0)',
+    'rgb(calc(1), 2, 3)', 'rgbx(1, 2, 3)', 'RGB(1, 2, 3)', 'rgb(1., 2, 3)', 'rgb(1, 2, 3) x', 'currentcolor', 'reddish', 'r\u0435d'];
+  for (const text of none) {
+    assert.equal(value('red', text), NOT_COLOUR, `to ${text}`);
+    assert.equal(value(text, 'red'), NOT_COLOUR, `from ${text}`);
+  }
+  // B7. A character above U+007F, or an escape, is part of a name: what follows is no `url(`,
+  // so its brackets are read as brackets, and the brace inside them cannot be followed.
+  assert.equal(css('a { x: \u00e9url({); color: red }\n', 'a { x: \u00e9url({); color: blue }\n'), LOST, 'a letter above U+007F before url(');
+  assert.equal(css('a { x: \\41 url({); color: red }\n', 'a { x: \\41 url({); color: blue }\n'), LOST, 'a hexadecimal escape before url(');
+  assert.equal(css('a { x: \\ url({); color: red }\n', 'a { x: \\ url({); color: blue }\n'), LOST, 'an escaped space before url(');
+  assert.equal(css('a { x: url({); color: red }\n', 'a { x: url({); color: blue }\n'), 'passed', 'a real url( holds what it holds');
+  assert.equal(css('a { x: 1px url({); color: red }\n', 'a { x: 1px URL({); color: blue }\n'), NOT_COLOUR, 'and is compared exactly');
 });

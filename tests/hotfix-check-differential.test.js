@@ -1007,13 +1007,16 @@ const ORACLE_SHORTHANDS = new Set(['background', 'border', 'border-top', 'border
   'border-block-end', 'border-inline', 'border-inline-start', 'border-inline-end', 'outline', 'column-rule', 'fill', 'stroke', 'box-shadow', 'text-shadow',
   'text-decoration', 'text-emphasis']);
 
+/** @param {string} text @returns {string} lower case as a browser compares a CSS name: the ASCII letters only (the Kelvin sign is no `k`) */
+const asciiLower = (text) => text.replace(/[A-Z]+/g, (letters) => letters.toLowerCase());
+
 /** @returns {boolean} postcss-value-parser reads the value as exactly one colour: a hexadecimal colour, a named colour or one colour function */
 function oneColourValue(value) {
   const nodes = valueParser(value).nodes;
   if (nodes.length !== 1) return false;
   const [node] = nodes;
-  if (node.type === 'function') return ORACLE_COLOUR_FUNCTIONS.has(node.value.toLowerCase());
-  return node.type === 'word' && (/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(node.value) || ORACLE_COLOUR_NAMES.has(node.value.toLowerCase()));
+  if (node.type === 'function') return ORACLE_COLOUR_FUNCTIONS.has(asciiLower(node.value));
+  return node.type === 'word' && (/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(node.value) || ORACLE_COLOUR_NAMES.has(asciiLower(node.value)));
 }
 
 /**
@@ -1062,7 +1065,7 @@ function cssOracle(oldText, newText) {
   const [before, after] = changed[0];
   if (before.raws.value || after.raws.value || !oneColourValue(before.value.trim()) || !oneColourValue(after.value.trim())) return 'the changed value is not exactly one colour';
   const prop = before.prop;
-  if (prop.startsWith('--') || !(/(?:^|-)color$/i.test(prop) || ORACLE_SHORTHANDS.has(prop.toLowerCase()))) return `the property ${prop} holds no colour`;
+  if (prop.startsWith('--') || !(/(?:^|-)color$/i.test(prop) || ORACLE_SHORTHANDS.has(asciiLower(prop)))) return `the property ${prop} holds no colour`;
   return null;
 }
 
@@ -1444,6 +1447,16 @@ const LATER_WITNESSES = [
   ['an @charset rule names UTF-8', 'lost', CSS_FILE, '@charset "shift_jis";\na { color: red }\n'],
   ['a colour name is compared in ASCII letters', 'unrecognised', CSS_FILE, 'a { color: red }\n', 'a { color: blacKELVIN }\n'],
   ['a property name holds ASCII letters and hyphens only', 'lost', CSS_FILE, 'a { stroKELVINe: red }\n'],
+  // Stylesheets: what the tenth round added.
+  ['a stylesheet holds no control character but white space', 'lost', CSS_FILE, 'a { color: red; animation-name: CTRL; outline-style: tan }\n', 'a { color: blue; animation-name: tan; outline-style: CTRL }\n'],
+  ['a stylesheet holds no control character but white space', 'lost', CSS_FILE, 'a { color: red } /* CTRL */\n'],
+  ['rgb holds three integers or three percentages, never mixed', 'unrecognised', CSS_FILE, 'a { color: rgb(10, 20, 30%) }\n', 'a { color: rgb(10, 20, 40%) }\n'],
+  ['hsl holds a number and two percentages', 'unrecognised', CSS_FILE, 'a { color: hsl(10, 20, 30) }\n', 'a { color: hsl(10, 20, 40) }\n'],
+  ['a colour function is written with commas', 'unrecognised', CSS_FILE, 'a { color: rgb(10 20 30) }\n', 'a { color: rgb(10 20 40) }\n'],
+  ['only rgb and hsl are colour functions', 'unrecognised', CSS_FILE, 'a { color: oklch(60% 0.2 240) }\n', 'a { color: oklch(60% 0.2 250) }\n'],
+  ['a hexadecimal colour has 3, 4, 6 or 8 digits', 'unrecognised', CSS_FILE, 'a { color: red }\n', 'a { color: #abcde }\n'],
+  ['a name before `url(` makes it no url: a character above U+007F', 'lost', CSS_FILE, 'a { x: EACUTEurl({); color: red }\n'],
+  ['a name before `url(` makes it no url: an escape', 'lost', CSS_FILE, 'a { x: \\41 url({); color: red }\n'],
   // Stylesheets: custom properties never qualify (the tenth round).
   ['a changed custom property is a setting', 'setting', CSS_FILE, ':root { --brand-color: red }\n'],
   ['a changed custom property is a setting', 'setting', CSS_FILE, ':root { --brand-color: red }\na { color: var(--brand-color) }\n'],
@@ -1476,7 +1489,7 @@ const LATER_WITNESSES = [
   ['a changed text is read as its references spell it', 'risk', HTML_FILE, '<p>alpha&shy;beta</p>'],
   ['a page names no character set but UTF-8', 'subset', HTML_FILE, '<meta charset="shift_jis"><p>alpha</p>']
 ];
-const SPELT = [['ZWSP', '​'], ['BOM', '﻿'], ['KELVIN', 'K'], ['AACUTE', 'á'], ['FWA', 'ａ']];
+const SPELT = [['CTRL', '\u0001'], ['EACUTE', '\u00e9'], ['ZWSP', '\u200b'], ['BOM', '\ufeff'], ['KELVIN', '\u212a'], ['AACUTE', '\u00e1'], ['FWA', '\uff41']];
 const spelt = (text) => SPELT.reduce((t, [name, character]) => t.replaceAll(name, character), text);
 
 test('witnesses of the ninth and tenth rounds: every refusal rule they added refuses the one change written for it, for its own reason', (t) => {
@@ -1565,7 +1578,7 @@ const BY_HAND = {
     'a { color: red; }\n', '.btn {\n  color: #0a58ca;\n  background-color: #fff;\n  border-color: rgb(1, 2, 3);\n}\n',
     'a { color: red !important; outline-color: hsla(210, 50%, 40%, 0.9) }\n', '@media (min-width: 10px) {\n  a { color: red; }\n}\n',
     '/* brand: red */\n@import "x.css";\na { fill: red; stroke: blue; }\n', '.sm\\:flex, #fff, .red { COLOR : red }\n', 'a { color: RED; caret-color: Tomato }\n',
-    '﻿a { color: red; }\r\nb { margin: 0; }\r\n', '@supports (color: red) { a { color: blue; } }\n', 'a { color: red; & b { color: blue; } }\n',
+    '\ufeffa { color: red; }\r\nb { margin: 0; }\r\n', '@supports (color: red) { a { color: blue; } }\n', 'a { color: red; & b { color: blue; } }\n',
     // A colour that is not the whole value, or stands in no colour property.
     'a { border: 1px solid red; box-shadow: 0 0 2px blue; }\n', 'a { background: url("red.png") red; }\n', 'a { background: linear-gradient(red, blue); }\n',
     'a { animation: red 2s; animation-name: blue; }\n', 'a { width: #fff; content: "red"; }\n', '.red, #fff { margin: 0 }\n', '@keyframes red { from { color: red } to { color: blue } }\n',
@@ -1659,4 +1672,19 @@ test('the real menu route answers a sample of the generated edits as the rules d
   } finally {
     fs.rmSync(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
   }
+});
+
+// The oracle itself compares names as a browser does. Until the tenth round it lower-cased
+// with `toLowerCase()`, which turns the Kelvin sign into `k`: it then called `blac<Kelvin>` a
+// colour, `o<Kelvin>lch(…)` a colour function and `stro<Kelvin>e` a colour property, and
+// would have agreed with a reader that made the same mistake.
+test('the stylesheet oracle compares a colour name, a function name and a property name in ASCII letters only', () => {
+  const K = String.fromCharCode(0x212a);
+  const one = (before, after) => cssOracle(`a { ${before} }\n`, `a { ${after} }\n`);
+  assert.equal(one('color: red', 'color: black'), null);
+  assert.equal(one('color: red', `color: blac${K}`), 'the changed value is not exactly one colour', 'a colour name');
+  assert.equal(one('color: red', 'color: oklch(60% 0.2 240)'), null);
+  assert.equal(one('color: red', `color: o${K}lch(60% 0.2 240)`), 'the changed value is not exactly one colour', 'a function name');
+  assert.equal(one('stroke: red', 'stroke: blue'), null);
+  assert.equal(one(`stro${K}e: red`, `stro${K}e: blue`), `the property stro${K}e holds no colour`, 'a property name');
 });
