@@ -103,7 +103,13 @@
  *                                          read from the top too; and a path that holds a character
  *                                          nobody sees is not recognised
  *   3  size                              — at most 20 changed lines in at most 3 files
- *   8  the existing tests pass           — only in the `--run-tests` call, in a copy
+ *   8  the existing tests pass           — only in the `--run-tests` call, in a copy. THE
+ *                                          GUARANTEE: a run passes when every distinct test command
+ *                                          exits with 0; reading its output then only adds reasons to
+ *                                          refuse ({@link readRunOutput}), exactly for Node's own test
+ *                                          runner and best effort for the others (the plan's record
+ *                                          lists what it does not see). After every run the command's
+ *                                          whole process tree is ended (macOS and Linux)
  * Rule 7 and the kind of each file (rule 4: where it is placed by its name and its place) run
  * before size because the functional plan's own scenarios name an edited test and the kind of
  * change ahead of size. Size then runs BEFORE any reader reads a file's content (the rest of

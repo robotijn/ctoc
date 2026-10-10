@@ -3195,6 +3195,40 @@ formats builds the wrong check.
     agent's passing result now carries its output (additive). A failure answers "the existing
     tests fail", a skip "<n> tests were skipped".
 
+224. **Escapes in stylesheets are out** (the session coordinator, 2026-10-10, after the final
+    re-check of `b5decfc6`). `a{background-image:url(x\);color:red;/*);*/}` to `…blue…` passed,
+    the colour inside the image address (confirmed in Chromium): the reader ended an unquoted
+    `url(` at the escaped bracket and blanked the backslash. Escapes had their fix in round 10
+    (B7), so by the two-rounds rule the sub-area comes out: a stylesheet that holds a backslash,
+    in the committed or the changed version, never qualifies ("<file> holds an escape (a
+    backslash), which the check does not read in a stylesheet", cause `unrecognised`), and the
+    escape handling is deleted (Decisions 210 and the escape rows of 185 describe code that is
+    gone).
+225. **Two choices confirmed as decided** (the coordinator): the extension is compared without
+    letter case (`site.CSS` qualifies), and several colour changes in one file qualify within
+    the size limits. Both are pinned by the test of the final re-check.
+226. **No exception for `tokens`** (the coordinator, the second final re-check). Deleted, not
+    replaced: `tokens.css`, `access-tokens.css`, `api-tokens.css`, `refresh.tokens.css` and
+    `design-tokens.css` name the token area. Decision 220 describes code that is gone.
+227. **The test command's process tree ends after every run** (the coordinator): a helper a test
+    started without detaching rewrote the judged stylesheet two seconds after a pass. With
+    `wholeTree` the group is now ended whatever ended the run. Windows: `taskkill /T` once the
+    program has exited may find no tree; not verified there.
+228. **What a passing test run guarantees** (the coordinator). A run passes when every distinct
+    test command exits with 0; the reading of the output (Decision 223 and its two fixes) only
+    adds refusals, exactly for Node's own test runner and best effort for the others. It is not
+    taken out, because exit codes alone would also let `pytest; node --test` with a failing
+    pytest through, which the reader refuses today. Known limits, from the second final
+    re-check: `describe.skip` in Node 24 shows `skipped 0`; unittest's `OK (skipped=1, expected
+    failures=1)`; `prove` (its failures, skips and `Tests=3` read as passes); a plain script
+    that throws before a `;`; the dot and junit reporters after a `;`; and a project's test
+    script can hide a failure on purpose, being committed code a hotfix never changes.
+229. **Moot now that only a colour can pass, and for the owner** (the coordinator). The
+    governing-place gaps the re-check found (`hooks/`, a plugin's declared skills folder, a
+    repository that is itself a skill) only matter for files that carry instructions, which no
+    longer qualify. For the owner, not built: `signin`, `sign-up`, `sso`, `mfa`, `otp`, `oidc`,
+    `jwt`, `rbac`, `stripe` and `subscriptions` are not in his list of sensitive words.
+
 ## Execution Record
 
 Built by the iron-loop executor in the worktree `.claude/worktrees/hotfix-s1-build`
@@ -5366,6 +5400,13 @@ stands).
   `QWEN.md`, `.github/agents/*.agent.md`;
 - a `CLAUDE.md` above the repository.
 The design idea for it: the project itself declares which pages are display pages.
+
+**The final and the second final re-check** (Decisions 224 to 229): `46326a36` refuses a
+stylesheet with a backslash and deletes the escape handling, and the differential test now
+writes unquoted and quoted addresses, strings and comments holding `)`, `;` and `{`, and
+backslashes, with every file that holds a backslash required to be refused (default seed:
+27,573 edits, 947 passed, 3.43%, 0 disagreements; the minimum is 3.09%); `04793d04` deletes
+the `tokens` exception and ends the test command's process tree after every run.
 
 **The differential test** now holds stylesheets only. On the default seed: 27,083 edits,
 1,622 passed (5.99%), 0 disagreements; the minimum is 5.39%.
