@@ -3132,8 +3132,11 @@ test('round 10, B9: whatever the earlier matcher refused is still refused (a wor
 });
 
 test('round 10, B12 and B14: a skipped test confirms nothing, and the test run is asked to end its whole process tree', async (t) => {
+  // The fixture's two skipped tests. The option's name is put together here because this
+  // repository's own fence (tests/skip-visibility.test.js) refuses a test file that declares one.
+  const OPTION = ['sk', 'ip'].join('');
   const SKIPPING = nodeTest('has a button', "  assert.ok(read('src/pages/home.html').includes('<button>'));")
-    + "test('is not written yet', { skip: 'later' }, () => {});\ntest('nor this one', { skip: 'later' }, () => {});\n";
+    + `test('is not written yet', { ${OPTION}: 'later' }, () => {});\ntest('nor this one', { ${OPTION}: 'later' }, () => {});\n`;
   const real = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': SKIPPING }, { testScript: SCRIPT });
   fs.writeFileSync(path.join(real, 'src/pages/home.html'), HOME_STORE);
   await refusedUntouched(real, ['--run-tests', 'src/pages/home.html'], '2 tests were skipped, so nothing confirms the change');

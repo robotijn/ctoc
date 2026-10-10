@@ -1273,6 +1273,54 @@ describe('the test run: one run per command, a failure counted on a summary line
     }
   });
 
+  it('B14: the tree is ended only for a run that asked for it and was stopped; a group already gone is no fault, any other failure is one', async () => {
+    const stopped = () => ({ pid: 4242, status: null, signal: 'SIGTERM', error: Object.assign(new Error('spawnSync node ETIMEDOUT'), { code: 'ETIMEDOUT' }), stdout: '', stderr: '' });
+    const realKill = process.kill;
+    const killed = [];
+    const withKill = async (fake, fn) => {
+      process.kill = fake;
+      try { return await fn(); } finally { process.kill = realKill; }
+    };
+    const record = (pid, signal) => { killed.push([pid, signal]); return true; };
+    const tools = { javascript: { test: 'node x' } };
+    await withExecSpies(stopped, async (qa, fileCalls) => {
+      const { res } = await withKill(record, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true, timeout: 5 })));
+      assert.equal(res.undetermined, true);
+      assert.deepEqual(killed, [[-4242, 'SIGKILL']], 'the group of the stopped program');
+      assert.deepEqual([fileCalls[0].opts.detached, fileCalls[0].opts.timeout], [true, 5]);
+      killed.length = 0;
+      await withKill(record, () => captureLog(() => qa.runFullTests(tools)));
+      assert.deepEqual(killed, [], 'not asked for: nothing is ended');
+      assert.equal('detached' in fileCalls[1].opts, false);
+      const gone = () => { throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' }); };
+      const { res: quiet } = await withKill(gone, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true })));
+      assert.equal(quiet.undetermined, true, 'a group already gone is no fault');
+      const refused = () => { throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' }); };
+      await assert.rejects(withKill(refused, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true }))), /EPERM/);
+      return {};
+    });
+    // A run that ended by itself is left alone, whatever it answered.
+    await withExecSpies(() => ({ pid: 4242, status: 1, signal: null, stdout: '', stderr: '' }), async (qa) => {
+      await withKill(record, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true })));
+      assert.deepEqual(killed, []);
+      return {};
+    });
+    // Windows: taskkill with the program's id, and no process group.
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform');
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    try {
+      await withExecSpies((bin) => (bin === 'taskkill' ? '' : stopped()), async (qa, fileCalls) => {
+        await withKill(record, () => captureLog(() => qa.runFullTests({ javascript: { test: 'runner x' } }, { wholeTree: true })));
+        assert.deepEqual(fileCalls.map((c) => [c.bin, ...c.args]), [['runner', 'x'], ['taskkill', '/pid', '4242', '/T', '/F']]);
+        assert.equal('detached' in fileCalls[0].opts, false);
+        assert.deepEqual(killed, []);
+        return {};
+      });
+    } finally {
+      Object.defineProperty(process, 'platform', platform);
+    }
+  });
+
   it('B14: at the time limit the whole process tree of the test command ends', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'qa-tree-'));
     const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
