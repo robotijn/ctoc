@@ -3153,6 +3153,48 @@ formats builds the wrong check.
     and a common name such as `index.html` in any instruction file refuses every file of
     that name. An instruction file whose bytes are no text is searched as far as it reads.
 
+218. **Pages come out; one colour in a stylesheet is the only thing that passes** (the session
+    coordinator, 2026-10-10, after the re-check of `4d5857cf`). The rule "a page that an
+    instruction file names" (Decision 217) failed a second time: a page named from a file
+    that governs by place (`.claude/rules/voice.md`), through a symbolic-linked `CLAUDE.md`,
+    with a name spelt otherwise, or two imports deep reached a commit. By the two-fix-rounds
+    rule the area comes out, and with it the one kind that needs it. `.html` and `.htm` are
+    kinds the check does not recognise. Deleted, not disabled: the HTML reader and its
+    tables, Decision 217's search of instruction files (`instructionText`), rule 6 (numbers,
+    prices, addresses in wording), the rules on characters nobody sees in text and on words
+    of two scripts (Decision 207), their tests, the page section of the differential test
+    and parse5. With parse5 gone `engines.node` is `>=18` again, as on main; nothing in the
+    tests held the raised value but the differential test's own guard, which is deleted.
+    Decisions 207 and 217 describe code that is gone. Kept for stylesheets: the governing
+    places, CTOC's protected paths, and a path that holds a character nobody sees, which is
+    still refused (now by rule 5, "I do not recognise").
+219. **`box-shadow` and `text-shadow` are no colour shorthands** (the coordinator). A bare
+    colour is no valid value of either: a browser drops `box-shadow: red` on both sides.
+220. **The `tokens` exception holds only as written** (the coordinator). Only a stylesheet's
+    own name part written exactly `tokens` is no sensitive word; `tokenS.css` and
+    `Tokens.dark.css` name their area again, as at `62b35dac`.
+221. **A third matcher of sensitive words, and three stems** (the coordinator). The path's
+    letters joined, every other character taken out, are searched for each listed word of
+    four letters or more (`log-in`, `log_out`, `check-out`, `pass-word`, `data-base`,
+    `work-flow`); the stems `licens`, `licenc` and `invoic` are on the list. Either of the
+    three matchers refuses. The executor's reading: a part that is exactly `author` or
+    `authors`, and a stylesheet's own name part written `tokens`, are left out of the joined
+    letters first, as the other two matchers leave them out; without that,
+    `styles/author/site.css` and `design-tokens.css` would be refused by the joining alone.
+222. **A database folder is named as one for a stylesheet too** (the coordinator):
+    `db/migrate/notes.css` answers "it changes stored data", before the kind returns.
+223. **A passing run's whole output is read once more** (the coordinator). A pass needs exit
+    code 0, no failure or skip counter above zero anywhere in the output, in either order
+    (`3 failed`, `# fail 3`, `failed: 3`), for `fail`, `failed`, `failures`, `error`,
+    `errors`, `skipped`, `ignored`, `todo`, `pending`, `flaky`, `xfailed`, `xpassed`,
+    `deselected`, `cancelled` and `filtered out`, and no line holding `FAILED`. The count
+    shown is the sum of the pass counts of every summary. The executor's readings: a line
+    that reports one passing test (`✔ …`, `ok 3 - …`) is not read, because a passing test's
+    name may hold such words; a summary of test files or suites (`Test Files`, `Test
+    Suites`) adds no passes, so jest's and vitest's tests are not counted twice; the quality
+    agent's passing result now carries its output (additive). A failure answers "the existing
+    tests fail", a skip "<n> tests were skipped".
+
 ## Execution Record
 
 Built by the iron-loop executor in the worktree `.claude/worktrees/hotfix-s1-build`
@@ -5230,6 +5272,103 @@ written:
   `[CTOC test-gate] coverage 99.88% (threshold 99%), skipped 0, failed 0`; `[CTOC
   test-gate] PASS`; `all files | 99.88 | 93.77 | 99.38` and `| 99.88 | 93.75 | 99.38`; 129
   seconds each.
+
+### After the re-check (2026-10-10)
+
+The final pass of the round, on the session coordinator's brief after the re-check of
+`4d5857cf`. Decisions 218 to 223. The specification hash was checked before and after the
+plan edit: `8092f09db82bf8ac0a95ac2a1a9d04bde47c6fecde79229ae1b5ae0aa7ebd1dd`.
+`src/lib/hotfix-check.js` went from 2,887 lines (`4d5857cf`) to 2,094; from 3,738 at the
+start of the round. Two usage-limit stops fell inside this pass; nothing was lost, and the
+work was then committed in small steps.
+
+**Commits.** `a51fa396` pages out (Decision 218). `411c037d` the small fixes (Decisions 219
+to 223). `c18b2a48` the module's header. `56e0163c` the differential's minimum pass share.
+
+**What came out, and why, with each deleted test group's reason.** Every group below tested
+the page reader, the wording rule or the instruction-file search, which are deleted; what it
+asserted is no longer true or false of the code.
+- Main test file: case 8 (a price in wording), "finding 2, same class: a page with many script
+  blocks", round 7 (its whole table was the HTML reader), "round 10, B1 to B3", both "round
+  10, B21" tests; and the page rows of the tables of rounds 3, 4, 5, 6 and 9, of "edge
+  shapes", of "every scanner fails closed", of "every guard fails closed" and of "a transform
+  only adds reasons to refuse" (154 rows). The tests of the check's mechanics (cases 1 to
+  53 and the rest) used a page as the file that passes; they now use a stylesheet, with no
+  assertion removed.
+- Corpus: the 10 page shapes that qualified and 55 page traps; 13 timing inputs of the HTML
+  reader; the property test's allowed characters for pages (none is allowed in a stylesheet).
+  Path and size traps were rewritten on stylesheets: 9 shapes qualify and 149 traps refuse.
+- Differential: the page generator, its oracle, its section, the 74 witnesses of the HTML
+  reader, the 28 page witnesses of the later rules (14 of them rewritten on stylesheets, the rest deleted with their rules), the
+  93 hand-written pages, the page half of the route sample, and the Node.js version guard.
+- One table (main file, "after the re-check: every extension the module ever recognised but
+  `.css` is refused") holds 20 extensions: `.html`, `.htm`, `.md`, `.txt`, `.json`, `.yaml`,
+  `.yml`, `.properties`, `.vue`, `.svelte`, `.jsx`, `.tsx`, `.mdx`, `.rst`, `.scss`, `.sass`,
+  `.less`, `.po`, `.svg`, and a page in capitals; and `ad<U+3164>min/site.css`. Seen failing:
+  the three page rows passed on `4d5857cf`, the Hangul path passed after the page reader was
+  deleted and before the path rule.
+
+**Each fix, with its test** (main file, "after the re-check: shadows, the `tokens` exception
+as written, sensitive words across separators, and a database folder" and "... a test run
+passes only when no failure or skip counter in its output is above zero ..."; both seen
+failing on `a51fa396`, each first assertion and then, as fixes landed, the next).
+
+| Fix | Witnesses | Before |
+|---|---|---|
+| shadows (219) | `box-shadow: red`, `text-shadow: red` refused; `outline` still passes | passed |
+| `tokens` as written (220) | `tokenS.css`, `Tokens.css` refused; `tokens.css` passes | passed |
+| joined letters (221) | `log-in/`, `pages/log_out.css`, `check-out/`, `pass-word/`, `data-base/`, `work-flow/`, `pay.ment.css`, `se-ssion/` | passed |
+| stems (221) | `licensing/`, `licences/`, `invoicing/` | passed |
+| database folder (222) | `db/migrate/notes.css`, `src/migrations/site.css` | passed / a sensitive word |
+| the run's output (223) | `node --test a; node --test b`, first failing; vitest `1 failed \| 3 passed`; pytest `2 passed, 1 error` and `1 xfailed, 2 deselected`; cargo `1 ignored`, `FAILED. 3 passed; 1 failed`, `2 filtered out`; deno `1 ignored`; playwright `1 flaky`; `failed: 2`; `# fail 1`; a `FAILED` line. Guards: `node --test a && node --test b` with 5 + 1 passing shows "6 tests passed."; zero counters pass; a passing test named "reports 3 failed logins" passes | the first passed |
+
+Tests changed by these fixes, with the reason: "finding 2c" times a long `background` value
+where it timed `box-shadow`; round 6's `box-shadow` row answers "not recognised";
+`Tokens.dark.css` is refused (Decision 220); the old matchers' table names a `migration` in
+a file name, because a folder of that name is a database folder.
+
+**The check on this repository's own suite** (a scratch clone of `56e0163c` with its
+packages; one stylesheet committed on top and one colour of it changed): refused after 186
+seconds, "the existing tests fail (the test command reported a failure)". The suite passed;
+the check refused it under Decision 223 as written: 29 lines of its output hold `FAILED` (its
+own tests of failure paths print "Step 14 VERIFY FAILED for …" and "Security scan FAILED: …"),
+and five of them also read as a failure counter (`FAILED: 1 critical`). So no hotfix can pass
+in this repository. Not changed: the brief words the rule exactly, and narrowing it is a
+decision for the coordinator (the executor's proposal: count `FAILED` only as a summary's
+word, at a line's start or after `test result:`, and read a counter only on a line that
+holds a pass counter too). There is no count to show.
+
+**The sentences of the specification this pass supersedes** (the text stays; the hash
+stands).
+- "Rule 4 — the four kinds, and everything else": one kind, a colour in a stylesheet.
+- Every sentence on markup, visible text, pages, HTML, and the acceptance criteria and Step 8
+  cases that pass a page (case 1's button wording, cases 4, 18, 19, 20 and the rest): a page
+  is refused; those cases change a stylesheet.
+- Rule 6, "no risk marker in wording": deleted; no qualifying file holds wording.
+- Risks, "The classifier passes a code change as text (template expressions, script, style
+  and text-area blocks, entities, a text node crossing a tag ...)": no text qualifies.
+- The Node.js version of Decision 174 and the ninth round's record: `>=18` again.
+
+**Recorded limits.**
+- A child process the tests start detached (its own process group or session) can outlive
+  the time limit: ending the test command's process group does not reach it.
+- A project's pre-commit hook that rewrites the judged file is the next piece's job: it
+  compares the commit with what was judged (`commit.judged`).
+- This repository's own suite cannot confirm a hotfix (above).
+
+**For the later piece on pages**, kept as found:
+- instruction files that govern by place (`.claude/rules/voice.md` and the like);
+- symbolic-linked instruction files, inside and outside the repository;
+- a name spelt with a decomposed accent, a no-break space, a zero-width space, a soft hyphen
+  or full-width letters;
+- two imports deep;
+- other tools' instruction file names: `AGENT.md`, `AGENTS.override.md`, `.goosehints`,
+  `QWEN.md`, `.github/agents/*.agent.md`;
+- a `CLAUDE.md` above the repository.
+The design idea for it: the project itself declares which pages are display pages.
+
+**The differential test** now holds stylesheets only. On the default seed: 27,083 edits,
+1,622 passed (5.99%), 0 disagreements; the minimum is 5.39%.
 
 ## Execution Plan (Steps 8-16)
 
