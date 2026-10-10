@@ -99,6 +99,7 @@ const SCREEN_MODULES = Object.freeze([
   // The menu-router contract ({ text, ask, actions }).
   'src/commands/start.js',
   'src/lib/menu-screens.js',
+  'src/lib/hotfix-check.js',
   'src/lib/streaming-gate.js',
   'src/lib/streaming-render.js',
   'src/lib/task-view.js',

@@ -947,8 +947,12 @@ function main() {
     // NOT duplicated into this branch).
     const { route } = require('../lib/menu-screens');
     const splitArgs = splitCliArgs(rest);
-    const result = route(splitArgs, app.projectPath, { liveAgentIds });
-    console.log(JSON.stringify(result, null, 2));
+    // A route may answer asynchronously (`hotfix check --run-tests` runs the tests), so the
+    // answer is printed once it settles. A synchronous route still throws exactly as before:
+    // the call happens before Promise.resolve.
+    Promise.resolve(route(splitArgs, app.projectPath, { liveAgentIds })).then((result) => {
+      console.log(JSON.stringify(result, null, 2));
+    });
     return;
   }
 

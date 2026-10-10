@@ -6,7 +6,7 @@
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
   <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.14.123-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-6.14.124-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-125-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-430-blue">
@@ -135,7 +135,7 @@ Answer them once; both choices are remembered. "Keep defaults, stop asking" and 
 **Worked example.** The classic pipeline overview (`Open the dashboard` on the first screen) of a busy project — this is a real capture of the CTO Chief repository itself:
 
 ```
-CTOC v6.14.123
+CTOC v6.14.124
 ────────────────────────────────────────────────────────────
 
 ▼ Business (2)
@@ -1107,7 +1107,7 @@ node --test tests/*.test.js   # fast pass only — does NOT enforce the floor
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.14.123'
+getVersion()       // → '6.14.124'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -1129,7 +1129,7 @@ ctoc/
 │   ├── hooks/       18 Claude Code hooks (session start, user-prompt-submit routing
 │   │                reminder, pre/post tool use, stop-continuation gate, subagent fence,
 │   │                record write protection — the only one Claude Code loads)
-│   ├── lib/         134 JS modules (planning, streaming gate, scheduler, quality,
+│   ├── lib/         135 JS modules (planning, streaming gate, scheduler, quality,
 │   │                enforcement, the EU-compliance program, the fences) plus plan-index/
 │   │                (the local semantic vector search)
 │   ├── areas/       5 dashboard areas (pipeline, inbox, agent, library, system)
@@ -1142,7 +1142,7 @@ ctoc/
 │                    61 quality configs, 6 agent-fragments/ — the cross-cutting
 │                    rules every agent carries: ancestry-read, async-choice-protocol,
 │                    honest-status, no-stub-rule, plain-gate-words, warnings-are-critical)
-├── tests/           564 test files (run with `npm test`)
+├── tests/           567 test files (run with `npm test`)
 ├── .ctoc/           Config, templates, operations, audit, loop journals, baselines
 │   ├── templates/   CLAUDE.md.template, canvas templates, SaaS templates,
 │   │                questions.yaml, product-kpis.yaml
@@ -1178,6 +1178,6 @@ Use CTO Chief freely for any project. You may not offer CTO Chief itself or a de
 
 ---
 
-**6.14.123** · Built by [@robotijn](https://github.com/robotijn)
+**6.14.124** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

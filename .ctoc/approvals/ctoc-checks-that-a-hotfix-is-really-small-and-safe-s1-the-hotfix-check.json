@@ -1,0 +1,9 @@
+{
+  "content_sha256": "14a39840dc7a60fc417edd2430dd79df71181f1ae19ef00bc584f09876afa45d",
+  "hash_scope": "specification",
+  "stage_from": "review",
+  "stage_to": "done",
+  "approved_at": "2026-10-10T22:56:24.332Z",
+  "approved_by": "human",
+  "plan_basename": "ctoc-checks-that-a-hotfix-is-really-small-and-safe-s1-the-hotfix-check"
+}

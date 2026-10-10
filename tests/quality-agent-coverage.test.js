@@ -116,21 +116,42 @@ const REAL_EXECSYNC = cp.execSync;
 const QA_PATH = require.resolve('../src/lib/quality-agent');
 
 // ---------------------------------------------------------------------------
-// child_process argv spy seam — the INJECTION-SAFE boundary. runSpecificTests now
-// runs jest/vitest/pytest/go via execFileSync with an ARGV VECTOR (shell:false), so
-// a test-file path from coverage-map.json can never be interpreted by a shell. This
-// harness captures the {bin, args, opts} of every execFileSync call AND harmlessly
-// stubs execSync (the fallback full-suite path) so nothing real is ever executed —
-// a malicious `a$(...).test.js` path in a test cannot run a command on the host.
+// child_process argv spy seam — the INJECTION-SAFE boundary. The runners start a test
+// program with spawnSync and an ARGV VECTOR (shell:false), so a test-file path from
+// coverage-map.json can never be interpreted by a shell. This harness fakes BOTH process
+// calls the module takes at load, then reloads it:
+//  - spawnSync records {bin, args, opts} and answers through the case's own function. A
+//    returned string is read as { status: 0, stdout: <the string>, stderr: '' }, a
+//    returned object is the spawnSync result itself, and a thrown error (the shape
+//    execFileSync threw) becomes { status: 1, stdout: <its stdout>, stderr: '' }.
+//  - execFileSync hands `git` to the real execFileSync; any other program is recorded and
+//    refused with `runner started through execFileSync`, so no real runner ever starts
+//    (`npm test` would run this repository's gated suite again, `npx jest` could install
+//    from the network).
+//  - execSync is stubbed harmlessly (the shell path).
+// "The fake saw no process start" means neither fake recorded a call.
 // ---------------------------------------------------------------------------
 const REAL_EXECFILESYNC = cp.execFileSync;
+const REAL_SPAWNSYNC = cp.spawnSync;
 
 function withExecSpies(impl, fn) {
   const fileCalls = [];
   const shellCalls = [];
-  cp.execFileSync = (bin, args, opts) => {
+  const execCalls = [];
+  cp.spawnSync = (bin, args, opts) => {
     fileCalls.push({ bin, args, opts });
-    return impl(bin, args, opts);
+    let answer;
+    try {
+      answer = impl(bin, args, opts);
+    } catch (err) {
+      return { status: 1, signal: null, stdout: err.stdout || '', stderr: '' };
+    }
+    return typeof answer === 'string' ? { status: 0, signal: null, stdout: answer, stderr: '' } : answer;
+  };
+  cp.execFileSync = (bin, args, opts) => {
+    if (bin === 'git') return REAL_EXECFILESYNC(bin, args, opts);
+    execCalls.push({ bin, args, opts });
+    throw new Error('runner started through execFileSync');
   };
   cp.execSync = (command) => {
     shellCalls.push(command);
@@ -138,12 +159,38 @@ function withExecSpies(impl, fn) {
   };
   delete require.cache[QA_PATH];
   const qa = require(QA_PATH);
-  try {
-    return { fileCalls, shellCalls, ...fn(qa, fileCalls, shellCalls) };
-  } finally {
+  const restore = () => {
+    cp.spawnSync = REAL_SPAWNSYNC;
     cp.execFileSync = REAL_EXECFILESYNC;
     cp.execSync = REAL_EXECSYNC;
     delete require.cache[QA_PATH];
+  };
+  let out;
+  try {
+    out = fn(qa, fileCalls, shellCalls, execCalls);
+  } catch (err) {
+    restore();
+    throw err;
+  }
+  if (out && typeof out.then === 'function') {
+    return out.then((v) => { restore(); return { fileCalls, shellCalls, execCalls, ...v }; },
+      (err) => { restore(); throw err; });
+  }
+  restore();
+  return { fileCalls, shellCalls, execCalls, ...out };
+}
+
+/** Run `fn` with process.platform and process.execPath replaced, restoring both. */
+async function withPlatform(platform, execPath, fn) {
+  const savedPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+  const savedExecPath = Object.getOwnPropertyDescriptor(process, 'execPath');
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true });
+  if (execPath) Object.defineProperty(process, 'execPath', { value: execPath, configurable: true, writable: true });
+  try {
+    return await fn();
+  } finally {
+    Object.defineProperty(process, 'platform', savedPlatform);
+    Object.defineProperty(process, 'execPath', savedExecPath);
   }
 }
 
@@ -238,7 +285,10 @@ describe('runTypecheck', () => {
 // framework's argv, goes red here — including the command-injection regression.
 // ---------------------------------------------------------------------------
 describe('runSpecificTests — per-framework argv construction (injection-safe process boundary)', () => {
-  it('SECURITY (RCE regression): a shell-metacharacter test path is a LITERAL argv element, never interpolated into a shell string', () => {
+  // The four cases below find or fake the jest or vitest call by its first argument, which is
+  // the program's own name only where npx starts by name; on Windows node starts npm's own
+  // npx-cli.js (case g pins that launch). So they run with the platform set to Linux.
+  it('SECURITY (RCE regression): a shell-metacharacter test path is a LITERAL argv element, never interpolated into a shell string', async () => {
     // A path like this arrives verbatim from .ctoc/state/coverage-map.json (entry.tests)
     // with NO sanitization. On the old string-interpolation path
     // (`npx jest ${testFiles.join(' ')}` → execSync → /bin/sh -c) the `$(...)` was a
@@ -247,7 +297,7 @@ describe('runSpecificTests — per-framework argv construction (injection-safe p
     // ever sees it. This test fails LOUDLY against the vulnerable string code (which
     // never calls execFileSync and leaks the payload into a shell string).
     const evil = 'a$(touch /tmp/ctoc_pwn).test.js';
-    withExecSpies(() => '0 passed', (qa, fileCalls, shellCalls) => {
+    await withExecSpies(() => '0 passed', (qa, fileCalls, shellCalls) => withPlatform('linux', null, () => {
       qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'jest' } }, [evil]);
 
       const jestCall = fileCalls.find(c => Array.isArray(c.args) && c.args[0] === 'jest');
@@ -261,32 +311,34 @@ describe('runSpecificTests — per-framework argv construction (injection-safe p
       assert.ok(!shellCalls.some(c => c.includes(evil)),
         `the malicious path must never appear in a shell command string; shell calls=${JSON.stringify(shellCalls)}`);
       return {};
-    });
+    }));
   });
 
-  it('builds an `npx jest <files>` ARGV vector for the jest framework', () => {
-    withExecSpies(() => '5 passed', (qa, fileCalls) => {
+  it('builds an `npx jest <files>` ARGV vector for the jest framework', async () => {
+    await withExecSpies(() => '5 passed', (qa, fileCalls) => withPlatform('linux', null, () => {
       const res = qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'jest' } }, ['a.test.js', 'b.test.js']);
       assert.equal(res.passed, true);
       const c = fileCalls.find(x => x.args && x.args[0] === 'jest');
-      assert.ok(c, `expected an execFileSync npx jest call; got ${JSON.stringify(fileCalls)}`);
-      assert.match(c.bin, /^npx(\.cmd)?$/, 'jest launches via npx (npx.cmd on win32)');
+      assert.ok(c, `expected a spawnSync npx jest call; got ${JSON.stringify(fileCalls)}`);
+      // The launcher contract (Decision 35): `npx` by name off Windows; on Windows node runs
+      // npm's own npx-cli.js, which case g below pins with a replaced platform.
+      assert.equal(c.bin, 'npx', 'jest launches via npx');
       assert.deepEqual(c.args, ['jest', 'a.test.js', 'b.test.js']);
       assert.equal(c.opts && c.opts.shell, false);
       return {};
-    });
+    }));
   });
 
-  it('builds an `npx vitest run <files>` ARGV vector for the vitest framework', () => {
-    withExecSpies(() => '', (qa, fileCalls) => {
+  it('builds an `npx vitest run <files>` ARGV vector for the vitest framework', async () => {
+    await withExecSpies(() => '', (qa, fileCalls) => withPlatform('linux', null, () => {
       qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'vitest' } }, ['a.test.js']);
       const c = fileCalls.find(x => x.args && x.args[0] === 'vitest');
       assert.ok(c, `expected an execFileSync npx vitest call; got ${JSON.stringify(fileCalls)}`);
-      assert.match(c.bin, /^npx(\.cmd)?$/);
+      assert.equal(c.bin, 'npx', 'vitest launches via npx by name');
       assert.deepEqual(c.args, ['vitest', 'run', 'a.test.js']);
       assert.equal(c.opts && c.opts.shell, false);
       return {};
-    });
+    }));
   });
 
   it('builds a `pytest <files>` ARGV vector for the pytest framework', () => {
@@ -336,17 +388,18 @@ describe('runSpecificTests — per-framework argv construction (injection-safe p
     });
   });
 
-  it('returns a failing result (failed:1, passCount preserved) when a framework command exits non-zero', () => {
-    withExecSpies((bin, args) => {
+  it('returns a failing result (failed:1, passCount preserved) when a framework command exits non-zero', async () => {
+    const { fileCalls } = await withExecSpies((bin, args) => {
       if (args && args[0] === 'jest') { const e = new Error('boom'); e.stdout = 'nope'; throw e; }
       return '';
-    }, (qa) => {
+    }, (qa) => withPlatform('linux', null, () => {
       const res = qa.runSpecificTests({ js: { test: 'ignored', testFramework: 'jest' } }, ['a.test.js']);
       assert.equal(res.passed, false);
       assert.equal(res.failed, 1);
       assert.equal(res.passCount, 0);
       return {};
-    });
+    }));
+    assert.equal(fileCalls.length, 1, 'the one jest call was the one that failed');
   });
 
   it('short-circuits to a NON-pass (undetermined) before running anything', async () => {
@@ -863,5 +916,434 @@ describe('printSummary', () => {
     assert.match(out, /CHECKS FAILED/);
     assert.match(out, /Lint:\s+FAIL/);
     assert.match(out, /1 scanner\(s\) skipped/, 'a partial-coverage security result must surface its skip count');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The test runners' faults the hotfix check met (plan: the hotfix check, Step 8, cases a
+// to k). A run's standard error is read on a passing and a failing run; a timeout, output
+// past 10 MiB, a runner that cannot start and npm's placeholder are "undetermined", never
+// a failure and never a pass; on Windows npm and npx start as node running npm's own
+// command-line script, with no command interpreter.
+// ---------------------------------------------------------------------------
+describe('runFullTests and runSpecificTests — undetermined runs, standard error and the npm launcher', () => {
+  const ENOENT_NOT_STARTED = /could not be started/;
+
+  it('a. a failing run\'s output holds its standard output and its standard error', async () => {
+    const cmd = `"${NODE}" -e "console.log('one line'); console.error('FAIL tests/a.test.js'); process.exit(1)"`;
+    const { res } = await captureLog(() => qualityAgent.runFullTests({ javascript: { test: cmd } }));
+    assert.equal(res.passed, false);
+    assert.match(res.output, /one line/);
+    assert.match(res.output, /FAIL tests\/a\.test\.js/);
+  });
+
+  it('b. a configured test command that does not exist is undetermined', async () => {
+    const { res } = await captureLog(() => qualityAgent.runFullTests({ javascript: { test: 'ctoc-no-such-runner' } }));
+    assert.equal(res.passed, false);
+    assert.equal(res.undetermined, true);
+    assert.match(res.output, ENOENT_NOT_STARTED);
+  });
+
+  it('c. a configured run that exits 127 (a shell that cannot find the program) is undetermined', async () => {
+    const code = process.platform === 'win32' ? 9009 : 127;
+    const { res } = await captureLog(() => qualityAgent.runFullTests({ javascript: { test: `"${NODE}" -e "process.exit(${code})"` } }));
+    assert.equal(res.passed, false);
+    assert.equal(res.undetermined, true);
+  });
+
+  it('d. a timeout is undetermined, through runFullTests and through runSpecificTests\' jest path', async () => {
+    const timeout = () => ({ status: null, signal: 'SIGTERM', error: Object.assign(new Error('spawnSync npx ETIMEDOUT'), { code: 'ETIMEDOUT' }), stdout: '', stderr: '' });
+    await withExecSpies(timeout, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'jest' } }));
+      assert.equal(res.passed, false);
+      assert.equal(res.undetermined, true);
+      assert.match(res.output, /timed out/);
+      const spec = qa.runSpecificTests({ javascript: { test: 'jest', testFramework: 'jest' } }, ['tests/a.test.js']);
+      assert.equal(spec.passed, false);
+      assert.equal(spec.undetermined, true);
+      assert.match(spec.output, /timed out/);
+      return {};
+    });
+  });
+
+  it('e. npm\'s placeholder test script runs nothing and is undetermined', async () => {
+    const { fileCalls, execCalls } = await withExecSpies(() => 'should never run', async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({
+        js: { test: 'echo "Error: no test specified" && exit 1', testFromScript: true }
+      }));
+      assert.equal(res.passed, false);
+      assert.equal(res.undetermined, true);
+      assert.match(res.output, /placeholder/);
+      return {};
+    });
+    assert.deepEqual(fileCalls, [], 'the fake saw no process start');
+    assert.deepEqual(execCalls, [], 'the fake saw no process start');
+  });
+
+  it('f. on Windows `npm test` starts as node running npm-cli.js, with no shell', async () => {
+    const dir = mkTmp('ctoc-npm-win-');
+    try {
+      const nodeExe = path.join(dir, 'node.exe');
+      const cli = path.join(dir, 'node_modules', 'npm', 'bin', 'npm-cli.js');
+      fs.mkdirSync(path.dirname(cli), { recursive: true });
+      fs.writeFileSync(cli, '');
+      const { fileCalls } = await withExecSpies(() => '\u2139 pass 1\n\u2139 fail 0\n', (qa) => withPlatform('win32', nodeExe, async () => {
+        const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node --test', testFromScript: true } }));
+        assert.equal(res.passed, true);
+        return {};
+      }));
+      assert.equal(fileCalls.length, 1);
+      assert.equal(fileCalls[0].bin, nodeExe);
+      assert.deepEqual(fileCalls[0].args, [cli, 'test']);
+      assert.equal(fileCalls[0].opts.shell, false);
+    } finally {
+      rm(dir);
+    }
+  });
+
+  it('g. on Windows `npx jest <files>` starts as node running npx-cli.js', async () => {
+    const dir = mkTmp('ctoc-npx-win-');
+    try {
+      const nodeExe = path.join(dir, 'node.exe');
+      const cli = path.join(dir, 'node_modules', 'npm', 'bin', 'npx-cli.js');
+      fs.mkdirSync(path.dirname(cli), { recursive: true });
+      fs.writeFileSync(cli, '');
+      const { fileCalls } = await withExecSpies(() => 'Tests: 1 passed, 1 total', (qa) => withPlatform('win32', nodeExe, async () => {
+        const res = qa.runSpecificTests({ javascript: { test: 'jest', testFramework: 'jest' } }, ['tests/a.test.js']);
+        assert.equal(res.passed, true);
+        return {};
+      }));
+      assert.equal(fileCalls.length, 1);
+      assert.equal(fileCalls[0].bin, nodeExe);
+      assert.deepEqual(fileCalls[0].args, [cli, 'jest', 'tests/a.test.js']);
+      assert.equal(fileCalls[0].opts.shell, false);
+    } finally {
+      rm(dir);
+    }
+  });
+
+  it('h. on Windows without npm\'s script beside node nothing starts, and the run is undetermined', async () => {
+    const dir = mkTmp('ctoc-npm-none-');
+    try {
+      const nodeExe = path.join(dir, 'node.exe');
+      const { fileCalls, execCalls } = await withExecSpies(() => 'should never run', (qa) => withPlatform('win32', nodeExe, async () => {
+        const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node --test', testFromScript: true } }));
+        assert.equal(res.passed, false);
+        assert.equal(res.undetermined, true);
+        assert.match(res.output, /npm-cli\.js/, 'the output names the missing script');
+        return {};
+      }));
+      assert.deepEqual(fileCalls, [], 'the fake saw no process start');
+      assert.deepEqual(execCalls, [], 'the fake saw no process start');
+    } finally {
+      rm(dir);
+    }
+  });
+
+  it('i. every other platform starts `npm test` and `npx jest <files>` by name', async () => {
+    const { fileCalls } = await withExecSpies(() => '\u2139 pass 1\n\u2139 fail 0\n', (qa) => withPlatform('linux', null, async () => {
+      await captureLog(() => qa.runFullTests({ javascript: { test: 'node --test', testFromScript: true } }));
+      qa.runSpecificTests({ javascript: { test: 'jest', testFramework: 'jest' } }, ['tests/a.test.js']);
+      return {};
+    }));
+    assert.deepEqual(fileCalls.map((c) => [c.bin, c.args]), [['npm', ['test']], ['npx', ['jest', 'tests/a.test.js']]]);
+  });
+
+  it('j. a passing run whose counters are on standard error counts as a run', async () => {
+    const cmd = `"${NODE}" -e "console.error('Tests:       2 passed, 2 total')"`;
+    const { res } = await captureLog(() => qualityAgent.runFullTests({ javascript: { test: cmd } }));
+    assert.equal(res.passed, true);
+    assert.equal(res.passCount, 2);
+  });
+
+  it('k. output past 10 MiB is undetermined, never a timeout', async () => {
+    const tooLarge = () => ({ status: null, signal: 'SIGTERM', error: Object.assign(new Error('spawnSync jest ENOBUFS'), { code: 'ENOBUFS' }), stdout: '\u2139 pass 3', stderr: '' });
+    await withExecSpies(tooLarge, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'jest' } }));
+      assert.equal(res.passed, false);
+      assert.equal(res.undetermined, true);
+      assert.match(res.output, /10 MiB/);
+      assert.doesNotMatch(res.output, /timed out/);
+      return {};
+    });
+  });
+
+  it('a configured test command with shell structure is refused, and the result says so', async () => {
+    const { res } = await captureLog(() => qualityAgent.runFullTests({ javascript: { test: 'npm run build && npm test' } }));
+    assert.equal(res.passed, false);
+    assert.equal(res.refused, true);
+    assert.match(res.output, /REFUSED/);
+    const specific = qualityAgent.runSpecificTests({ javascript: { test: 'npm run build && npm test' } }, ['a.test.js']);
+    assert.equal(specific.passed, false);
+    assert.equal(specific.refused, true);
+  });
+
+  it('counters are read from standard output; standard error only when standard output has none', async () => {
+    const both = () => ({ status: 0, signal: null, stdout: '\u2139 pass 2\n\u2139 fail 1\n', stderr: '\u2139 pass 3\n\u2139 fail 0\n' });
+    await withExecSpies(both, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+      assert.equal(res.passed, false, 'standard output reports a failure; standard error cannot outvote it');
+      assert.equal(res.failed, 1);
+      const specific = qa.runSpecificTests({ javascript: { test: 'node x' } }, ['a.test.js']);
+      assert.equal(specific.passed, false);
+      assert.equal(specific.failed, 1);
+      return {};
+    });
+    const errOnly = () => ({ status: 0, signal: null, stdout: 'Determining test suites to run...\n', stderr: 'Tests:       4 passed, 4 total\n' });
+    await withExecSpies(errOnly, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+      assert.equal(res.passed, true);
+      assert.equal(res.passCount, 4, 'jest\'s case: the counters on standard error are read');
+      return {};
+    });
+  });
+
+  it('a failure on standard error refuses the run even when standard output reports none', async () => {
+    const mirrored = () => ({ status: 0, signal: null, stdout: '\u2139 pass 2\n\u2139 fail 0\n', stderr: '\u2139 pass 3\n\u2139 fail 1\n' });
+    await withExecSpies(mirrored, async (qa) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+      assert.equal(res.passed, false, 'standard error reports a failure; a clean standard output cannot hide it');
+      assert.equal(res.failed, 1);
+      const specific = qa.runSpecificTests({ javascript: { test: 'node x' } }, ['a.test.js']);
+      assert.equal(specific.passed, false);
+      assert.equal(specific.failed, 1);
+      return {};
+    });
+  });
+
+  /**
+   * What a timed call must cost, in milliseconds, and below what a time is noise. Until the tenth
+   * round the ratio was `big / max(small, 20)`: with a small input that cost 2 ms, a reader that
+   * took 100 ms at four times the size (50 times as long) showed a ratio of 5 and passed. The
+   * inputs now grow until a call costs 40 ms, and only a time below 2 ms is taken for 2 ms, so
+   * that a reader too fast to time must also be fast, in milliseconds, at four times the size.
+   */
+  const TIMED_MS = 40;
+  const NOISE_MS = 2;
+  /**
+   * A timing case in ratio form (the decision at review of 2026-10-09: a bound in milliseconds
+   * passed or failed with the machine's load, where a ratio does not). `at(n)` gives the call
+   * to time on an input of size `n`, built before it is timed. The call is warmed once; `n`
+   * grows until one call costs at least 40 ms or `4n` would pass `limit` (inputs of many
+   * megabytes measure the engine's memory, not the reader); an input that cannot grow that
+   * far is run several times in a row, so that what is timed still costs about 40 ms. Then
+   * the minimum of five runs at `n` and of five runs at `4n` is taken. Work that is linear in
+   * the input gives a ratio near 4, quadratic work one near 16, and the bound is 8. The one
+   * absolute bound is seconds wide and stops a runaway reader early.
+   */
+  async function growth(at, n, limit) {
+    const ms = async (call) => {
+      const start = process.hrtime.bigint();
+      await call();
+      return Number(process.hrtime.bigint() - start) / 1e6;
+    };
+    let call = at(n);
+    await ms(call); // warm once
+    let once = await ms(call);
+    while (once < TIMED_MS && n * 8 <= limit) {
+      n *= once < TIMED_MS / 4 && n * 16 <= limit ? 4 : 2;
+      call = at(n);
+      once = await ms(call);
+    }
+    assert.ok(once < 5000, `one call at size ${n} took ${once.toFixed(0)} ms`);
+    const times = once < TIMED_MS ? Math.min(Math.ceil(TIMED_MS / Math.max(once, 0.02)), 2000) : 1;
+    const run = async (fn) => {
+      let sum = 0;
+      for (let k = 0; k < times; k++) sum += await ms(fn);
+      return sum;
+    };
+    const least = async (fn) => Math.min(await run(fn), await run(fn), await run(fn), await run(fn), await run(fn));
+    const small = await least(call);
+    const big = await least(at(4 * n));
+    return { n, small, big, ratio: big / Math.max(small, NOISE_MS) };
+  }
+
+  it('a passing run with a long blank stretch is read in linear time', async () => {
+    // The runner is faked once and answers the output of the call being timed; the quality
+    // agent reads it in this process.
+    let stdout = '';
+    await withExecSpies(() => stdout, async (qa) => {
+      const at = (kb) => {
+        const output = `\u2139 pass 1\n\u2139 fail 0\n${'\n'.repeat(kb * 1024)}done\n`;
+        return async () => {
+          stdout = output;
+          const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+          assert.equal(res.passed, true, JSON.stringify(res));
+          assert.equal(res.passCount, 1);
+        };
+      };
+      const { n, small, big, ratio } = await growth(at, 4, 2048);
+      assert.ok(ratio < 8, `${n} KB of blank lines took ${small.toFixed(1)} ms and ${4 * n} KB took ${big.toFixed(1)} ms`);
+      return {};
+    });
+  });
+
+  it('a long run of digits in a run\'s output is read in linear time by the skipped and passed fallbacks', async () => {
+    // The re-review of 2026-10-09: `(\d+)\s+skipped` and `(\d+)\s*(passed|passing)` tried
+    // every start inside a run of digits, each scanning to its end: quadratic.
+    let stdout = '';
+    await withExecSpies(() => stdout, async (qa) => {
+      for (const [label, head] of [['the skipped fallback', '\u2139 pass 1\n\u2139 fail 0\n'], ['the passed fallback', '']]) {
+        const at = (kb) => {
+          const output = `${head}${'7'.repeat(kb * 1024)}x\n`;
+          return async () => {
+            stdout = output;
+            await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' } }));
+          };
+        };
+        const { n, small, big, ratio } = await growth(at, 4, 2048);
+        assert.ok(ratio < 8, `${label}: ${n} thousand digits took ${small.toFixed(1)} ms and ${4 * n} thousand took ${big.toFixed(1)} ms`);
+      }
+      return {};
+    });
+  });
+
+  it('runCommandArgv without allowFail throws the shape execFileSync threw', () => {
+    assert.throws(() => qualityAgent.runCommandArgv(NODE, ['-e', 'process.exit(3)'], { silent: true }), (err) => {
+      assert.equal(err.status, 3);
+      assert.match(err.message, /exited with 3/);
+      return true;
+    });
+    assert.throws(() => qualityAgent.runCommandArgv('ctoc-no-such-runner', [], { silent: true }), (err) => err.code === 'ENOENT');
+  });
+});
+
+// The hotfix check's tenth round (2026-10-10): what the reviewers of its ninth round found in
+// the test run. Each case was written and seen failing before its fix.
+describe('the test run: one run per command, a failure counted on a summary line, and the whole process tree ended at the time limit', () => {
+  const COUNTERS = `${String.fromCharCode(0x2139)} pass 5\n${String.fromCharCode(0x2139)} fail 0\n`;
+
+  it('B11: a test command two detected languages share runs once, and its count is the count of one run', async () => {
+    await withExecSpies(() => COUNTERS, async (qa, fileCalls) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' }, typescript: { test: 'node x' } }));
+      assert.equal(fileCalls.length, 1, JSON.stringify(fileCalls.map((c) => [c.bin, c.args])));
+      assert.deepEqual([res.passed, res.passCount], [true, 5]);
+      return {};
+    });
+    await withExecSpies(() => COUNTERS, async (qa, fileCalls) => {
+      const script = { test: 'node --test', testFromScript: true };
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: script, typescript: { ...script } }));
+      assert.equal(fileCalls.length, 1, 'npm test once');
+      assert.equal(res.passCount, 5);
+      return {};
+    });
+    // Two commands that differ each run; a script's `node x` and a configured `node x` are two.
+    await withExecSpies(() => COUNTERS, async (qa, fileCalls) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' }, python: { test: 'pytest' }, typescript: { test: 'node x', testFromScript: true } }));
+      assert.equal(fileCalls.length, 3);
+      assert.equal(res.passCount, 15);
+      return {};
+    });
+    await withExecSpies(() => COUNTERS, async (qa, fileCalls) => {
+      const jest = { test: 'jest', testFramework: 'jest' };
+      const res = qa.runSpecificTests({ javascript: jest, typescript: { ...jest } }, ['a.test.js']);
+      assert.equal(fileCalls.length, 1, 'the selected tests once');
+      assert.equal(res.passCount, 5);
+      return {};
+    });
+  });
+
+  it('B11: a lint command two detected languages share runs once', async () => {
+    await withExecSpies(() => '', async (qa, fileCalls) => {
+      const { res } = await captureLog(() => qa.runLint({ javascript: { lint: 'eslint .' }, typescript: { lint: 'eslint .' }, python: { lint: 'ruff check' } }));
+      assert.deepEqual(fileCalls.map((c) => [c.bin, ...c.args].join(' ')), ['eslint .', 'ruff check']);
+      assert.deepEqual([res.passed, res.ran], [true, 2]);
+      return {};
+    });
+  });
+
+  it('B13: "N failed" on a summary line is a failure, also when the runner exits with 0', async () => {
+    const failing = ['1 failed, 3 passed', '=== 1 failed, 3 passed in 0.12s ===', '3 passed, 2 failed', '  2 failed', '1 failed in 0.1s', '1 skipped, 1 failed, 3 passed'];
+    for (const summary of failing) {
+      await withExecSpies(() => `collected 4 items\n${summary}\n`, async (qa) => {
+        const { res } = await captureLog(() => qa.runFullTests({ python: { test: 'pytest' } }));
+        assert.equal(res.passed, false, summary);
+        assert.ok(res.failed >= 1, summary);
+        return {};
+      });
+    }
+    // No summary line: a test's name or its own output that holds the words, and a count of none.
+    const clean = ['ok 1 - 3 failed attempts are retried\n4 passed', '2 failed logins recorded\n4 passed', '4 passed, 0 failed', 'the 1 failed request is retried\n4 passed'];
+    for (const output of clean) {
+      await withExecSpies(() => `${output}\n`, async (qa) => {
+        const { res } = await captureLog(() => qa.runFullTests({ python: { test: 'pytest' } }));
+        assert.equal(res.passed, true, output);
+        return {};
+      });
+    }
+  });
+
+  it('B14: the tree is ended only for a run that asked for it and was stopped; a group already gone is no fault, any other failure is one', async () => {
+    const stopped = () => ({ pid: 4242, status: null, signal: 'SIGTERM', error: Object.assign(new Error('spawnSync node ETIMEDOUT'), { code: 'ETIMEDOUT' }), stdout: '', stderr: '' });
+    const realKill = process.kill;
+    const killed = [];
+    const withKill = async (fake, fn) => {
+      process.kill = fake;
+      try { return await fn(); } finally { process.kill = realKill; }
+    };
+    const record = (pid, signal) => { killed.push([pid, signal]); return true; };
+    const tools = { javascript: { test: 'node x' } };
+    await withExecSpies(stopped, async (qa, fileCalls) => {
+      const { res } = await withKill(record, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true, timeout: 5 })));
+      assert.equal(res.undetermined, true);
+      assert.deepEqual(killed, [[-4242, 'SIGKILL']], 'the group of the stopped program');
+      assert.deepEqual([fileCalls[0].opts.detached, fileCalls[0].opts.timeout], [true, 5]);
+      killed.length = 0;
+      await withKill(record, () => captureLog(() => qa.runFullTests(tools)));
+      assert.deepEqual(killed, [], 'not asked for: nothing is ended');
+      assert.equal('detached' in fileCalls[1].opts, false);
+      const gone = () => { throw Object.assign(new Error('kill ESRCH'), { code: 'ESRCH' }); };
+      const { res: quiet } = await withKill(gone, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true })));
+      assert.equal(quiet.undetermined, true, 'a group already gone is no fault');
+      const refused = () => { throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' }); };
+      await assert.rejects(withKill(refused, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true }))), /EPERM/);
+      return {};
+    });
+    // A run that ended by itself has its group ended too (since the second final re-check of
+    // 2026-10-10: what it started could still write after the answer).
+    await withExecSpies(() => ({ pid: 4242, status: 1, signal: null, stdout: '', stderr: '' }), async (qa) => {
+      await withKill(record, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true })));
+      assert.deepEqual(killed, [[-4242, 'SIGKILL']]);
+      killed.length = 0;
+      return {};
+    });
+    // Windows: taskkill with the program's id, and no process group.
+    const platform = Object.getOwnPropertyDescriptor(process, 'platform');
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    try {
+      await withExecSpies((bin) => (bin === 'taskkill' ? '' : stopped()), async (qa, fileCalls) => {
+        await withKill(record, () => captureLog(() => qa.runFullTests({ javascript: { test: 'runner x' } }, { wholeTree: true })));
+        assert.deepEqual(fileCalls.map((c) => [c.bin, ...c.args]), [['runner', 'x'], ['taskkill', '/pid', '4242', '/T', '/F']]);
+        assert.equal('detached' in fileCalls[0].opts, false);
+        assert.deepEqual(killed, []);
+        return {};
+      });
+    } finally {
+      Object.defineProperty(process, 'platform', platform);
+    }
+  });
+
+  it('B14: at the time limit the whole process tree of the test command ends', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'qa-tree-'));
+    const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    let pid = 0;
+    try {
+      fs.writeFileSync(path.join(dir, 'slow.js'), "require('fs').writeFileSync('slow.pid', String(process.pid));\nsetTimeout(() => {}, 60000);\n");
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'slow', version: '1.0.0', private: true, scripts: { test: 'node slow.js && echo done' } }));
+      const started = Date.now();
+      const { res } = await withCwd(dir, () => captureLog(() => qualityAgent.runFullTests(
+        { javascript: { test: 'node slow.js && echo done', testFromScript: true } }, { timeout: 3000, wholeTree: true })));
+      assert.ok(Date.now() - started < 30000, 'the run came back at its time limit');
+      assert.deepEqual([res.passed, res.undetermined], [false, true], JSON.stringify(res));
+      assert.match(res.output, /timed out/);
+      pid = Number(fs.readFileSync(path.join(dir, 'slow.pid'), 'utf8'));
+      assert.ok(pid > 0, 'the test script started');
+      // The signal that ends the tree is sent before the run returns; the processes need a moment to go.
+      for (let waited = 0; alive(pid) && waited < 5000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+      assert.equal(alive(pid), false, `the test script (process ${pid}) is left behind`);
+    } finally {
+      if (pid > 0 && alive(pid)) process.kill(pid, 'SIGKILL');
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    }
   });
 });

@@ -95,6 +95,7 @@ const PLANTED_AWS_KEY = 'AKIAJKQR7MNPZ2WXVBDF';
 const SENTINEL = 'CTOC-COVERAGE-HOLES-SENTINEL';
 
 const REAL_EXECFILESYNC = cp.execFileSync;
+const REAL_SPAWNSYNC = cp.spawnSync;
 const REAL_EXECSYNC = cp.execSync;
 const REAL_FIND_AFFECTED = coverageMap.findAffectedTests;
 
@@ -128,8 +129,9 @@ async function quiet(fn) {
  * visible to a FRESH instance. The module under test is unchanged; only its collaborators
  * are replaced, and everything is restored in the finally.
  */
-async function withBoundaries({ execFileSync, findAffectedTests }, fn) {
+async function withBoundaries({ execFileSync, spawnSync, findAffectedTests }, fn) {
   if (execFileSync) cp.execFileSync = execFileSync;
+  if (spawnSync) cp.spawnSync = spawnSync;
   // Nothing in these cases may reach a shell. A shell command here is a test defect.
   cp.execSync = (command) => {
     throw new Error(`no shell command may run in this test (got: ${String(command).slice(0, 40)})`);
@@ -141,6 +143,7 @@ async function withBoundaries({ execFileSync, findAffectedTests }, fn) {
     return await fn(qa);
   } finally {
     cp.execFileSync = REAL_EXECFILESYNC;
+    cp.spawnSync = REAL_SPAWNSYNC;
     cp.execSync = REAL_EXECSYNC;
     coverageMap.findAffectedTests = REAL_FIND_AFFECTED;
     delete require.cache[QA_PATH];
@@ -150,6 +153,21 @@ async function withBoundaries({ execFileSync, findAffectedTests }, fn) {
 /** A failure exactly as execFileSync reports one: non-zero status, output on err.stdout. */
 function execFailure(stdout) {
   return Object.assign(new Error('Command failed'), { status: 1, stdout });
+}
+
+/**
+ * The test runner starts programs with spawnSync. A runner fake written as execFileSync's
+ * (a returned string is the output, a thrown failure carries it on err.stdout) answers
+ * through this as a spawnSync result with the same output.
+ */
+function asSpawn(runner) {
+  return (bin, args) => {
+    try {
+      return { status: 0, signal: null, stdout: runner(bin, args), stderr: '' };
+    } catch (err) {
+      return { status: 1, signal: null, stdout: err.stdout || '', stderr: '' };
+    }
+  };
 }
 
 /**
@@ -437,7 +455,7 @@ describe('runSmartTests: the affected-test selection and its hash cache', () => 
     };
 
     const result = await inFixture(() => withBoundaries(
-      { execFileSync: gitFake(runner), findAffectedTests: affectedFake(['tests/one.test.js']) },
+      { execFileSync: gitFake(), spawnSync: asSpawn(runner), findAffectedTests: affectedFake(['tests/one.test.js']) },
       qa => quiet(() => qa.runSmartTests({
         javascript: { test: 'never-run', testFramework: 'jest' }
       }))
@@ -459,7 +477,7 @@ describe('runSmartTests: the affected-test selection and its hash cache', () => 
     const runner = () => { throw execFailure('ℹ pass 0\nℹ fail 1\n'); };
 
     const result = await inFixture(() => withBoundaries(
-      { execFileSync: gitFake(runner), findAffectedTests: affectedFake(['tests/one.test.js']) },
+      { execFileSync: gitFake(), spawnSync: asSpawn(runner), findAffectedTests: affectedFake(['tests/one.test.js']) },
       qa => quiet(() => qa.runSmartTests({
         javascript: { test: 'never-run', testFramework: 'jest' }
       }))

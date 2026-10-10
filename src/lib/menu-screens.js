@@ -51,6 +51,7 @@ const gateMigration = require('./gate-migration');
 // The ONE encoding of human-facing gate wording — say the MOMENT/decision, never the
 // gate number, which is an internal code a person cannot decode.
 const gateWords = require('./gate-words');
+const hotfixCheck = require('./hotfix-check');
 
 // Task lifecycle legality is asked of the registry's ONE encoding (`canTransition`
 // / `actions.cancelTask`), never re-encoded here — see `taskTransition`. The former
@@ -2894,6 +2895,11 @@ function route(args, projectPath, opts = {}) {
       const file = ref.substring(slashIndex + 1);
       return validateScreen(stage, file, projectPath);
     }
+
+    // `hotfix check [--run-tests] [<file> ...]` — the hotfix check judges a change that was
+    // called a hotfix (src/lib/hotfix-check.js). Asynchronous: it can run the tests.
+    case 'hotfix':
+      return hotfixCheck.hotfixRoute(args.slice(1), getProjectPath(projectPath));
 
     default:
       return dashboardPipeline(projectPath, opts);
