@@ -274,6 +274,8 @@ const { isCtocProject } = require('./ctoc-project-detector');
 const MAX_LINES = 20;
 const MAX_FILES = 3;
 const LOG_MAX_BYTES = 1024 * 1024;
+/** How many pieces of 1 MiB are read of untracked files to count their lines for the log ({@link unstagedLineCount}). */
+const UNTRACKED_COUNT_PIECES = 4;
 const STATUS_LINE = 'Checking the hotfix against the existing tests.';
 const USAGE = 'Use: hotfix check [--run-tests] [<file> ...]';
 const SENTENCE_HEAD = 'I did not treat this as a hotfix because ';
@@ -781,7 +783,8 @@ function readChange(root, named, ctx, runTests) {
  * The changed lines of a change that is refused before it is staged ({@link readChange}),
  * for the log: git's own count for every path git tracks (`diff --numstat` against the last
  * commit, which writes nothing), and for an untracked file its lines as they stand in the
- * working folder, read in pieces (a link counts as the one line git would store for it).
+ * working folder, read in pieces up to a fixed amount over all such files (a link counts as
+ * the one line git would store for it).
  * @param {Context} ctx @param {ChangedFile[]} files @returns {number}
  */
 function unstagedLineCount(ctx, files) {
@@ -796,9 +799,14 @@ function unstagedLineCount(ctx, files) {
       count += (Number(added) || 0) + (Number(removed) || 0);
     }
   }
+  // A bounded read (the tenth round): the count is for the log only, and a call that names no
+  // file would otherwise read every untracked file to its end. Past the budget the counting
+  // stops, and the log's count is then a lower bound.
   const piece = Buffer.alloc(1024 * 1024);
+  let budget = UNTRACKED_COUNT_PIECES;
   for (const f of files) {
     if (f.oldSha !== null) continue;
+    if (budget <= 0) break;
     const abs = path.join(top, ...f.topRel.split('/'));
     const st = safeFs.lstatSync(abs);
     if (st.isSymbolicLink()) count += 1;
@@ -806,11 +814,13 @@ function unstagedLineCount(ctx, files) {
     const fd = safeFs.openSync(abs, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
     try {
       let last = 10;
-      for (let n = fs.readSync(fd, piece); n > 0; n = fs.readSync(fd, piece)) {
+      let n = 0;
+      while (budget > 0 && (n = fs.readSync(fd, piece)) > 0) {
+        budget--;
         for (let i = 0; i < n; i++) if (piece[i] === 10) count++;
         last = piece[n - 1];
       }
-      if (last !== 10) count++; // a last line without a line break
+      if (n === 0 && last !== 10) count++; // read to its end: a last line without a line break
     } finally {
       fs.closeSync(fd);
     }
@@ -2512,7 +2522,9 @@ async function ruleTestsInCopy(change, ctx) {
     if (!Object.values(tools).some((t) => t && t.test)) return null;
     // The whole suite, always (the decision at review of 2026-10-09): a selection by file
     // name ran one test file and left a failing test under another name unrun.
-    return await require('./quality-agent').runFullTests(tools);
+    // At the time limit the whole process tree of the test command ends, not only the program
+    // that was started: a test left running would write into the copy while it is removed.
+    return await require('./quality-agent').runFullTests(tools, { wholeTree: true });
   });
 
   const second = hashJudged(ctx, change.files);
@@ -2521,6 +2533,10 @@ async function ruleTestsInCopy(change, ctx) {
   }
 
   if (run === null) return NO_TEST_RAN;
+  // A skipped test confirms nothing (the tenth round): the change may be exactly what it would have caught.
+  if (run.passed === true && run.skipped > 0) {
+    return { clause: `${run.skipped} ${run.skipped === 1 ? 'test was' : 'tests were'} skipped, so nothing confirms the change`, cause: 'no-test-ran' };
+  }
   if (run.passed === true && run.passCount > 0) return { tests: `${run.passCount} ${run.passCount === 1 ? 'test' : 'tests'} passed.` };
   // A run that never started, could not be read, or whose command was refused before it ran
   // (shell structure in a tracked quality setting) is "no test ran", never a failing test.

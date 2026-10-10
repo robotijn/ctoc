@@ -1412,13 +1412,22 @@ test('a log folder that cannot be written changes no answer', async () => {
 // each case written and seen failing before its fix.
 
 /**
+ * What a timed call must cost, in milliseconds, and below what a time is noise. Until the tenth
+ * round the ratio was `big / max(small, 20)`: with a small input that cost 2 ms, a reader that
+ * took 100 ms at four times the size (50 times as long) showed a ratio of 5 and passed. The
+ * inputs now grow until a call costs 40 ms, and only a time below 2 ms is taken for 2 ms, so
+ * that a reader too fast to time must also be fast, in milliseconds, at four times the size.
+ */
+const TIMED_MS = 40;
+const NOISE_MS = 2;
+/**
  * A timing case in ratio form (the decision at review of 2026-10-09: a bound in milliseconds
  * passed or failed with the machine's load, where a ratio does not). `at(n)` gives the call to
  * time on an input of size `n`, built before it is timed; `cost(call)` runs it and answers
  * what it cost in milliseconds. The call is warmed once; `n` grows until one call costs at
  * least 20 ms or `4n` would pass `limit` (inputs of many megabytes measure the engine's
  * memory, not the reader); an input that cannot grow that far is run several times in a row,
- * so that what is timed still costs about 20 ms. Then the minimum of five runs at `n` and of
+ * so that what is timed still costs about 40 ms. Then the minimum of five runs at `n` and of
  * five runs at `4n` is taken. Work that is linear in the input gives a ratio near 4,
  * quadratic work one near 16, and the bound is 8. The one absolute bound is seconds wide and
  * stops a runaway reader early.
@@ -1430,13 +1439,13 @@ async function growth(at, n, limit, cost = wallMs) {
   let call = at(n);
   await cost(call); // warm once
   let once = await cost(call);
-  while (once < 20 && n * 8 <= limit) {
-    n *= once < 5 && n * 16 <= limit ? 4 : 2;
+  while (once < TIMED_MS && n * 8 <= limit) {
+    n *= once < TIMED_MS / 4 && n * 16 <= limit ? 4 : 2;
     call = at(n);
     once = await cost(call);
   }
   assert.ok(once < 5000, `one call at size ${n} took ${once.toFixed(0)} ms`);
-  const times = once < 20 ? Math.min(Math.ceil(20 / Math.max(once, 0.02)), 1000) : 1;
+  const times = once < TIMED_MS ? Math.min(Math.ceil(TIMED_MS / Math.max(once, 0.02)), 2000) : 1;
   const run = async (fn) => {
     let sum = 0;
     for (let k = 0; k < times; k++) sum += await cost(fn);
@@ -1445,7 +1454,7 @@ async function growth(at, n, limit, cost = wallMs) {
   const least = async (fn) => Math.min(await run(fn), await run(fn), await run(fn), await run(fn), await run(fn));
   const small = await least(call);
   const big = await least(at(4 * n));
-  return { n, small, big, ratio: big / Math.max(small, 20) };
+  return { n, small, big, ratio: big / Math.max(small, NOISE_MS) };
 }
 /** @param {() => unknown} call @returns {number} the time one call takes, in milliseconds */
 function wallMs(call) {
@@ -2564,7 +2573,10 @@ test('round 9: an added or deleted path is refused before anything is staged, so
   let before = objects();
   assert.equal((await check(root)).text, refusal('it adds, removes or renames big.txt'));
   assert.equal(objects(), before, 'the unnamed first call wrote nothing to the object store');
-  assert.deepEqual(last(), { verdict: 'refused', cause: 'adds-removes-renames', urgent: false, files: 2, lines: 655362 });
+  // The count of lines is for the log only, and reading it is bounded (the tenth round): at most
+  // 4 MiB of untracked files are read, here 65,536 lines of 64 bytes, and the 2 changed lines
+  // of the page. (Until then the whole 40 MiB were read to count 655,360 lines.)
+  assert.deepEqual(last(), { verdict: 'refused', cause: 'adds-removes-renames', urgent: false, files: 2, lines: 65538 });
   assert.equal((await check(root, '--run-tests')).text, refusal('it adds, removes or renames big.txt'));
   assert.equal((await check(root, 'big.txt')).text, refusal('it adds, removes or renames big.txt'));
   assert.equal(objects(), before, 'neither did the test call, nor the call that names the file');
@@ -3117,4 +3129,31 @@ test('round 10, B9: whatever the earlier matcher refused is still refused (a wor
   }
   // What passed then passes now, where the tenth round did not decide otherwise.
   for (const part of ['circle', 'Author', 'ui', 'special', 'site']) assert.equal(page(`src/${part}/page.html`), 'passed', part);
+});
+
+test('round 10, B12 and B14: a skipped test confirms nothing, and the test run is asked to end its whole process tree', async (t) => {
+  const SKIPPING = nodeTest('has a button', "  assert.ok(read('src/pages/home.html').includes('<button>'));")
+    + "test('is not written yet', { skip: 'later' }, () => {});\ntest('nor this one', { skip: 'later' }, () => {});\n";
+  const real = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': SKIPPING }, { testScript: SCRIPT });
+  fs.writeFileSync(path.join(real, 'src/pages/home.html'), HOME_STORE);
+  await refusedUntouched(real, ['--run-tests', 'src/pages/home.html'], '2 tests were skipped, so nothing confirms the change');
+  assert.equal(logLines(real).pop().cause, 'no-test-ran');
+
+  const root = testedProject();
+  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+  const asked = [];
+  const answer = (result) => t.mock.method(qualityAgent, 'runFullTests', async (tools, options) => { asked.push(options); return result; });
+  answer({ passed: true, passCount: 3, failed: 0, skipped: 1, flaky: 0 });
+  const one = await check(root, '--run-tests', 'src/pages/home.html');
+  t.mock.restoreAll();
+  assert.equal(one.text, refusal('1 test was skipped, so nothing confirms the change'));
+  // A failing run is named as one, whatever it skipped; a run that skipped nothing passes.
+  answer({ passed: false, passCount: 3, failed: 1, skipped: 1, flaky: 0, output: 'not ok 1 - shows Save\n' });
+  const failing = await check(root, '--run-tests', 'src/pages/home.html');
+  t.mock.restoreAll();
+  assert.equal(failing.text, refusal('the existing tests fail (shows Save)'));
+  answer({ passed: true, passCount: 3, failed: 0, skipped: 0, flaky: 0 });
+  assertPass(await check(root, '--run-tests', 'src/pages/home.html'), ['src/pages/home.html']);
+  t.mock.restoreAll();
+  assert.deepEqual(asked, [{ wholeTree: true }, { wholeTree: true }, { wholeTree: true }], 'B14: the whole process tree ends at the time limit');
 });

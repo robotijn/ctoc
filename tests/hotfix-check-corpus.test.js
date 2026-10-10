@@ -818,15 +818,23 @@ test('property: a qualifying file cut short at any point refuses', (t) => {
 });
 
 /**
+ * What a timed call must cost, in milliseconds, and below what a time is noise. Until the tenth
+ * round the ratio was `big / max(small, 20)`: with a small input that cost 2 ms, a reader that
+ * took 100 ms at four times the size (50 times as long) showed a ratio of 5 and passed. The
+ * inputs now grow until a call costs 40 ms, and only a time below 2 ms is taken for 2 ms, so
+ * that a reader too fast to time must also be fast, in milliseconds, at four times the size.
+ */
+const TIMED_MS = 40;
+const NOISE_MS = 2;
+/**
  * A timing case in ratio form (the decision at review of 2026-10-09: a bound in milliseconds
  * passed or failed with the machine's load, where a ratio does not). `at(n)` gives the call to
  * time on an input of size `n`, built before it is timed. The call is warmed once; `n` grows
- * until one call costs at least 20 ms or `4n` would pass `limit` (inputs of many megabytes
+ * until one call costs at least 40 ms or `4n` would pass `limit` (inputs of many megabytes
  * measure the engine's memory, not the reader); an input that cannot grow that far is run
- * several times in a row, so that what is timed still costs about 20 ms. Then the minimum of
+ * several times in a row, so that what is timed still costs about 40 ms. Then the minimum of
  * five runs at `n` and of five runs at `4n` is taken. Work that is linear in the input gives
- * a ratio near 4, quadratic work one near 16, and the bound is 8. An input the reader does
- * not read in proportion (a kind it refuses at once) is held to 8 times 20 ms. The one
+ * a ratio near 4, quadratic work one near 16, and the bound is 8. The one
  * absolute bound is seconds wide and stops a runaway reader early.
  * @param {(n: number) => (() => unknown)} at @param {number} n the first size tried @param {number} limit the largest `4n`
  * @returns {{n: number, small: number, big: number, ratio: number}}
@@ -841,17 +849,17 @@ function growth(at, n, limit) {
   let call = at(n);
   call(); // warm once
   let once = ms(call);
-  while (once < 20 && n * 8 <= limit) {
-    n *= once < 5 && n * 16 <= limit ? 4 : 2;
+  while (once < TIMED_MS && n * 8 <= limit) {
+    n *= once < TIMED_MS / 4 && n * 16 <= limit ? 4 : 2;
     call = at(n);
     once = ms(call);
   }
   assert.ok(once < 5000, `one call at size ${n} took ${once.toFixed(0)} ms`);
-  const times = once < 20 ? Math.min(Math.ceil(20 / Math.max(once, 0.02)), 1000) : 1;
+  const times = once < TIMED_MS ? Math.min(Math.ceil(TIMED_MS / Math.max(once, 0.02)), 2000) : 1;
   const repeated = (fn) => () => { for (let k = 0; k < times; k++) fn(); };
   const small = least(repeated(call));
   const big = least(repeated(at(4 * n)));
-  return { n, small, big, ratio: big / Math.max(small, 20) };
+  return { n, small, big, ratio: big / Math.max(small, NOISE_MS) };
 }
 
 // Each scanner moves forward only. Inputs built to make a backtracking or rescanning scanner
