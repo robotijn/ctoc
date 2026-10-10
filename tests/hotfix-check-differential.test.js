@@ -1415,7 +1415,7 @@ const HTML_FILE = 'site/page.html';
 const PAGE = '<p>alpha</p>';
 const COLOUR = 'a { color: red }\n';
 /** The plain change of each kind: every one of these passes, so a witness is refused for what it adds. */
-const PLAIN_CHANGES = [[CSS_FILE, COLOUR], [HTML_FILE, PAGE], ['src/styles/design-tokens.css', COLOUR]];
+const PLAIN_CHANGES = [[CSS_FILE, COLOUR], [HTML_FILE, PAGE], ['src/styles/design-tokens.css', COLOUR], ['src/author/page.html', PAGE]];
 const LATER_WITNESSES = [
   // Byte-order marks and line endings.
   ['a byte-order mark stands on both sides or on neither', 'unrecognised', CSS_FILE, COLOUR, 'BOMa { color: blue }\n'],
@@ -1465,7 +1465,12 @@ const LATER_WITNESSES = [
   // Paths and names.
   ['a folder named prompts governs the work', 'unrecognised', 'prompts/page.html', PAGE],
   ['a folder named output-styles governs the work', 'unrecognised', 'output-styles/page.css', COLOUR],
-  ['a run of capitals ends where its last capital starts a word', 'area key', 'src/APIKey/page.html', PAGE],
+  ['a sensitive word counts anywhere inside a part of the path', 'area key', 'src/APIKey/page.html', PAGE],
+  ['a sensitive word counts anywhere inside a part of the path', 'area auth', 'src/oauth/page.html', PAGE],
+  ['a sensitive word counts anywhere inside a part of the path', 'area deploy', 'src/pages/deployment.html', PAGE],
+  ['security is a sensitive word', 'area security', 'src/security/page.html', PAGE],
+  ['a part of the path that holds `prompt` governs the work', 'unrecognised', 'src/llm/system_prompt.html', PAGE],
+  ['a page or stylesheet in a dot-folder never qualifies', 'unrecognised', '.storybook/page.html', PAGE],
   ['a path is asked as its letters read', 'area payment', 'src/payZWSPment/page.html', PAGE],
   ['a path is asked as its letters read', 'area payment', 'src/pAACUTEyment/page.html', PAGE],
   ['a path is asked as it is written', 'area auth', 'src/authZWSPlogin/page.html', PAGE],

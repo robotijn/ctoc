@@ -343,11 +343,11 @@ const SETTINGS_EXT = new Set(['.json', '.yaml', '.yml', '.toml', '.ini', '.conf'
 const CODE_EXT = new Set(['.js', '.mjs', '.cjs', '.ts', '.mts', '.cts', '.py', '.rb', '.go', '.rs', '.java',
   '.kt', '.kts', '.swift', '.c', '.h', '.cc', '.cpp', '.hpp', '.cs', '.php', '.sh', '.bash', '.zsh', '.ps1',
   '.bat', '.cmd', '.lua', '.scala', '.dart', '.ex', '.exs', '.erl', '.clj', '.pl', '.r', '.m', '.mm', '.sol']);
-/** The functional plan's sensitive words, matched whole against the path's letter runs. */
-const SENSITIVE_WORDS = new Set(['auth', 'login', 'logout', 'password', 'session', 'token', 'secret',
+/** The functional plan's sensitive words, and `security` (the tenth round), looked for inside each part of the path ({@link sensitiveWord}). */
+const SENSITIVE_WORDS = ['auth', 'login', 'logout', 'password', 'session', 'token', 'secret', 'security',
   'credential', 'key', 'permission', 'role', 'admin', 'payment', 'billing', 'checkout', 'price', 'pricing',
   'invoice', 'tax', 'legal', 'terms', 'privacy', 'consent', 'cookie', 'gdpr', 'license', 'migration',
-  'schema', 'database', 'sql', 'deploy', 'workflow', 'ci']);
+  'schema', 'database', 'sql', 'deploy', 'workflow', 'ci'];
 /** The shorthand properties that may carry a colour; every property ending in `color` may too. */
 const COLOUR_SHORTHANDS = new Set(['background', 'border', 'border-top', 'border-right', 'border-bottom', 'border-left',
   'border-block', 'border-block-start', 'border-block-end', 'border-inline', 'border-inline-start', 'border-inline-end',
@@ -2068,7 +2068,10 @@ function kindAs(f, spelt) {
   const unrecognised = unrecognisedRefusal(d);
   const build = { clause: `it changes how the project is built or shipped in ${d}`, cause: 'build' };
   const named = namedKind(lowerBase, ext, topFolders);
-  const governing = topFolders.some((p, i) => GOVERNING_FOLDERS.has(p) || (p === '.github' && GITHUB_GOVERNING.has(topFolders[i + 1])));
+  // A place that governs the work: a governing folder, GitHub's assistant folders, and any
+  // folder or file name that holds `prompt` (`src/llm/system_prompt.html`: the tenth round).
+  const governing = topFolders.some((p, i) => GOVERNING_FOLDERS.has(p) || p.includes('prompt') || (p === '.github' && GITHUB_GOVERNING.has(topFolders[i + 1])))
+    || lowerBase.includes('prompt');
   const buildFolder = topFolders.some((p) => BUILD_FOLDERS.has(p));
 
   let kind = null;
@@ -2081,6 +2084,10 @@ function kindAs(f, spelt) {
   // A side emptied, or filled from empty, holds the content of a removal or an addition.
   if (kind !== null && (f.oldText === '') !== (f.newText === '')) return unrecognised;
   if (kind !== null && buildFolder) return build;
+  // Any other dot-folder may be some tool's own (`.storybook/`, `.vitepress/`): what a page or
+  // a stylesheet there does, that tool decides. (Until the tenth round this held for
+  // documentation only.)
+  if (kind !== null && topFolders.some((p) => p.startsWith('.') && p !== '.' && p !== '..')) return unrecognised;
   if (kind !== null) return { kind };
 
   if (named === 'dependencies') return { clause: `it changes the dependencies in ${d}`, cause: 'dependencies' };
@@ -2157,47 +2164,52 @@ const READERS = {
   }
 };
 
-/** @param {string} part a letter run, lower case @returns {string|null} the sensitive word it is, also in the plural (`s`, `es`) */
+/**
+ * @param {string} part one part of a path: a run of letters, lower case
+ * @returns {string|null} the first sensitive word the part holds ANYWHERE inside it (`oauth`,
+ * `idtoken`, `sshkeys`, `authentication` and `deployment` each hold one); a word of two
+ * letters, `ci`, only as the whole part. A part that is exactly `author` or `authors` is not
+ * read as `auth`.
+ */
 function sensitiveWord(part) {
-  if (SENSITIVE_WORDS.has(part)) return part;
-  if (part.endsWith('es') && SENSITIVE_WORDS.has(part.slice(0, -2))) return part.slice(0, -2);
-  if (part.endsWith('s') && SENSITIVE_WORDS.has(part.slice(0, -1))) return part.slice(0, -1);
+  for (const word of SENSITIVE_WORDS) {
+    if (word === 'auth' && (part === 'author' || part === 'authors')) continue;
+    if (word.length >= 3 ? part.includes(word) : part === word) return word;
+  }
   return null;
 }
 
 /**
- * Rule 5 — not in a sensitive area: no letter run of the path from the repository top is a
- * sensitive word, and no camel-case sub-word of one (`AuthPanel` holds `auth`, `APIKey`
- * holds `key`, `Author` and `APIKeyboard` hold none). The path is asked in every form
+ * Rule 5 — not in a sensitive area: no part of the path from the repository top holds a
+ * sensitive word ({@link sensitiveWord}; the tenth round: anywhere inside the part, where
+ * until then the part, or a camel-case sub-word of it, had to be the word or its plural, so
+ * `oauth`, `apikey` and `paymentsapi` passed). The path is asked in every form
  * ({@link PATH_FORMS}): as written (`auth<zero-width space>login` is `auth` and `login`),
  * with compatibility letters as plain ones, and as its letters read
  * (`pay<zero-width space>ment` and a `payment` written with an accent read as `payment`);
  * a word in any form refuses. Each form is split at every character that is no letter, and
- * each run again where a capital letter follows a small one and where the last capital of a
- * run of capitals starts a word (the decision at review of 2026-10-09). The words count
- * also in the plural; in a stylesheet's own file name one plural does not, `tokens`
- * (`design-tokens.css` holds design tokens; `payments.css` and `keys.css` name their area).
+ * each part is read in lower case. In a stylesheet's own file name a part that is exactly
+ * `tokens` is no such word (`tokens.css` and `design-tokens.css` hold design tokens;
+ * `accessTokens.css`, `payments.css` and `keys.css` name their area).
  * The path is no secret-bearing file by CTOC's own secret-file guard (`isSecretTarget`: the
  * word `secret`), asked with the path in every form, and, in CTOC's own
  * repository only, no part of CTOC's enforcement by its protected-paths list
  * (`isProtectedEnforcementPath`: the word `enforcement`), which names CTOC's own files
  * (`src/hooks/`, ...), not another project's; that list is asked with the path in every
- * form too, each also in lower case (a file system that folds case opens `src/Hooks/`). Both lists are CTOC's, read where they live,
- * never copied.
+ * form too, each also in lower case (a file system that folds case opens `src/Hooks/`).
+ * Both lists are CTOC's, read where they live, never copied.
  * @param {ChangedFile} f @param {boolean} ctoc the repository is CTOC's own source
  * @returns {Refusal|null}
  */
 function ruleSensitiveArea(f, ctoc) {
   const nameAt = f.topRel.lastIndexOf('/') + 1;
-  /** @param {string} text @param {boolean} stylesheet the text is a stylesheet's own name @returns {string|null} the first sensitive word among its letter runs and their camel-case sub-words */
+  /** @param {string} text @param {boolean} stylesheet the text is a stylesheet's own name @returns {string|null} the first sensitive word among its parts */
   const wordIn = (text, stylesheet) => {
     for (const form of PATH_FORMS) {
       for (const run of form(text).split(/\P{L}+/u)) {
-        for (const piece of [run, ...run.split(/(?<=\p{Ll})(?=\p{Lu})|(?<=\p{Lu})(?=\p{Lu}\p{Ll})/u)]) {
-          const part = piece.toLowerCase();
-          const found = stylesheet && part === 'tokens' ? null : sensitiveWord(part);
-          if (found) return found;
-        }
+        const part = run.toLowerCase();
+        const found = stylesheet && part === 'tokens' ? null : sensitiveWord(part);
+        if (found) return found;
       }
     }
     return null;

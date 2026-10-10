@@ -2141,7 +2141,8 @@ test('round 6: the strict HTML subset, folded paths, the cannot-read-exactly sen
     row(10, 'src/pages/paymentForm.html', '<p>@</p>\n', save, area('src/pages/paymentForm.html', 'payment')),
     row(10, 'src/pages/userTokens.html', '<p>@</p>\n', save, area('src/pages/userTokens.html', 'token')),
     row(10, 'src/pages/Author.html', '<p>@</p>\n', save, null),
-    row(10, 'src/styles/brandTokens.css', 'a { color: @; }\n', ['red', 'blue'], null),
+    // A pass until the tenth round: a sensitive word counts anywhere inside a part of the path.
+    row(10, 'src/styles/brandTokens.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/brandTokens.css', 'token')),
     // The functional plan's fifth case: a colour that is not the whole value of a colour
     // property. (A custom property is a setting since the tenth round, whatever its name.)
     row('colour', 'src/styles/border.css', '.save { border: 1px solid @; }\n', ['#0a58ca', '#0b5ed7'], exact('src/styles/border.css')),
@@ -2512,9 +2513,11 @@ test('round 9: paths and names — governing folders, sensitive words in every s
     ['sensitive word', 'src/p\u00e1yment/page.html', PAGE, area('payment')],
     ['sensitive word', 'src/styles/payments.css', COLOUR, area('payment')],
     ['sensitive word', 'src/styles/keys.css', COLOUR, area('key')],
-    // Words that only hold one, and the one plural a stylesheet's name may carry (guards).
-    ['sensitive word', 'src/HTMLAuthor/page.html', PAGE, null],
-    ['sensitive word', 'src/APIKeyboard/page.html', PAGE, null],
+    // Words that hold one refuse since the tenth round (both passed until then); a part that is
+    // exactly `author`, and the one plural a stylesheet's name may carry, pass (guards).
+    ['sensitive word', 'src/HTMLAuthor/page.html', PAGE, area('auth')],
+    ['sensitive word', 'src/APIKeyboard/page.html', PAGE, area('key')],
+    ['sensitive word', 'src/author/page.html', PAGE, null],
     ['sensitive word', 'src/styles/design-tokens.css', COLOUR, null],
     // 4. A byte-order mark on one side only, or another count of carriage returns, in a
     // stylesheet (red: `checking`).
@@ -3054,4 +3057,36 @@ test('round 10, B5 to B7: a control character in a stylesheet, the exact grammar
   assert.equal(css('a { x: \\ url({); color: red }\n', 'a { x: \\ url({); color: blue }\n'), LOST, 'an escaped space before url(');
   assert.equal(css('a { x: url({); color: red }\n', 'a { x: url({); color: blue }\n'), 'passed', 'a real url( holds what it holds');
   assert.equal(css('a { x: 1px url({); color: red }\n', 'a { x: 1px URL({); color: blue }\n'), NOT_COLOUR, 'and is compared exactly');
+});
+
+test('round 10, B9 and B10: a sensitive word anywhere inside a part of the path, a part that holds `prompt`, and a page in a dot-folder', () => {
+  const page = (rel) => reasonOf(ruleRefusal(changeOf(rel, HOME, HOME_STORE)));
+  const sheet = (rel) => reasonOf(ruleRefusal(changeOf(rel, 'a { color: red; }\n', 'a { color: blue; }\n')));
+  const area = (rel, word) => `${rel} sits in an area named ${word}, and such areas are never a hotfix`;
+  const un = (rel) => `I do not recognise ${rel} as wording or a colour`;
+  // B9. The brief's witnesses: [a part of the path, the word it holds].
+  const held = [['oauth', 'auth'], ['Oauth', 'auth'], ['oauth2client', 'auth'], ['idtoken', 'token'], ['sshkeys', 'key'], ['paymentsapi', 'payment'], ['apikey', 'key'],
+    ['authentication', 'auth'], ['authorization', 'auth'], ['deployment', 'deploy'], ['security', 'security'], ['coauthor', 'auth'], ['authority', 'auth'],
+    ['HTMLAuthor', 'auth'], ['APIKeyboard', 'key'], ['ci', 'ci'], ['ci-tools', 'ci'], ['CI_scripts', 'ci']];
+  for (const [part, word] of held) {
+    assert.equal(page(`src/${part}/page.html`), area(`src/${part}/page.html`, word), part);
+    assert.equal(page(`src/pages/${part}.html`), area(`src/pages/${part}.html`, word), `${part} as a file name`);
+  }
+  assert.equal(sheet('src/styles/accessTokens.css'), area('src/styles/accessTokens.css', 'token'));
+  assert.equal(sheet('src/styles/brandTokens.css'), area('src/styles/brandTokens.css', 'token'));
+  assert.equal(sheet('src/tokens/base.css'), area('src/tokens/base.css', 'token'), 'a folder named tokens');
+  assert.equal(page('src/pages/tokens.html'), area('src/pages/tokens.html', 'token'), 'a page named tokens');
+  // What stays: a part that is exactly `author` or `authors`; `ci` inside a longer part; a
+  // stylesheet's own name part that is exactly `tokens`.
+  for (const part of ['author', 'Authors', 'circle', 'pencil', 'special', 'home']) assert.equal(page(`src/${part}/page.html`), 'passed', part);
+  for (const rel of ['src/styles/tokens.css', 'src/styles/design-tokens.css', 'src/styles/Tokens.dark.css']) assert.equal(sheet(rel), 'passed', rel);
+  // B10. A part of the path that holds `prompt` governs the work.
+  for (const rel of ['src/llm/system_prompt.html', 'src/llm/SystemPrompt.html', 'src/prompting/page.html', 'src/my-prompts-old/page.html']) assert.equal(page(rel), un(rel), rel);
+  assert.equal(sheet('src/styles/Prompt.css'), un('src/styles/Prompt.css'));
+  assert.equal(page('src/prom/pt.html'), 'passed', 'the word stands in one part');
+  // A dot-folder may be some tool's own: a page or a stylesheet below one never qualifies.
+  for (const rel of ['.storybook/preview-head.html', 'docs/.vitepress/theme/index.html', '.foo/page.html']) assert.equal(page(rel), un(rel), rel);
+  assert.equal(sheet('.vitepress/theme/custom.css'), un('.vitepress/theme/custom.css'));
+  assert.equal(page('docs/a.b/page.html'), 'passed', 'a dot inside a folder name is no dot-folder');
+  assert.equal(page('.github/pages/index.html'), 'it changes how the project is built or shipped in .github/pages/index.html', 'a build folder is named as one');
 });
