@@ -5408,6 +5408,17 @@ backslashes, with every file that holds a backslash required to be refused (defa
 27,573 edits, 947 passed, 3.43%, 0 disagreements; the minimum is 3.09%); `04793d04` deletes
 the `tokens` exception and ends the test command's process tree after every run.
 
+**The release script's refusal on `b303de6b`, traced** (2026-10-11). "The existing tests fail
+(tests/a-completion-says-whether-the-work-was-ever-claimed.test.js: case 12 …)" came from a
+clone with no installed packages: `src/lib/circuit-breaker.js` loads `js-yaml`, which this
+repository does not declare (it is installed only through eslint), and `recordStepKickback`
+in `src/lib/actions.js` requires the circuit breaker outside its `try`, so case 12 throws
+"Cannot find module 'js-yaml'". A plain `node --test` of that file in such a clone fails the
+same way; with `npm ci` done, the file and the whole check pass (six real runs on `b303de6b`,
+each `hotfix`, "13093 tests passed.", 130 to 139 seconds). The copy runs what the clone has:
+not a fault of the check. Both files lie outside this plan; declaring `js-yaml` is a
+one-line fix for another plan.
+
 **The differential test** now holds stylesheets only. On the default seed: 27,083 edits,
 1,622 passed (5.99%), 0 disagreements; the minimum is 5.39%.
 
