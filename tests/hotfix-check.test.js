@@ -2999,6 +2999,12 @@ test('after the re-check: a test run passes only when no failure or skip counter
   const clean = await run({ 'print.js': printer('test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out\n') }, 'node print.js');
   assertPass(clean, ['src/styles/home.css']);
   assert.equal(clean.tests, '4 tests passed.');
+  // Lines a project's own tests print about failure paths they test (this repository's suite
+  // prints both) are no summary: they refuse nothing (the coordinator's narrowing, 2026-10-10).
+  const ownLines = await run({ 'print.js': printer('\u26a0\ufe0f  Step 14 VERIFY FAILED for demo-widget \u2014 moved to review with evidence passed:false.\n'
+    + 'Security scan FAILED: 1 critical, 0 high\nRun 2 failed checks again\n# pass 3\n# fail 0\n') }, 'node print.js');
+  assertPass(ownLines, ['src/styles/home.css']);
+  assert.equal(ownLines.tests, '3 tests passed.');
   const named = await run({ 'tests/a.test.js': `${head}test('reports 3 failed logins', () => {});\ntest('FAILED is a word here', () => {});\n` }, SCRIPT);
   assertPass(named, ['src/styles/home.css']);
   assert.equal(named.tests, '2 tests passed.');

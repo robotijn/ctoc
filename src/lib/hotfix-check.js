@@ -1644,14 +1644,30 @@ const SKIP_COUNTER = /(\d+)[ \t]+(?:skipped|ignored|todo|pending|flaky|xfailed|x
 /** The pass counter of a summary: `5 passed`, `5 passing`, `# pass 5`, `ℹ pass 5`, `passed: 5`. */
 const PASS_COUNTER = /(\d+)[ \t]+pass(?:ed|ing)\b|(?:^|[ \t])(?:#|\u2139)[ \t]+pass[ \t]+(\d+)|\bpassed[ \t]*:[ \t]*(\d+)/gi;
 
+/** A TAP or node:test summary line at a line's start: `# fail 1`, `ℹ skipped 2`, `# todo 0`, `# cancelled 0`. */
+const TAP_SUMMARY = /^(?:#|ℹ)[ \t]+(?:fail|skipped|todo|cancelled)[ \t]+\d+/i;
 /**
- * Rule 8 — a passing run's whole output, read once more (the re-check of 2026-10-10): a run
- * passes only with no failure or skip counter above zero ANYWHERE in it, and no line that holds
- * `FAILED`; the count shown is the sum of the pass counts of every summary. Two summaries come
- * from two runners in one command (`node --test a; node --test b`, whose exit code is the
- * second's). Not read: a line that reports one passing test (`✔ …`, `ok 3 - …`), whose name may
- * hold such words; and a summary of test FILES or SUITES (`Test Files  1 passed`), counted
- * apart from the tests. One pass over the lines.
+ * @param {string} line a trimmed line @returns {boolean} it holds nothing but one counter, as
+ * a runner prints its summary over several lines (`1 flaky`, `failed: 2`, `3 passed (2.1s)`)
+ */
+function counterAlone(line) {
+  const words = line.replace(/ \([^()]*\)$/, '').split(/[ \t:]+/).filter(Boolean);
+  if (words.length === 3 && /^\d+$/.test(words[0])) return /^[a-z]+$/i.test(words[1]) && words[2].toLowerCase() === 'out';
+  return words.length === 2 && ((/^\d+$/.test(words[0]) && /^[a-z]+$/i.test(words[1])) || (/^[a-z]+$/i.test(words[0]) && /^\d+$/.test(words[1])));
+}
+
+/**
+ * Rule 8 — a passing run's whole output, read once more (the re-check of 2026-10-10, narrowed
+ * the same day): a run passes only when no SUMMARY in it reports a failure or a test that ran
+ * nothing, and the count shown is the sum of the pass counts of every summary. Two summaries
+ * come from two runners in one command (`node --test a; node --test b`, whose exit code is the
+ * second's). A summary line is a line that holds a pass counter (`2 passed, 1 error`), a TAP
+ * or node:test summary line at its start (`# fail 1`), or a line that holds one counter and
+ * nothing else (`  1 flaky`); only there are failure and skip counters read. `FAILED` counts
+ * at a line's start (`FAILED tests/x.py::test_a`) or after `test result:`. So what a project's
+ * own tests print about the failure paths they test ("Step 14 VERIFY FAILED for …", "Security
+ * scan FAILED: 1 critical") refuses nothing. Not read: a line that reports one passing test
+ * (`✔ …`, `ok 3 - …`); a summary of test files or suites adds no passes. One pass over the lines.
  * @param {string} output standard output and standard error of every command that ran
  * @returns {{failed: boolean, skipped: number, passed: number}}
  */
@@ -1667,15 +1683,14 @@ function readRunOutput(output) {
   };
   for (const raw of output.replace(ANSI, '').split(/\r?\n/)) {
     const line = raw.trim();
-    if (/^(?:\u2714|ok[ \t]+\d+[ \t]+-)/.test(line)) continue; // one passing test, by its name
-    if (/FAILED/.test(line)) failed = true;
-    if (/^(?:Test Files|Test Suites)\b/i.test(line)) {
-      if (sum(FAIL_COUNTER, line) > 0) failed = true;
-      continue;
-    }
+    if (/^(?:✔|ok[ \t]+\d+[ \t]+-)/.test(line)) continue; // one passing test, by its name
+    if (/^FAILED\b|test result:[ \t]*FAILED\b/.test(line)) failed = true;
+    const passes = sum(PASS_COUNTER, line);
+    if (passes === 0 && !TAP_SUMMARY.test(line) && !counterAlone(line)) continue;
     if (sum(FAIL_COUNTER, line) > 0) failed = true;
+    if (/^(?:Test Files|Test Suites)\b/i.test(line)) continue;
     skipped += sum(SKIP_COUNTER, line);
-    passed += sum(PASS_COUNTER, line);
+    passed += passes;
   }
   return { failed, skipped, passed };
 }
