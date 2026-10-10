@@ -96,8 +96,7 @@
  *                                          and the path's letters joined, every other character
  *                                          taken out, for a word of four letters or more (`log-in`,
  *                                          `data.base`). A part that is exactly `author` or
- *                                          `authors` is not `auth`, and in a stylesheet's own file
- *                                          name a part written exactly `tokens` is no such word;
+ *                                          `authors` is not `auth`;
  *                                          CTOC's own secret-file guard, and in CTOC's own repository
  *                                          its protected paths, asked in every form and in lower
  *                                          case; the test, governing, build and database folders are
@@ -1448,9 +1447,9 @@ function wholeSensitiveWord(piece) {
  * (`pay<zero-width space>ment` and a `payment` written with an accent read as `payment`);
  * a word in any form refuses. Each form is split at every character that is no letter, and
  * each part is read in lower case; a part's camel-case sub-words are read too, each as a
- * whole word or its plural ({@link wholeSensitiveWord}), as before the tenth round. In a stylesheet's own file name a part that is exactly
- * `tokens` is no such word (`tokens.css` and `design-tokens.css` hold design tokens;
- * `accessTokens.css`, `payments.css` and `keys.css` name their area).
+ * whole word or its plural ({@link wholeSensitiveWord}), as before the tenth round. (A
+ * stylesheet's name `tokens` was no such word until the second final re-check of 2026-10-10;
+ * `tokens.css` names the token area like `access-tokens.css`.)
  * The path is no secret-bearing file by CTOC's own secret-file guard (`isSecretTarget`: the
  * word `secret`), asked with the path in every form, and, in CTOC's own
  * repository only, no part of CTOC's enforcement by its protected-paths list
@@ -1462,13 +1461,11 @@ function wholeSensitiveWord(piece) {
  * @returns {Refusal|null}
  */
 function ruleSensitiveArea(f, ctoc) {
-  const nameAt = f.topRel.lastIndexOf('/') + 1;
-  /** @param {string} text @param {boolean} stylesheet the text is a stylesheet's own name @returns {string|null} the first sensitive word among its parts */
-  const wordIn = (text, stylesheet) => {
+  /** @param {string} text @returns {string|null} the first sensitive word among its parts */
+  const wordIn = (text) => {
     for (const form of PATH_FORMS) {
       for (const run of form(text).split(/\P{L}+/u)) {
         const part = run.toLowerCase();
-        if (stylesheet && run === 'tokens') continue; // only as written: `tokenS.css` names its area
         // The part itself, then each camel-case sub-word of it: where a capital follows a small
         // letter, and where the last capital of a run of capitals starts a word.
         const found = sensitiveWord(part)
@@ -1482,18 +1479,13 @@ function ruleSensitiveArea(f, ctoc) {
    * @param {string} text the path in one form @returns {string|null} the first word of four
    * letters or more in the path's letters joined, every character that is no letter taken
    * out (`log-in`, `pass_word`, `data.base`; the re-check of 2026-10-10). A part that is
-   * exactly `author` or `authors`, and a stylesheet's own name part written exactly `tokens`,
-   * are left out first, as the other matchers leave them.
+   * exactly `author` or `authors` is left out first, as the other matchers leave it.
    */
-  const stylesheet = nameParts(f).ext === '.css';
   const joinedWord = (text) => {
-    const at = text.lastIndexOf('/') + 1;
-    const keep = (part) => !/^authors?$/i.test(part);
-    const joined = [...text.slice(0, at).split(/\P{L}+/u).filter(keep),
-      ...text.slice(at).split(/\P{L}+/u).filter((part) => keep(part) && !(stylesheet && part === 'tokens'))].join('').toLowerCase();
+    const joined = text.split(/\P{L}+/u).filter((part) => !/^authors?$/i.test(part)).join('').toLowerCase();
     return SENSITIVE_WORDS.find((w) => w.length >= 4 && joined.includes(w)) || null;
   };
-  let word = wordIn(f.topRel.slice(0, nameAt), false) || wordIn(f.topRel.slice(nameAt), stylesheet)
+  let word = wordIn(f.topRel)
     || PATH_FORMS.map((form) => joinedWord(form(f.topRel))).find(Boolean) || null;
   if (!word && PATH_FORMS.some((form) => isSecretTarget(form(f.topRel)))) word = 'secret';
   if (!word && ctoc && PATH_FORMS.some((form) => isProtectedEnforcementPath(form(f.topRel)) || isProtectedEnforcementPath(form(f.topRel).toLowerCase()))) word = 'enforcement';

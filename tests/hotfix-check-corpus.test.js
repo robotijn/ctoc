@@ -223,7 +223,6 @@ const QUALIFY = [
   // The fourth round (2026-10-09). A design-token stylesheet with a real colour property; a
   // React project's `src/hooks/` stylesheet (CTOC's enforcement list is CTOC's own, and this
   // repository is not CTOC).
-  ['src/styles/tokens.css', BASE['src/styles/tokens.css'].replace('#0a58ca', '#0b5ed7')],
   ['src/hooks/notes.css', BASE['src/hooks/notes.css'].replace('red', 'blue')],
   // `Author` is not `auth`.
   ['src/styles/Author.css', BASE['src/styles/Author.css'].replace('red', 'blue')],
@@ -371,6 +370,8 @@ TRAPS.push(
   [{ 'src/payments/site.css': BASE['src/payments/site.css'].replace('red', 'blue') }, null, 'src/payments/site.css sits in an area named payment, and such areas are never a hotfix'],
   [{ 'docs/passwords.css': BASE['docs/passwords.css'].replace('red', 'blue') }, null, 'docs/passwords.css sits in an area named password, and such areas are never a hotfix'],
   [{ 'docs/id_rsa.css': BASE['docs/id_rsa.css'].replace('red', 'blue') }, null, 'docs/id_rsa.css sits in an area named secret, and such areas are never a hotfix'],
+  // (A stylesheet named for design tokens passed until the second final re-check of 2026-10-10, which took the exception out.)
+  [{ 'src/styles/tokens.css': BASE['src/styles/tokens.css'].replace('#0a58ca', '#0b5ed7') }, null, 'src/styles/tokens.css sits in an area named token, and such areas are never a hotfix'],
   [{ 'docs/tokens/site.css': BASE['docs/tokens/site.css'].replace('red', 'blue') }, null, 'docs/tokens/site.css sits in an area named token, and such areas are never a hotfix'],
   [{ 'src/styles/AuthPanel.css': BASE['src/styles/AuthPanel.css'].replace('red', 'blue') }, null, 'src/styles/AuthPanel.css sits in an area named auth, and such areas are never a hotfix'],
   [{ 'src/styles/paymentForm.css': BASE['src/styles/paymentForm.css'].replace('red', 'blue') }, null, 'src/styles/paymentForm.css sits in an area named payment, and such areas are never a hotfix'],
@@ -432,9 +433,9 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 9, 'the corpus holds 9 shapes that qualify');
+assert.equal(QUALIFY.length, 8, 'the corpus holds 8 shapes that qualify');
 assert.equal(REMOVED_FORMATS.length, 44, 'the corpus holds 44 cases of removed formats');
-assert.equal(TRAPS.length, 149, 'the corpus holds 149 traps, the removed formats among them');
+assert.equal(TRAPS.length, 150, 'the corpus holds 150 traps, the removed formats among them');
 
 let root;
 

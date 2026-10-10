@@ -162,7 +162,7 @@ function runCommand(cmd, options = {}) {
  * only the program started here (npm, or the configured runner); the test processes that
  * program started kept running, kept files open and could write after the answer. With
  * `wholeTree` the program is started as the leader of a process group of its own on macOS
- * and Linux, and when the run is stopped at its time limit or for its output's size, the
+ * and Linux, and when the run ends (by itself, at its time limit or for its output's size), the
  * whole group is ended ({@link endProcessTree}). Off by default: a process group of its own
  * is a session of its own, so an interrupt typed at the terminal no longer reaches the
  * tests, which an interactive `/ctoc:push` relies on.
@@ -185,9 +185,10 @@ function runCommandArgv(bin, args, options = {}) {
     windowsHide: true,
     ...(wholeTree && process.platform !== 'win32' ? { detached: true } : {})
   });
-  // Stopped from here (the time limit, or more output than the buffer holds): only the
-  // program itself was ended, so what it started is ended now.
-  if (wholeTree && r.error && typeof r.pid === 'number' && r.pid > 0) endProcessTree(r.pid);
+  // Whatever ended the run (its own exit, the time limit, more output than the buffer holds),
+  // what the program started is ended now, so nothing it left behind writes after the answer
+  // (the second final re-check of 2026-10-10: until then only a stopped run's tree was ended).
+  if (wholeTree && typeof r.pid === 'number' && r.pid > 0) endProcessTree(r.pid);
   const text = (v) => (typeof v === 'string' ? v.trim() : '');
   const stdout = text(r.stdout);
   const stderr = text(r.stderr);

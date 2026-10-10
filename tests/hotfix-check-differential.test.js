@@ -628,7 +628,7 @@ function reasonOf(refusal) {
 const CSS_FILE = 'site/page.css';
 const COLOUR = 'a { color: red }\n';
 /** The plain change of each kind: every one of these passes, so a witness is refused for what it adds. */
-const PLAIN_CHANGES = [[CSS_FILE, COLOUR], ['src/styles/design-tokens.css', COLOUR], ['src/author/site.css', COLOUR]];
+const PLAIN_CHANGES = [[CSS_FILE, COLOUR], ['src/author/site.css', COLOUR]];
 const LATER_WITNESSES = [
   // Byte-order marks and line endings.
   ['a byte-order mark stands on both sides or on neither', 'unrecognised', CSS_FILE, COLOUR, 'BOMa { color: blue }\n'],
@@ -688,7 +688,8 @@ const LATER_WITNESSES = [
   ['a path is asked as its letters read', 'area payment', 'src/pAACUTEyment/site.css', COLOUR],
   ['a path is asked as it is written', 'area auth', 'src/authZWSPlogin/site.css', COLOUR],
   ['a path is asked with compatibility letters as plain ones', 'area auth', 'src/FWAuthZWSPpanel/site.css', COLOUR],
-  ['in a stylesheet\'s name only `tokens` keeps its plural', 'area payment', 'src/styles/payments.css', COLOUR],
+  ['a word counts in the plural, in a stylesheet\'s name too', 'area payment', 'src/styles/payments.css', COLOUR],
+  ['a word counts in the plural, in a stylesheet\'s name too', 'area token', 'src/styles/design-tokens.css', COLOUR],
   ['a test folder is found in every form of the path', 'test', 'teZWSPsts/site.css', COLOUR],
   ['a governing folder is found in every form of the path', 'unrecognised', 'promZWSPpts/site.css', COLOUR],
   ['a page or stylesheet is one as its name is written', 'unrecognised', 'site/page.cZWSPss', COLOUR],

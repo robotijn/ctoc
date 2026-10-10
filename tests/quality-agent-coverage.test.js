@@ -1299,10 +1299,12 @@ describe('the test run: one run per command, a failure counted on a summary line
       await assert.rejects(withKill(refused, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true }))), /EPERM/);
       return {};
     });
-    // A run that ended by itself is left alone, whatever it answered.
+    // A run that ended by itself has its group ended too (since the second final re-check of
+    // 2026-10-10: what it started could still write after the answer).
     await withExecSpies(() => ({ pid: 4242, status: 1, signal: null, stdout: '', stderr: '' }), async (qa) => {
       await withKill(record, () => captureLog(() => qa.runFullTests(tools, { wholeTree: true })));
-      assert.deepEqual(killed, []);
+      assert.deepEqual(killed, [[-4242, 'SIGKILL']]);
+      killed.length = 0;
       return {};
     });
     // Windows: taskkill with the program's id, and no process group.

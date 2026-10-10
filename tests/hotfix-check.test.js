@@ -1777,7 +1777,8 @@ test('round 4: components and code elements in HTML, custom properties; Vue, JSX
     ['src/styles/font.css', ':root { --font: "Old"; }\n', ':root { --font: "New"; }\n', setting('src/styles/font.css')],
     ['src/styles/width.css', 'a { width: #fff; }\n', 'a { width: #000; }\n', un('src/styles/width.css')],
     ['src/styles/fill.css', 'path { fill: red; stroke: blue; outline-color: red; }\n', 'path { fill: blue; stroke: red; outline-color: blue; }\n', null],
-    ['src/styles/design-tokens.css', '.a { border-color: red; }\n', '.a { border-color: blue; }\n', null],
+    // (A stylesheet named for design tokens passed until the second final re-check of 2026-10-10, which took the exception out.)
+    ['src/styles/design-tokens.css', '.a { border-color: red; }\n', '.a { border-color: blue; }\n', 'src/styles/design-tokens.css sits in an area named token, and such areas are never a hotfix'],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
     // stay, and each now asserts the "not recognised" refusal.
@@ -1968,7 +1969,8 @@ test('round 5: host elements, the element stack, stylesheet names, custom proper
     // 8. A stylesheet's own name: a sensitive word still counts, its plural does not.
     row(8, 'src/styles/login.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/login.css', 'login')),
     row(8, 'src/styles/payment.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/payment.css', 'payment')),
-    row(8, 'src/styles/tokens.css', 'a { color: @; }\n', ['red', 'blue'], null),
+    // (A stylesheet named for design tokens passed until the second final re-check of 2026-10-10, which took the exception out.)
+    row(8, 'src/styles/tokens.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/tokens.css', 'token')),
     row(8, 'src/tokens/base.css', 'a { color: @; }\n', ['red', 'blue'], area('src/tokens/base.css', 'token')),
     // 9. A changed custom property is a setting, whatever it is named and whatever it holds
     // (the tenth round, the session coordinator's decision of 2026-10-10: custom properties
@@ -2320,7 +2322,8 @@ test('round 9: paths and names — governing folders, sensitive words in every s
     ['sensitive word', 'src/HTMLAuthor/site.css', COLOUR, area('auth')],
     ['sensitive word', 'src/APIKeyboard/site.css', COLOUR, area('key')],
     ['sensitive word', 'src/author/site.css', COLOUR, null],
-    ['sensitive word', 'src/styles/design-tokens.css', COLOUR, null],
+    // (A stylesheet named for design tokens passed until the second final re-check of 2026-10-10, which took the exception out.)
+    ['sensitive word', 'src/styles/design-tokens.css', COLOUR, area('token')],
     // 4. A byte-order mark on one side only, or another count of carriage returns, in a
     // stylesheet (red: `checking`).
     ['mark and line ending', 'src/styles/marked.css', [COLOUR[0], `\ufeff${COLOUR[1]}`], un],
@@ -2824,12 +2827,10 @@ test('round 10, B9 and B10: a sensitive word anywhere inside a part of the path,
   assert.equal(sheet('src/styles/accessTokens.css'), area('src/styles/accessTokens.css', 'token'));
   assert.equal(sheet('src/styles/brandTokens.css'), area('src/styles/brandTokens.css', 'token'));
   assert.equal(sheet('src/tokens/base.css'), area('src/tokens/base.css', 'token'), 'a folder named tokens');
-  // What stays: a part that is exactly `author` or `authors`; `ci` inside a longer part; a
-  // stylesheet's own name part that is exactly `tokens`.
+  // What stays: a part that is exactly `author` or `authors`; `ci` inside a longer part.
   for (const part of ['author', 'Authors', 'circle', 'pencil', 'special', 'home']) assert.equal(page(`src/${part}/site.css`), 'passed', part);
-  for (const rel of ['src/styles/tokens.css', 'src/styles/design-tokens.css', 'src/styles/tokens.dark.css']) assert.equal(sheet(rel), 'passed', rel);
-  // Since the re-check of 2026-10-10 the exception holds only for `tokens` as written.
-  assert.equal(sheet('src/styles/Tokens.dark.css'), area('src/styles/Tokens.dark.css', 'token'));
+  // (A stylesheet named for design tokens passed until the second final re-check of 2026-10-10, which took the exception out.)
+  for (const rel of ['src/styles/tokens.css', 'src/styles/design-tokens.css', 'src/styles/tokens.dark.css', 'src/styles/Tokens.dark.css']) assert.equal(sheet(rel), area(rel, 'token'), rel);
   // B10. A part of the path that holds `prompt` governs the work.
   for (const rel of ['src/llm/system_prompt.css', 'src/llm/SystemPrompt.css', 'src/prompting/site.css', 'src/my-prompts-old/site.css']) assert.equal(page(rel), un(rel), rel);
   assert.equal(sheet('src/styles/Prompt.css'), un('src/styles/Prompt.css'));
@@ -2942,8 +2943,8 @@ test('after the re-check: shadows, the `tokens` exception as written, sensitive 
     assert.equal(css('src/styles/site.css', `a { ${prop}: red; }\n`, `a { ${prop}: blue; }\n`), 'I do not recognise src/styles/site.css as wording or a colour', prop);
   }
   assert.equal(css('src/styles/site.css', 'a { outline: red; }\n', 'a { outline: blue; }\n'), 'passed', 'a real shorthand still takes one');
-  // The stylesheet exception holds only for a part written exactly `tokens`.
-  assert.equal(sheet('styles/tokens.css'), 'passed');
+  // (A stylesheet named for design tokens passed until the second final re-check of 2026-10-10, which took the exception out.)
+  assert.equal(sheet('styles/tokens.css'), area('styles/tokens.css', 'token'));
   assert.equal(sheet('styles/tokenS.css'), area('styles/tokenS.css', 'token'));
   assert.equal(sheet('styles/Tokens.css'), area('styles/Tokens.css', 'token'));
   // A word of four letters or more is found in the path with every character that is no letter taken out.
@@ -3108,4 +3109,32 @@ test('the final re-check: a stylesheet that holds a backslash never qualifies', 
   // Two choices recorded as decided: the extension is compared without letter case, and several colour changes in one file qualify within the size limits.
   assert.equal(ruleRefusal(changeOf('site/site.CSS', 'a { color: red; }\n', 'a { color: blue; }\n')), null);
   assert.equal(ruleRefusal(changeOf('site/site.css', 'a { color: red; }\nb { fill: red; }\n', 'a { color: blue; }\nb { fill: blue; }\n')), null);
+});
+
+// The second final re-check of 2026-10-10 (the session coordinator).
+test('the second final re-check: no stylesheet exception for `tokens`', () => {
+  const sheet = (rel) => reasonOf(ruleRefusal(changeOf(rel, 'a { color: red; }\n', 'a { color: blue; }\n')));
+  for (const rel of ['src/styles/tokens.css', 'src/styles/access-tokens.css', 'src/styles/api-tokens.css', 'src/styles/refresh.tokens.css', 'src/styles/design-tokens.css']) {
+    assert.equal(sheet(rel), `${rel} sits in an area named token, and such areas are never a hotfix`, rel);
+  }
+});
+
+test('the second final re-check: after a test command exits normally its whole process tree ends, so nothing it started rewrites the judged file', async (t) => {
+  if (process.platform === 'win32') { t.diagnostic('the process group is a macOS and Linux matter'); return; }
+  const helper = "require('fs');\nconst f = process.argv[1];\nsetTimeout(() => require('fs').writeFileSync(f, '.save { background-color: #ff0000; }\\n'), 2000);\n";
+  const starter = nodeTest('has a rule', [
+    "  const cp = require('child_process');",
+    "  const child = cp.spawn(process.execPath, ['-e', " + JSON.stringify(helper) + ", process.env.CTOC_HOTFIX_EDIT], { stdio: 'ignore' });",
+    '  child.unref();',
+    "  assert.ok(read('src/styles/home.css').includes('.save'));"
+  ].join('\n'));
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': starter }, { testScript: SCRIPT });
+  const judged = path.join(root, 'src', 'styles', 'home.css');
+  fs.writeFileSync(judged, HOME_STORE);
+  const res = await withEnv({ CTOC_HOTFIX_EDIT: judged }, () => check(root, '--run-tests', 'src/styles/home.css'));
+  await new Promise((resolve) => setTimeout(resolve, 3000));
+  const after = fs.readFileSync(judged, 'utf8');
+  // Either the helper was gone before it could write, or the check saw the write and refused.
+  if (res.verdict === 'hotfix') assert.equal(after, HOME_STORE, 'the helper rewrote the judged file after a pass');
+  else assert.equal(res.text, unreadable('src/styles/home.css changed while it was being checked'));
 });
