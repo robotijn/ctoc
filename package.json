@@ -5,7 +5,7 @@
   "license": "PolyForm-Shield-1.0.0",
   "private": true,
   "engines": {
-    "node": "^20.19.0 || >=22.12.0"
+    "node": ">=18"
   },
   "scripts": {
     "test": "node src/scripts/test-gate.js --experimental-test-coverage",
@@ -22,7 +22,6 @@
     "eslint": "^9.36.0",
     "eslint-plugin-n": "^17.23.1",
     "eslint-plugin-security": "^3.0.1",
-    "parse5": "8.0.1",
     "postcss": "8.5.29",
     "postcss-value-parser": "4.2.0",
     "typescript": "^5.9.3"

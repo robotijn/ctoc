@@ -336,7 +336,6 @@ const GITHUB_GOVERNING = new Set(['instructions', 'prompts', 'chatmodes']);
  * clause of the first other kind it matches, or "I do not recognise", and goes through a
  * normal plan.
  */
-const MARKUP_EXT = new Set(['.html', '.htm']);
 const TEST_FOLDERS = new Set(['test', 'tests', '__tests__', 'spec']);
 /** Dependency lists and lock files, by name in lower case; every `*.lock` is one too. */
 const DEPENDENCY_NAMES = new Set(['package.json', 'package-lock.json', 'npm-shrinkwrap.json', 'yarn.lock',
@@ -405,22 +404,6 @@ const NAMED_COLOURS = new Set(('aliceblue antiquewhite aqua aquamarine azure bei
   + 'slategray slategrey snow springgreen steelblue tan teal thistle tomato turquoise violet wheat white '
   + 'whitesmoke yellow yellowgreen transparent').split(' '));
 
-/*
- * THE WORDING RULE (rule 6; widened by the decisions at review of 2026-10-09). A changed
- * text run of a page holds none of
- *   - a number character of any script and any kind (`\p{N}`: a decimal digit, a Roman
- *     numeral character, a superscript, a circled digit, a fraction), a currency sign, `%`,
- *     `@`, `<`, `>`, `{`, `}`, `$` or a backtick;
- *   - a web address: `://`, `www.`, a bare host (`label.label` whose last label is two or
- *     more letters: `account.example.com`, and so also `Node.js` and `file.txt`) or a scheme
- *     anywhere ({@link SCHEME});
- *   - a character no reader sees ({@link UNSEEN_CHARACTER}: a control or format character,
- *     a right-to-left override among them).
- * KNOWN LIMIT: a Roman numeral written in letters (`VIII`) is a word to every rule.
- */
-const RISK_MARKER = /[\p{N}\p{Sc}%<>{}$`@]|:\/\/|www\.|(?<=[\p{L}\p{N}])\.\p{L}{2,}/iu;
-/** A scheme: a letter or a digit, a colon, then anything but white space (`mailto:x`, `javascript:go()`). */
-const SCHEME = /(?<=[\p{L}\p{N}]):\S/u;
 const CONTROL_CHARS = /[\u0000-\u001f\u007f-\u009f]/g;
 /** A character a single-quoted path in the commit command cannot carry, or slice 2's reader refuses. */
 const UNCARRIABLE = /['"$\\`\u0000-\u001f\u007f-\u009f]/;
@@ -446,11 +429,9 @@ const ANSI = /\u001b\[[0-9;:<=>?]*[ -/]*[@-~]|\u001b\][^\u0007\u001b]*(?:\u0007|
  * @property {(string|null)} [oldText]
  * @property {(string|null)} [newText]
  * @property {Hunk[]} [hunks]
- * @property {boolean} [named] an instruction file of the last commit names it
  * @property {string} [kind] the qualifying kind rule 4 placed it in
- * @property {string[]} [runs] the old and new wording rule 6 reads
  */
-/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string, top?: string, instructions?: string}} Change `instructions`: the text of the last commit's instruction files ({@link instructionText}); a change read from a repository always carries it */
+/** @typedef {{files: ChangedFile[], lineCount: number, root: string, rootFromTop: string, top?: string}} Change */
 /**
  * The check's own state for one call: the repository it reads, and everything rule 8
  * made, so that {@link removeCopy} can take it away on every path.
@@ -693,71 +674,6 @@ function copyIndex(ctx) {
   safeFs.cpSync(index, ctx.repoIndex, { preserveTimestamps: true });
 }
 
-/** The endings of instruction, rule, prompt and chat-mode files, wherever they sit. */
-const GOVERNING_ENDINGS = ['.mdc', '.instructions.md', '.prompt.md', '.chatmode.md'];
-/**
- * The instruction files coding assistants read, by name, at any depth: `AGENTS.md`,
- * `CONVENTIONS.md`, `copilot-instructions.md`, `.cursorrules`, `.windsurfrules`,
- * `IRON_LOOP.md`, `SKILL.md`, `MEMORY.md`, any `CLAUDE*.md` or `GEMINI*.md`, and any name
- * ending in `.mdc`, `.instructions.md`, `.prompt.md` or `.chatmode.md`. Such a file is itself
- * no kind the check reads; its TEXT says which pages and stylesheets govern the work
- * ({@link instructionText}).
- * @param {string} lower the base name, lower case @returns {boolean}
- */
-function governingName(lower) {
-  return ['agents.md', 'conventions.md', 'copilot-instructions.md', '.cursorrules', '.windsurfrules', 'iron_loop.md', 'skill.md', 'memory.md'].includes(lower)
-    || ((lower.startsWith('claude') || lower.startsWith('gemini')) && lower.endsWith('.md'))
-    || GOVERNING_ENDINGS.some((x) => lower.endsWith(x));
-}
-
-/**
- * Rule 4, a page or stylesheet that an instruction file NAMES (the session coordinator's
- * decision of 2026-10-10, B21). The text of every file of the LAST COMMIT that is governing
- * by its name ({@link governingName}), in lower case and with every backslash taken out
- * (`my\_rules.html`), each as it is written and with its percent-escapes read as the
- * characters they spell (`my%20rules.html`). A judged page or stylesheet whose base name
- * occurs anywhere in it never qualifies ({@link ruleRefusal}). A PLAIN SEARCH: no link, import
- * or tag syntax is read, so a name in a sentence counts like a name in a link. The working
- * folder's copies are never read. All blobs are read in one git call.
- * KNOWN LIMIT: a folder an instruction file names does not make the files below it governing.
- * @param {Context} ctx
- * @returns {string}
- */
-function instructionText(ctx) {
-  const top = /** @type {string} */ (ctx.top);
-  const ids = [];
-  for (const line of gitOut(ctx, top, ['ls-tree', '-r', '-z', '--full-tree', /** @type {string} */ (ctx.head)]).toString('utf8').split('\0')) {
-    const tab = line.indexOf('\t');
-    if (tab < 0) continue;
-    const [mode, type, id] = line.slice(0, tab).split(' ');
-    const base = path.posix.basename(line.slice(tab + 1));
-    if (type === 'blob' && mode !== '160000' && PATH_FORMS.some((form) => governingName(form(base).toLowerCase()))) ids.push(id);
-  }
-  if (ids.length === 0) return '';
-  // `cat-file --batch` answers each id with `<id> blob <size>`, a line feed, the bytes and a line feed.
-  const out = gitOut(ctx, top, ['cat-file', '--batch'], { input: Buffer.from(`${ids.join('\n')}\n`) });
-  const texts = [];
-  let at = 0;
-  for (let k = 0; k < ids.length; k++) {
-    const eol = out.indexOf(10, at);
-    const size = Number(out.toString('latin1', at, eol).split(' ')[2]);
-    if (eol < 0 || !Number.isInteger(size)) throw new Error('git cat-file answered in a form the check does not know');
-    const text = out.toString('utf8', eol + 1, eol + 1 + size).toLowerCase().replace(/\\/g, '');
-    texts.push(text, text.replace(/(?:%[0-9a-f][0-9a-f])+/g, percentRead));
-    at = eol + 1 + size + 1;
-  }
-  return texts.join('\n');
-}
-
-/** @param {string} run percent-escapes in a row @returns {string} the characters they spell, in lower case; a run that spells no UTF-8 stays as it is written */
-function percentRead(run) {
-  try {
-    return decodeURIComponent(run).toLowerCase();
-  } catch {
-    return run;
-  }
-}
-
 /**
  * Rule 1 — read the change: which files, their old and new text, and their changed-line
  * groups; in the `--run-tests` call also each file's first hash, taken before any rule
@@ -832,13 +748,12 @@ function readChange(root, named, ctx, runTests) {
   const hidden = files.find((f) => marked.has(f.topRel));
   if (hidden) throw new Unreadable(`${hidden.display} is marked in git's index as unchanged or skipped`);
 
-  const instructions = instructionText(ctx);
   // An added or a deleted path is refused by rule 2 whatever it holds, so nothing is staged
   // for such a change (the decision at review of 2026-10-09): `add --all` writes every file
   // it stages into the repository's object store, and a call that names no file would write
   // every untracked file there. Only the count of changed lines is still read, for the log.
   if (files.some((f) => f.status === 'A' || f.status === 'D')) {
-    return { files, lineCount: unstagedLineCount(ctx, files), root: realRoot, rootFromTop, top, instructions };
+    return { files, lineCount: unstagedLineCount(ctx, files), root: realRoot, rootFromTop, top };
   }
 
   // The judged bytes are exactly what `git add` stages: a temporary index holding the last
@@ -876,7 +791,7 @@ function readChange(root, named, ctx, runTests) {
     f.hunks = groups.get(f.topRel) || [];
     for (const h of f.hunks) lineCount += h.removed.length + h.added.length;
   }
-  return { files, lineCount, root: realRoot, rootFromTop, top, instructions };
+  return { files, lineCount, root: realRoot, rootFromTop, top };
 }
 
 /**
@@ -951,8 +866,15 @@ function ruleSameFiles(f) {
   return null;
 }
 
-/** @param {string} text @returns {string} the text as its letters read: compatibility forms taken apart (a full-width letter is the plain one, a letter with a mark its letter and the mark), then every mark and every format character (a zero-width space, a joiner) dropped */
-const lettersOf = (text) => text.normalize('NFKD').replace(/[\p{Cf}\p{M}]/gu, '');
+/**
+ * A CHARACTER NOBODY SEES in a path: every control and format character, every
+ * default-ignorable code point (the Hangul fillers, which Unicode calls letters, the combining
+ * grapheme joiner, the variation selectors), a lone surrogate, a private-use and an unassigned
+ * code point, the line and the paragraph separator, and the blank Braille pattern.
+ */
+const UNSEEN_CHARACTER = /[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Default_Ignorable_Code_Point}\u2028\u2029\u2800]/gu;
+/** @param {string} text @returns {string} the text as its letters read: compatibility forms taken apart (a full-width letter is the plain one, a letter with a mark its letter and the mark), then every mark and every character nobody sees dropped ({@link UNSEEN_CHARACTER}) */
+const lettersOf = (text) => text.normalize('NFKD').replace(/\p{M}/gu, '').replace(UNSEEN_CHARACTER, '');
 /**
  * THE FORMS A PATH IS ASKED IN (the coordinator's point at review, 2026-10-09: a transform
  * may only add reasons to refuse). git, a file system and the tools that read a file compare
@@ -993,149 +915,25 @@ function ruleTextsDiffer(f) {
 }
 
 /*
- * THE MARKUP SCANNER (rule 4: HTML). THE STRICT SUBSET
- * (the session's design decision of 2026-10-09, after the owner's decision that the check
- * keeps only what it can read exactly): the scanner reads only the part of HTML in which it
- * agrees with a browser's parser by construction, and refuses the whole file for anything
- * outside it; it never copies the browser's recovery rules. HELD TO REAL PARSERS (the
- * decisions at review of 2026-10-09): `tests/hotfix-check-differential.test.js` generates
- * documents and edits, and for every edit the check passes requires that parse5, the HTML
- * standard's parser, with scripting on and off, reads the same tree on both sides but for one
- * text node outside every element that holds its text; and it holds one witness document for
- * every rule below, so that a rule taken out is noticed. One pass, after the HTML tokenizer:
- * data; a tag (its name, attribute names, unquoted, single- and double-quoted values, `/>`);
- * `<!DOCTYPE html>` and a standard comment; raw text after `<script>` (with the script-data
- * escape states), `<style>`, `<textarea>`, `<title>`, `<xmp>`, `<iframe>`, `<noembed>`,
- * `<noframes>` and `<plaintext>`; `<svg>` and `<math>` from their start tag to their matching
- * end tag as one opaque piece. Character references stay part of their token. A browser
- * knows no braces: in text they are plain characters. Names are lower-cased as HTML does it,
- * the ASCII letters only.
- * OUTSIDE THE SUBSET, each refusing the whole file ({@link outside}):
- *   - a `{` or `}` anywhere inside a tag;
- *   - anything that starts `<!` but `<!DOCTYPE html>` (any letter case; any other doctype
- *     puts a browser in quirks mode, where a table nests otherwise) and a standard comment
- *     (`<!--`, not followed at once by `>` or `->`, holding no `<!--` and no `--!>`, not
- *     ending in `<!-`, closed by the first `-->`); `<![CDATA[`, `<?` and `</` before anything
- *     but a letter; the same comment rule inside a script block;
- *   - anything but white space before the doctype (text or a tag there puts a browser in
- *     quirks mode; a comment does not, and the decision refuses it all the same);
- *   - an unfinished tag, attribute quote or comment; an attribute name that starts with `<`,
- *     `"`, `'` or `=`;
- *   - inside `<svg>` or `<math>`: an end tag that does not close the element on top, any
- *     tag inside an element where a browser reads HTML again (`foreignObject`, `desc`,
- *     `title`, `mi`, `mo`, `mn`, `ms`, `mtext`, `annotation-xml`), an HTML element's name
- *     other than `a`, `script`, `style` and `title` (a browser leaves the foreign content at
- *     many of them), and an `<svg>` or `<math>` that is never closed;
- *   - inside `<select>`: any tag but `<option>`, `<optgroup>`, `<hr>` and their end tags
- *     (older parsers ignore every other tag there, a `<style>` among them, newer ones do not);
- *   - `<frameset>` and `<frame>`; an `is` attribute on `<html>` or `<body>`;
- *   - an end tag that closes neither the element on top of the stack nor one above which
- *     only elements stand that may leave their end tag out before it ({@link IMPLIED_END});
- *   - a start tag for which a browser closes an open element that is not on top of the
- *     stack ({@link P_CLOSERS}), a part of a table where no table has it, a `<table>` among
- *     another table's rows, a `<form>` in a `<form>`;
- *   - a `<noscript>` whose end tag does not stand exactly where its raw text ends, or does
- *     not find it on top of the stack;
- *   - anything but white space, comments and `</body>` or `</html>` after one of those two,
- *     and text directly inside `<colgroup>`;
- *   - an element that is never closed, a raw-text element among them.
- * Every token is a slice of the text, and the slices cover it, so two token sequences that
- * are identical are two identical texts. No pattern backtracks: the scanner moves forward.
- */
-
-/** @typedef {{k: string, v: string, name?: string, end?: boolean, attrs?: string[], self?: boolean, quiet?: boolean, inexact?: boolean, lead?: boolean}} Tok */
-
-/*
  * EVERY SCANNER FAILS CLOSED. A scanner that ends inside an unfinished construct (a string,
- * a stylesheet comment or block) reports `open`; one that meets a
- * construct it cannot follow where it expects structure (a string running into a line
- * break; a `}` with nothing open; a custom property whose value opens a block) reports
- * `lost`; the markup scanner reports `subset` for
- * anything outside its strict subset. Rule 4 resets the report before it judges a file and
- * refuses the change when either side reported one: a scanner that lost its place never
- * falls through to text.
+ * a stylesheet comment, bracket or block) reports `open`; one that meets a construct it
+ * cannot follow where it expects structure (a string running into a line break; a `}` with
+ * nothing open; a custom property whose value opens a block) reports `lost`. Rule 4 resets
+ * the report before it judges a file and refuses the change when either side reported one:
+ * a scanner that lost its place never falls through to a comparison.
  */
-/** @type {('open'|'lost'|'subset'|null)} the first fault the scanners met since rule 4 last reset it */
+/** @type {('open'|'lost'|null)} the first fault the scanner met since rule 4 last reset it */
 let scanFault = null;
 /** @param {'open'|'lost'} kind @returns {null} what a reader that met the fault answers */
 const fault = (kind) => { if (scanFault === null) scanFault = kind; return null; };
-/** The markup holds something outside the strict subset: the whole file is refused. */
-const outside = () => { if (scanFault === null) scanFault = 'subset'; };
 
 /**
- * Elements whose content a browser reads as raw text, never as markup (`plaintext` runs to
- * the end). `<noscript>` is not among them: a browser without scripting reads its content as
- * markup, so the scanner reads it in place ({@link scanMarkup}).
- */
-const RAW_TEXT = new Set(['script', 'style', 'textarea', 'xmp', 'iframe', 'noembed', 'noframes', 'plaintext']);
-/** HTML's void elements: they have no content and no end tag, so they never open. */
-const VOID_ELEMENTS = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param',
-  'source', 'track', 'wbr']);
-/**
- * The host elements: the HTML element names, a fixed list of 111. The names are those of
- * Vue's `isHTMLTag` list (`HTML_TAGS` in `packages/shared/src/domTagConfig.ts` of
- * vuejs/core; the session compared the copy with that file on 2026-10-09), matched in lower
- * case, as HTML reads element names. An element of any other name is unknown to the browser
- * as HTML: a component or a custom element, whose text is whatever its script makes of it.
- * The SVG and MathML names are not in it: `<svg>` and `<math>` are opaque pieces
- * ({@link foreignEnd}), and outside them such a name is no host element.
- */
-const HOST_ELEMENTS = new Set((
-  'html,body,base,head,link,meta,style,title,address,article,aside,footer,header,hgroup,h1,h2,h3,h4,h5,h6,'
-  + 'nav,section,div,dd,dl,dt,figcaption,figure,picture,hr,img,li,main,ol,p,pre,ul,a,b,abbr,bdi,bdo,br,cite,'
-  + 'code,data,dfn,em,i,kbd,mark,q,rp,rt,ruby,s,samp,small,span,strong,sub,sup,time,u,var,wbr,area,audio,map,'
-  + 'track,video,embed,object,param,source,canvas,script,noscript,del,ins,caption,col,colgroup,table,thead,'
-  + 'tbody,td,th,tr,button,datalist,fieldset,form,input,label,legend,meter,optgroup,option,output,progress,'
-  + 'select,textarea,details,dialog,menu,summary,template,blockquote,iframe,tfoot').split(','));
-/** HTML's code elements: their text is code, compared exactly. */
-const CODE_ELEMENTS = new Set(['code', 'pre', 'kbd', 'samp', 'var', 'listing', 'tt']);
-/**
- * @param {string} name the element's name, lower case @param {string[]} attrs its attribute names, lower case
- * @returns {boolean} a component or custom element: an `is` attribute (a customised built-in
- * element), or a name that is no host element (every name with a hyphen among them)
- */
-const isComponent = (name, attrs) => attrs.includes('is') || !HOST_ELEMENTS.has(name);
-/**
- * Inside `<svg>` or `<math>`, the elements in which a browser reads HTML again: SVG's
- * `foreignObject`, `desc` and `title`, MathML's token elements and `annotation-xml`. Only
- * text may stand in one.
- */
-const FOREIGN_TEXT_ONLY = new Set(['foreignobject', 'desc', 'title', 'mi', 'mo', 'mn', 'ms', 'mtext', 'annotation-xml']);
-/** The HTML element names that SVG has too; every other HTML name inside `<svg>` or `<math>` is outside the subset. */
-const FOREIGN_SHARED = new Set(['a', 'script', 'style', 'title']);
-/**
- * Names outside {@link HOST_ELEMENTS} that the HTML standard's parser still treats in a way
- * of its own (obsolete elements, mostly). Written from the executor's memory of the
- * standard's tree-construction rules, not compared with it (the round ran without network);
- * the differential test's foreign content exercises it against parse5. A browser leaves
- * `<svg>` and `<math>` at some of them.
- */
-const PARSER_KNOWN = new Set(['acronym', 'applet', 'basefont', 'bgsound', 'big', 'center', 'dir', 'font', 'frame',
-  'frameset', 'image', 'isindex', 'keygen', 'listing', 'marquee', 'menuitem', 'nobr', 'noembed', 'noframes',
-  'plaintext', 'rb', 'rtc', 'search', 'selectedcontent', 'strike', 'tt', 'xmp']);
-/** The end of each raw-text element but `<script>` and `<plaintext>`, of `<title>`, and of `<noscript>` as a browser with scripting reads it: its closing tag, letter case ignored. */
-const RAW_CLOSE = {
-  style: /<\/style(?=[\t\n\f\r />]|$)/gi,
-  textarea: /<\/textarea(?=[\t\n\f\r />]|$)/gi,
-  title: /<\/title(?=[\t\n\f\r />]|$)/gi,
-  xmp: /<\/xmp(?=[\t\n\f\r />]|$)/gi,
-  iframe: /<\/iframe(?=[\t\n\f\r />]|$)/gi,
-  noembed: /<\/noembed(?=[\t\n\f\r />]|$)/gi,
-  noframes: /<\/noframes(?=[\t\n\f\r />]|$)/gi,
-  noscript: /<\/noscript(?=[\t\n\f\r />]|$)/gi
-};
-/** The marks that move a script block between the script-data states (a tag name ends at HTML's white space, `/` or `>`). */
-const SCRIPT_MARKS = /<!--|--!?>|<(\/?)script(?=[\t\n\f\r />]|$)/gi;
-
-/**
- * @param {string} s @returns {string} lower case as HTML reads a name: the ASCII letters
- * only. The Kelvin sign and the long s, which Unicode folds to `k` and `s`, stay what they
- * are, so `lin` with the Kelvin sign is no `link`.
+ * @param {string} s @returns {string} lower case as a browser compares a CSS name: the ASCII
+ * letters only. The Kelvin sign and the long s, which Unicode folds to `k` and `s`, stay what
+ * they are, so `blac` with the Kelvin sign is no `black`.
  */
 const asciiLower = (s) => s.replace(/[A-Z]+/g, (m) => m.toLowerCase());
-/** @param {string} c @returns {boolean} */
-const isLetter = (c) => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-/** @param {string} c @returns {boolean} white space as the HTML tokenizer reads it */
+/** @param {string} c @returns {boolean} white space as a stylesheet's reader reads it */
 const isSpace = (c) => c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f';
 
 /**
@@ -1158,591 +956,8 @@ function skipString(s, i) {
   return s.length;
 }
 
-/**
- * One tag from its `<`, after the HTML tokenizer's tag states: the name runs to white space,
- * `/` or `>`; an attribute name to white space, `/`, `>` or `=`; a value is single- or
- * double-quoted (to the same quote, whatever lies between) or unquoted (to white space or
- * `>`, a `/` included). `self`: the tag ends in `/>` as the tokenizer reads it (never after
- * an unquoted value); HTML ignores that, foreign content honours it. The name and the
- * attribute names are returned in lower case ({@link asciiLower}). A brace anywhere in the
- * tag, an attribute name that cannot start so, and a tag or quote that never ends are
- * outside the subset.
- * @param {string} s
- * @param {number} i
- * @param {boolean} isEnd whether it is `</…`
- * @returns {Tok}
- */
-function scanTag(s, i, isEnd) {
-  const n = s.length;
-  let j = i + (isEnd ? 2 : 1);
-  const nameStart = j;
-  while (j < n && !isSpace(s[j]) && s[j] !== '/' && s[j] !== '>') j++;
-  const name = asciiLower(s.slice(nameStart, j));
-  const attrs = [];
-  let slash = false; // the last character read was a `/` between attributes
-  let self = false;
-  while (j < n) {
-    const c = s[j];
-    if (c === '>') { self = slash; j++; break; }
-    slash = c === '/';
-    if (isSpace(c) || slash) { j++; continue; }
-    if (c === '<' || c === '"' || c === "'" || c === '=') outside(); // no attribute name starts so
-    const attrStart = j++;
-    while (j < n && !isSpace(s[j]) && s[j] !== '/' && s[j] !== '>' && s[j] !== '=') j++;
-    attrs.push(asciiLower(s.slice(attrStart, j)));
-    while (j < n && isSpace(s[j])) j++;
-    if (s[j] !== '=') continue;
-    j++;
-    while (j < n && isSpace(s[j])) j++;
-    const q = s[j];
-    if (q === '"' || q === "'") {
-      const e = s.indexOf(q, j + 1);
-      if (e < 0) outside();
-      j = e < 0 ? n : e + 1;
-    } else {
-      while (j < n && !isSpace(s[j]) && s[j] !== '>') j++;
-    }
-  }
-  const v = s.slice(i, j);
-  if (v[v.length - 1] !== '>' || v.includes('{') || v.includes('}')) outside(); // never ended, or a brace in it
-  return { k: 'tag', v, name, end: isEnd, attrs, self };
-}
-
-/**
- * The end of a raw-text element's content, from just after its start tag: for `<script>`
- * the script-data states (`<!--` escapes, `<script` inside it escapes twice, and only a
- * `</script` outside the double escape ends the block); for the others their closing tag.
- * Inside a script block the comment rule of the subset holds too: a `<!--` followed at once
- * by `>` or `->` (a browser leaves the escape there), a `<!--` inside another and a `--!>`
- * inside one are outside the subset. Content that never ends runs to the end of the file,
- * where its element is still open, which refuses the file ({@link scanMarkup}).
- * @param {string} s @param {number} from @param {string} name lower case @returns {number}
- */
-function rawEnd(s, from, name) {
-  if (name === 'plaintext') return s.length;
-  if (name !== 'script') {
-    const re = RAW_CLOSE[/** @type {keyof RAW_CLOSE} */ (name)];
-    re.lastIndex = from;
-    const m = re.exec(s);
-    return m ? m.index : s.length;
-  }
-  let state = 0; // 0 script data, 1 escaped, 2 double escaped
-  SCRIPT_MARKS.lastIndex = from;
-  let m;
-  while ((m = SCRIPT_MARKS.exec(s)) !== null) {
-    if (m[0] === '<!--') {
-      if (state !== 0 || s[m.index + 4] === '>' || s.startsWith('->', m.index + 4)) outside();
-      if (state === 0) state = 1;
-    } else if (m[0] === '-->') state = 0;
-    else if (m[0] === '--!>') { if (state !== 0) outside(); }
-    else if (m[1]) { if (state === 2) state = 1; else return m.index; }
-    else if (state === 1) state = 2;
-  }
-  return s.length;
-}
-
-/**
- * The end of a piece that starts `<!`, `<?` or `</` before no letter. Inside the subset are
- * only `<!DOCTYPE html>` (any letter case) and a standard comment: `<!--`, not followed at
- * once by `>` or `->`, holding no `<!--` and no `--!>`, not ending in `<!-`, and closed by
- * the first `-->`. A browser ends every other such piece by recovery rules this scanner
- * does not copy (`<![CDATA[`, `<?…>`, `<!x>`, `</ x>`), so each is outside the subset.
- * @param {string} s @param {number} i the index of its `<` @returns {number} the index after it
- */
-function declarationEnd(s, i) {
-  if (s.startsWith('<!--', i)) {
-    const e = s.indexOf('-->', i + 4);
-    const inner = s.slice(i + 4, e < 0 ? s.length : e);
-    if (e < 0 || inner[0] === '>' || inner.startsWith('->') || inner.includes('<!--') || inner.includes('--!>')
-      || inner.endsWith('<!-')) outside();
-    return e < 0 ? s.length : e + 3;
-  }
-  if (asciiLower(s.slice(i, i + 15)) === '<!doctype html>') return i + 15;
-  outside();
-  const e = s.indexOf('>', i + 2);
-  return e < 0 ? s.length : e + 1;
-}
-
-/**
- * The end of foreign content: from the `<` of an `<svg>` or `<math>` start tag to the end
- * of its matching end tag, which the caller compares exactly as one opaque piece (no text
- * inside counts as wording). The tags inside are read as the tokenizer reads them (no raw
- * text there; `/>` closes), on a stack of their own, and the piece is inside the subset
- * only where a browser stays in the foreign content from end to end: every end tag closes
- * the element on top; no tag stands inside an element where HTML is read again
- * ({@link FOREIGN_TEXT_ONLY}); no start tag carries an HTML element's name but those SVG
- * shares ({@link FOREIGN_SHARED}) or another name the parser knows ({@link PARSER_KNOWN}),
- * because a browser leaves the foreign content at many of them; and the piece ends in the
- * file.
- * @param {string} s @param {number} from @returns {number} the index after the piece
- */
-function foreignEnd(s, from) {
-  /** @type {string[]} */
-  const stack = [];
-  let i = from;
-  while (i < s.length) {
-    const lt = s.indexOf('<', i);
-    if (lt < 0) break;
-    const d = s[lt + 1] || '';
-    if (isLetter(d) || (d === '/' && isLetter(s[lt + 2] || ''))) {
-      const tag = scanTag(s, lt, d === '/');
-      i = lt + tag.v.length;
-      const name = /** @type {string} */ (tag.name);
-      if (tag.end) {
-        if (stack.pop() !== name) outside();
-      } else {
-        if (stack.length > 0 && (FOREIGN_TEXT_ONLY.has(stack[stack.length - 1]) || PARSER_KNOWN.has(name)
-          || (HOST_ELEMENTS.has(name) && !FOREIGN_SHARED.has(name)))) outside();
-        if (!tag.self) stack.push(name);
-      }
-      if (stack.length === 0) return i;
-    } else if (d === '!' || d === '?' || d === '/') {
-      i = declarationEnd(s, lt);
-    } else {
-      i = lt + 1;
-    }
-  }
-  outside(); // never closed
-  return s.length;
-}
-
-/** No names: the end tags that close an element which never leaves its end tag out. */
-const NO_NAMES = new Set();
-/** A character that is no white space for the HTML parser. */
-const NOT_HTML_SPACE = /[^ \t\n\f\r]/;
-/**
- * THE END TAGS THAT MAY BE LEFT OUT (the decision at review of 2026-10-09). In an HTML file
- * an end tag closes the element on top of the stack; any other end tag is outside the
- * subset, with these exceptions only, each held to the HTML standard's parser by the
- * differential test (`tests/hotfix-check-differential.test.js`): for each element name, the
- * end tags that also close it while it stands above their own element.
- *   p                           the end tag of its parent: address, article, aside, blockquote,
- *                               details, dialog, div, dl, fieldset, figcaption, figure, footer,
- *                               header, hgroup, main, menu, nav, ol, section, summary, ul, li,
- *                               dd, dt, td, th, body, html
- *   li                          ul, ol, menu
- *   dt, dd                      dl
- *   rt, rp                      ruby
- *   option                      select, datalist, optgroup
- *   optgroup                    select, datalist
- *   caption, colgroup, thead,
- *   tbody, tfoot                table
- *   tr                          table, thead, tbody, tfoot
- *   td, th                      tr, table, thead, tbody, tfoot
- *   head, body                  html
- * Nothing is closed at the end of the file: an element still open there is outside the subset.
- * @type {Map<string, Set<string>>}
- */
-const IMPLIED_END = new Map(Object.entries({
-  p: ['address', 'article', 'aside', 'blockquote', 'details', 'dialog', 'div', 'dl', 'fieldset', 'figcaption', 'figure',
-    'footer', 'header', 'hgroup', 'main', 'menu', 'nav', 'ol', 'section', 'summary', 'ul', 'li', 'dd', 'dt', 'td', 'th',
-    'body', 'html'],
-  li: ['ul', 'ol', 'menu'],
-  dt: ['dl'],
-  dd: ['dl'],
-  rt: ['ruby'],
-  rp: ['ruby'],
-  option: ['select', 'datalist', 'optgroup'],
-  optgroup: ['select', 'datalist'],
-  caption: ['table'],
-  colgroup: ['table'],
-  thead: ['table'],
-  tbody: ['table'],
-  tfoot: ['table'],
-  tr: ['table', 'thead', 'tbody', 'tfoot'],
-  td: ['tr', 'table', 'thead', 'tbody', 'tfoot'],
-  th: ['tr', 'table', 'thead', 'tbody', 'tfoot'],
-  head: ['html'],
-  body: ['html']
-}).map(([name, ends]) => [name, new Set(ends)]));
-
-/**
- * THE START TAGS THAT CLOSE AN OPEN ELEMENT (the decision at review of 2026-10-09). The HTML
- * parser closes some elements when certain start tags arrive, and where the element to
- * close is not the one on top it closes everything above it too, by rules of scope this
- * scanner does not copy. So each such start tag is followed only in its plain form, where
- * the element it closes is on top of the stack (it is then closed, exactly as a browser
- * does), and is outside the subset in every other form:
- *   - a tag that ends a paragraph ({@link P_CLOSERS}) while a `<p>` is open: the `<p>` on top;
- *   - `<li>` while an `<li>` is open in the same list: that `<li>` on top, or under a `<p>`
- *     on top; `<dd>` and `<dt>` likewise within their `<dl>`;
- *   - a heading on top of the stack is closed by the next heading's start tag;
- *   - `<a>` while an `<a>` is open, `<button>` while a `<button>` is open, `<nobr>` likewise:
- *     that element on top;
- *   - `<rt>` and `<rp>` inside a `<ruby>`: an `<rt>` or `<rp>` on top;
- *   - `<option>`, `<optgroup>` and, inside a `<select>`, `<hr>`: an `<option>` on top, and
- *     inside a `<select>` for the last two an `<optgroup>` on top after it;
- *   - the parts of a table, each only where a table has it ({@link TABLE_PARTS}); a `<table>`
- *     among another table's rows is outside the subset, also when elements stand between
- *     ({@link TABLE_ROW_PARTS}).
- * A `<form>` inside a `<form>` is ignored by a browser, and its end tag then closes the
- * outer one: outside the subset.
- */
-const P_CLOSERS = new Set(['address', 'article', 'aside', 'blockquote', 'center', 'details', 'dialog', 'dir', 'div', 'dl',
-  'fieldset', 'figcaption', 'figure', 'footer', 'header', 'hgroup', 'main', 'menu', 'nav', 'ol', 'p', 'search', 'section',
-  'summary', 'ul', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre', 'listing', 'form', 'li', 'dd', 'dt', 'plaintext', 'table',
-  'hr', 'xmp']);
-const HEADINGS = new Set(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']);
-/** The elements a list item belongs to, and the items themselves: `<li>` in a list, `<dd>` and `<dt>` in a `<dl>`. */
-const ITEM_HOLDERS = new Map([['ul', 0], ['ol', 0], ['menu', 0], ['dl', 1]]);
-const ITEMS = new Map([['li', 0], ['dd', 1], ['dt', 1]]);
-/** The start tags that close an open element of their own name when it is on top, and are outside the subset when it is not. */
-const CLOSES_OWN = new Set(['a', 'button', 'nobr']);
-/** The end tags the parser adds by itself before an `<rt>` or `<rp>`; `rt` and `rp` are followed, the others are outside the subset. */
-const RUBY_IMPLIED = new Set(['p', 'li', 'dd', 'dt', 'option', 'optgroup', 'rb', 'rtc']);
-/**
- * The parts of a table: for each, the open parts its start tag closes while they are on
- * top, and the elements it may then stand in. A browser puts a part in its place whatever
- * stands between, by closing that; here anything else between is outside the subset, and so
- * is a part with no table around it (a browser ignores its start tag). Directly inside a
- * `<template>` every part may stand.
- */
-const TABLE_ROWS = ['table', 'thead', 'tbody', 'tfoot'];
-const TABLE_SECTION_CLOSES = ['td', 'th', 'tr', 'thead', 'tbody', 'tfoot', 'caption', 'colgroup'];
-const TABLE_PARTS = new Map(Object.entries({
-  caption: [TABLE_SECTION_CLOSES, ['table']],
-  colgroup: [TABLE_SECTION_CLOSES, ['table']],
-  thead: [TABLE_SECTION_CLOSES, ['table']],
-  tbody: [TABLE_SECTION_CLOSES, ['table']],
-  tfoot: [TABLE_SECTION_CLOSES, ['table']],
-  col: [[], ['table', 'colgroup']],
-  tr: [['td', 'th', 'tr', 'caption', 'colgroup'], TABLE_ROWS],
-  td: [['td', 'th', 'caption', 'colgroup'], ['tr', ...TABLE_ROWS]],
-  th: [['td', 'th', 'caption', 'colgroup'], ['tr', ...TABLE_ROWS]]
-}));
-/**
- * The parts of a table among which a browser is still reading rows, and those in which it
- * reads cell content again. While the nearest such part around a `<table>` start tag is one
- * of the first, a browser ends the table that is open and starts the new one beside it; the
- * scanner refuses the file instead.
- */
-const TABLE_ROW_PARTS = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr', 'colgroup']);
-const TABLE_CELL_PARTS = new Set(['td', 'th', 'caption', 'template']);
-/** Directly inside these a browser moves text that is no white space in front of the table. */
-const TABLE_TEXT_MOVES = new Set(['table', 'thead', 'tbody', 'tfoot', 'tr']);
-
-/**
- * Rule 4 — the tokens of a whole HTML file. The open elements are kept on a stack, their
- * names in lower case ({@link asciiLower}). Text is `quiet`, never wording, while an element
- * that holds its text is open (a code element, a `<template>`, a `<noscript>`, an `<option>`
- * with no `value`, a component or custom element: {@link isComponent}, then also `inexact`),
- * inside a `<select>` anywhere but directly in an `<option>` with a `value`, and after the
- * body's end (only white space stands there, and it is no wording). Text read before the body
- * (only `<html>` and `<head>` open) or directly inside a table is marked `lead`: a browser
- * puts its leading white space elsewhere than the rest.
- * A void element never opens, and `/>` closes nothing. The text of `<title>` is read to its
- * closing tag as one text token. `<svg>` and `<math>` are one `foreign` token each
- * ({@link foreignEnd}). Inside `<select>` only options are followed. `<frameset>` and
- * `<frame>` are outside the subset (a browser may drop the whole body for them), and so is
- * an `is` attribute on `<html>` or `<body>` (a browser adds the attributes of a second such
- * tag to the element that holds everything). A start tag closes what a browser closes for it
- * only where that is on top of the stack ({@link P_CLOSERS}). An end tag closes the element
- * on top of the stack, or the elements that may leave their end tag out before it
- * ({@link IMPLIED_END}); every other end tag is outside the subset: HTML itself ignores such
- * an end tag or moves elements for it, by rules this scanner does not copy. An element still
- * open at the end is outside the subset.
- * THE CONTENT OF `<noscript>` is read in place, on the same stack: a browser without
- * scripting reads it as markup, a browser with scripting as raw text up to the first
- * `</noscript`. Both end the element at the same place only when its end tag stands exactly
- * where the raw text ends and finds the `<noscript>` on top of the stack (as every end tag
- * must find its element); anything else is outside the subset.
- * THE DOCTYPE counts only before everything else: text or a tag before it leaves a browser
- * in quirks mode, and the decision lets only white space stand there (one byte-order mark is
- * taken off before the scan), so a comment before the doctype refuses the file too. Without
- * a doctype a `<table>` leaves an open `<p>` open (quirks mode). After `</body>` or `</html>`
- * only white space, comments and those two end tags may follow (a browser puts anything else
- * back into the body, inside whatever is still open there).
- * @param {string} s the whole file, line feeds only, without a leading byte-order mark
- * @returns {Tok[]}
- */
-function scanMarkup(s) {
-  /** @type {Tok[]} */
-  const out = [];
-  /**
-   * @typedef {{name: string, holds: boolean, component: boolean, holder: number, item: number, rows: boolean, end: number}} Open
-   * an open element: whether it holds its text and is a component; which kind of list it is
-   * ({@link ITEM_HOLDERS}) or is an item of ({@link ITEMS}), or -1; whether the nearest part
-   * of a table around it, itself included, is one that holds rows and not cells; for a
-   * `<noscript>`, where its raw text ends
-   */
-  /** @type {Open[]} the open elements, the innermost last */
-  const stack = [];
-  /** @type {Map<string, number>} how many open elements carry each name */
-  const open = new Map();
-  let held = 0;
-  let components = 0;
-  let ended = false; // `</body>` or `</html>` has been read
-  let initial = true; // nothing but white space has been read
-  let quirks = true; // no `<!DOCTYPE html>` leads the file: a browser then leaves a `<p>` open at a `<table>`
-  let noscriptEnd = -1; // where the raw text of the `<noscript>` last opened ends
-  /** For lists and for `<dl>`: how many items are open in each open one, the innermost last. */
-  const items = [[0], [0]];
-  const top = () => (stack.length > 0 ? stack[stack.length - 1] : null);
-  const pop = () => {
-    const el = /** @type {Open} */ (stack.pop());
-    open.set(el.name, /** @type {number} */ (open.get(el.name)) - 1);
-    if (el.holds) held--;
-    if (el.component) components--;
-    if (el.holder >= 0) items[el.holder].pop();
-    else if (el.item >= 0) items[el.item][items[el.item].length - 1]--;
-  };
-  /** @param {Open} el */
-  const enter = (el) => {
-    stack.push(el);
-    open.set(el.name, (open.get(el.name) || 0) + 1);
-    if (el.holds) held++;
-    if (el.component) components++;
-    if (el.holder >= 0) items[el.holder].push(0);
-    else if (el.item >= 0) items[el.item][items[el.item].length - 1]++;
-  };
-  /** @param {string} name @param {boolean} holds @param {boolean} component @param {number} end @returns {Open} the element as it will stand on the stack */
-  const element = (name, holds, component, end) => {
-    const above = top();
-    const rows = TABLE_ROW_PARTS.has(name) || (!TABLE_CELL_PARTS.has(name) && above !== null && above.rows);
-    return { name, holds, component, holder: ITEM_HOLDERS.get(name) ?? -1, item: ITEMS.get(name) ?? -1, rows, end };
-  };
-  /** @param {number} back @returns {string} the name of the element `back` places under the top, or '' */
-  const nameAt = (back) => (stack.length > back ? stack[stack.length - 1 - back].name : '');
-  /** An end tag that does not close the element on top closes the elements above its own that may leave their end tag out before it, or is outside the subset. */
-  const closeImplied = (name) => {
-    let k = stack.length - 1;
-    while (k >= 0 && stack[k].name !== name && (IMPLIED_END.get(stack[k].name) || NO_NAMES).has(name)) k--;
-    if (k < 0 || stack[k].name !== name) outside();
-    else while (stack.length > k) pop();
-  };
-  /**
-   * The open elements a start tag closes ({@link P_CLOSERS} and what follows it), each only
-   * where it is on top; where a browser would close through other elements, the start tag is
-   * outside the subset.
-   * @param {string} name @param {boolean} selects inside a `<select>`
-   */
-  const closeBefore = (name, selects) => {
-    if (ITEMS.has(name)) {
-      const of = items[/** @type {number} */ (ITEMS.get(name))];
-      if (of[of.length - 1] > 0) {
-        if (nameAt(0) === 'p' && ITEMS.get(nameAt(1)) === ITEMS.get(name)) pop();
-        if (ITEMS.get(nameAt(0)) === ITEMS.get(name)) pop();
-        else outside();
-      }
-    }
-    // A table closes the paragraph only under `<!DOCTYPE html>`; in quirks mode it stays inside it.
-    if (P_CLOSERS.has(name) && open.get('p') && !(name === 'table' && quirks)) {
-      if (nameAt(0) === 'p') pop();
-      else outside();
-    }
-    if (HEADINGS.has(name) && HEADINGS.has(nameAt(0))) pop();
-    if (CLOSES_OWN.has(name) && open.get(name)) {
-      if (nameAt(0) === name) pop();
-      else outside();
-    }
-    if (name === 'form' && open.get('form')) outside();
-    if ((name === 'rt' || name === 'rp' || name === 'rb' || name === 'rtc') && open.get('ruby')) {
-      if (RUBY_IMPLIED.has(nameAt(0)) || name === 'rb' || name === 'rtc') outside();
-      // A browser closes more than the `<rt>` or `<rp>` on top unless the `<ruby>` stands right under it.
-      else if ((nameAt(0) === 'rt' || nameAt(0) === 'rp') && nameAt(1) !== 'ruby') outside();
-      else if (nameAt(0) === 'rt' || nameAt(0) === 'rp') pop();
-    }
-    if (name === 'option' || name === 'optgroup' || (name === 'hr' && selects)) {
-      if (nameAt(0) === 'option') pop();
-      if (name !== 'option' && selects && nameAt(0) === 'optgroup') pop();
-    }
-    const part = TABLE_PARTS.get(name);
-    if (part && nameAt(0) !== 'template') {
-      while (part[0].includes(nameAt(0))) pop();
-      if (!part[1].includes(nameAt(0))) outside();
-    }
-    // A table started among another table's rows, also through elements that stand there, ends that table for a browser.
-    if (name === 'table' && stack.length > 0 && stack[stack.length - 1].rows) outside();
-    if (nameAt(0) === 'colgroup' && name !== 'col' && name !== 'template') outside();
-  };
-  const n = s.length;
-  let i = 0; // how far the file is read
-  let start = 0; // where the text token in progress starts
-  /** @param {number} end the text token in progress ends here */
-  const text = (end) => {
-    if (end <= start) return;
-    const v = s.slice(start, end);
-    start = end;
-    const el = top();
-    const blank = !NOT_HTML_SPACE.test(v);
-    if (!blank) initial = false;
-    // After the body's end, and directly inside a `<colgroup>`, a browser moves text elsewhere.
-    if ((ended || (el !== null && el.name === 'colgroup')) && !blank) outside();
-    const unsent = Boolean(open.get('select')) && !(el !== null && el.name === 'option' && !el.holds);
-    const lead = !ended && (stack.length === (open.get('html') || 0) + (open.get('head') || 0) || (el !== null && TABLE_TEXT_MOVES.has(el.name)));
-    out.push({ k: 'text', v, quiet: held > 0 || unsent || ended, inexact: components > 0, lead });
-  };
-  /** @param {string} k @param {number} end one token of kind `k` from where the scan stands to `end` */
-  const take = (k, end) => {
-    text(i);
-    out.push({ k, v: s.slice(i, end) });
-    i = end;
-    start = end;
-  };
-  if (s.indexOf('<') < 0) i = n; // nothing but text: one token
-  while (i < n && scanFault === null) {
-    if (s[i] !== '<') { i++; continue; }
-    const d = s[i + 1] || '';
-    if (isLetter(d) || (d === '/' && isLetter(s[i + 2] || ''))) {
-      const tag = scanTag(s, i, d === '/');
-      const name = /** @type {string} */ (tag.name);
-      const attrs = /** @type {string[]} */ (tag.attrs);
-      const selects = Boolean(open.get('select'));
-      if (selects && !['option', 'optgroup', tag.end ? 'select' : 'hr'].includes(name)) outside();
-      if (ended && !(tag.end && (name === 'body' || name === 'html'))) outside();
-      if (!tag.end && (name === 'svg' || name === 'math')) {
-        take('foreign', foreignEnd(s, i));
-        initial = false;
-        continue;
-      }
-      text(i);
-      initial = false;
-      const at = i;
-      out.push(tag);
-      i += tag.v.length;
-      start = i;
-      if (scanFault !== null) break; // already refused: nothing more is followed
-      if (tag.end) {
-        // With scripting a `<noscript>` ends where its raw text ends; without, at this end tag: the same place, or the file is refused.
-        if (name === 'noscript' && nameAt(0) === name && /** @type {Open} */ (top()).end !== at) outside();
-        if (nameAt(0) === name) pop();
-        else closeImplied(name);
-        if (name === 'body' || name === 'html') ended = true;
-        continue;
-      }
-      if (name === 'frameset' || name === 'frame' || ((name === 'html' || name === 'body') && attrs.includes('is'))) outside();
-      closeBefore(name, selects);
-      if (!VOID_ELEMENTS.has(name)) {
-        const code = CODE_ELEMENTS.has(name) || name === 'template' || name === 'noscript';
-        const component = !code && isComponent(name, attrs);
-        // The first `</noscript` from here on is looked for once: a `<noscript>` inside another has the same one.
-        if (name === 'noscript' && noscriptEnd < i) noscriptEnd = rawEnd(s, i, name);
-        enter(element(name, code || component || (name === 'option' && !attrs.includes('value')), component,
-          name === 'noscript' ? noscriptEnd : -1));
-      }
-      if (name === 'title') {
-        i = rawEnd(s, i, name);
-        text(i);
-      } else if (RAW_TEXT.has(name)) {
-        const end = rawEnd(s, i, name);
-        if (end > i) take('raw', end);
-      }
-    } else if (d === '!' || d === '?' || d === '/') {
-      text(i); // what stands before a doctype counts, so it is read first
-      const end = declarationEnd(s, i);
-      if (!s.startsWith('<!--', i)) { // the doctype: only white space may stand before it
-        if (!initial) outside();
-        quirks = false;
-      }
-      initial = false;
-      take('comment', end);
-    } else {
-      i++;
-    }
-  }
-  text(n);
-  if (stack.length > 0) outside(); // an element never closed
-  return out;
-}
-
-/**
- * Rule 4 — compare two token sequences: equal in length and kind, every token identical
- * but changed text tokens, each of which `wording` accepts on both sides. A changed text
- * token marked `lead` keeps its leading white space (a browser reads that white space into
- * another place than the text after it). Returns `runs`, the old and new values of the
- * changed text tokens (rule 6 reads them), or `runs: null` with `inexact`: the first change
- * that is no wording stands in a component or custom element, or in `<svg>` or `<math>`.
- * @param {Tok[]} a @param {Tok[]} b
- * @param {(toks: Tok[], k: number) => boolean} wording
- * @returns {{runs: (string[]|null), inexact: boolean}}
- */
-function changedTexts(a, b, wording) {
-  if (a.length !== b.length) return { runs: null, inexact: false };
-  const runs = [];
-  /** @param {string} v @returns {number} how much white space the text starts with */
-  const leading = (v) => { const at = v.search(NOT_HTML_SPACE); return at < 0 ? v.length : at; };
-  for (let k = 0; k < a.length; k++) {
-    if (a[k].k !== b[k].k) return { runs: null, inexact: false };
-    if (a[k].v === b[k].v) continue;
-    // Text that comes or goes whole is no reworded text: a browser may then build another tree.
-    if (a[k].k !== 'text' || !wording(a, k) || !wording(b, k) || NOT_HTML_SPACE.test(a[k].v) !== NOT_HTML_SPACE.test(b[k].v)
-      || ((a[k].lead || b[k].lead) && a[k].v.slice(0, leading(a[k].v)) !== b[k].v.slice(0, leading(b[k].v)))) {
-      return { runs: null, inexact: a[k].k === 'foreign' || Boolean(a[k].inexact || b[k].inexact) };
-    }
-    runs.push(a[k].v, b[k].v);
-  }
-  return { runs, inexact: false };
-}
-
-/** Characters a markup text token never holds when it changes (template and script starts, a lone `<`). `$` is not among them: rule 6 decides it, with its own sentence, as it decides `€`. */
-const MARKUP_TEXT_BAD = /[{}`<]/;
-/**
- * A CHARACTER NOBODY SEES. A changed text token holds none: a reader does not see them, and a
- * terminal, a browser or a search acts on them. Every control and format character other than
- * a tab, line feed, form feed or carriage return (an escape, a right-to-left override, a
- * zero-width or a tag character); every default-ignorable code point (the Hangul fillers, the
- * combining grapheme joiner, the variation selectors); a lone surrogate, a private-use and an
- * unassigned code point (the non-characters U+FFFE and U+FFFF among them); the line and the
- * paragraph separator; and the blank Braille pattern, which is drawn as nothing.
- */
-const UNSEEN_CHARACTER = /(?![\t\n\f\r])[\p{Cc}\p{Cf}\p{Cs}\p{Co}\p{Cn}\p{Default_Ignorable_Code_Point}\u2028\u2029\u2800]/u;
-const LATIN_LETTER = /\p{Script=Latin}/u;
-const LOOKALIKE_LETTER = /[\p{Script=Cyrillic}\p{Script=Greek}]/u;
-const LETTER_OR_MARK = /[\p{L}\p{M}]/u;
-/**
- * @param {string} text @returns {boolean} one run of letters (marks between them do not part
- * it) mixes Latin letters with Cyrillic or Greek ones: `Pаy` with a Cyrillic `а` reads as
- * `Pay` and is another word to every program. One pass, one character at a time.
- */
-function mixedScripts(text) {
-  let latin = false;
-  let other = false;
-  for (const ch of text) {
-    if (!LETTER_OR_MARK.test(ch)) latin = other = false;
-    else if (LATIN_LETTER.test(ch)) latin = true;
-    else if (LOOKALIKE_LETTER.test(ch)) other = true;
-    if (latin && other) return true;
-  }
-  return false;
-}
-/**
- * The character references a changed markup text token may hold, each written in full with
- * its semicolon: punctuation and spacing a sentence is written with. Any other `&` refuses,
- * because rule 6 reads the text as written and a reference can spell a digit, a currency
- * sign, an `@` or a `/` that it would not see.
- */
-const PLAIN_REFERENCE = /&(?:amp|nbsp|quot|apos|copy|reg|trade|hellip|mdash|ndash|lsquo|rsquo|ldquo|rdquo|laquo|raquo|middot|bull|shy);/g;
-/** The character each plain reference spells. */
-const REFERENCE_CHARACTERS = { amp: '&', nbsp: '\u00a0', quot: '"', apos: "'", copy: '\u00a9', reg: '\u00ae', trade: '\u2122', hellip: '\u2026', mdash: '\u2014',
-  ndash: '\u2013', lsquo: '\u2018', rsquo: '\u2019', ldquo: '\u201c', rdquo: '\u201d', laquo: '\u00ab', raquo: '\u00bb', middot: '\u00b7', bull: '\u2022', shy: '\u00ad' };
-/** @param {string} text a changed markup text, as written @returns {string} the text a browser shows: each plain reference as its character (`&shy;` is a hyphen nobody sees, and rule 6 refuses it as it refuses the character) */
-const referencesRead = (text) => text.replace(PLAIN_REFERENCE, (m) => REFERENCE_CHARACTERS[m.slice(1, -1)]);
-/**
- * A character set named in a page: the word `charset` anywhere, not followed by `=` and
- * `utf-8` (the decision at review of 2026-10-09). The check reads every file as UTF-8; under
- * another character set a browser reads other characters from the same bytes, and in some
- * (Shift_JIS, GBK) a letter or a brace after a non-ASCII character is the second half of that
- * character. KNOWN LIMIT: a character set the server names in a header is not seen.
- */
-const OTHER_CHARSET = /charset(?![ \t\n]*=[ \t\n]*["']?utf-?8(?![\w-]))/i;
-/** The same for a stylesheet: an `@charset` rule that names anything but UTF-8. */
+/** A stylesheet's `@charset` rule that names anything but UTF-8: the check read the bytes as UTF-8, and a browser would read other characters from them. */
 const OTHER_CSS_CHARSET = /@charset(?![ \t\n]*["']utf-?8["'])/i;
-
-/**
- * Rule 4 (markup) — a changed text token is visible text: not quiet, without template or
- * script characters, without a character nobody sees ({@link UNSEEN_CHARACTER}) and without a
- * word that mixes Latin letters with Cyrillic or Greek ones ({@link mixedScripts}),
- * every `&` in it one of the plain references ({@link PLAIN_REFERENCE}), between two tags or
- * comments. It may run over several lines (the decision at review of 2026-10-09: a text node
- * is one node however many lines it is written on).
- * @param {Tok[]} toks @param {number} k @returns {boolean}
- */
-function markupWording(toks, k) {
-  const t = toks[k];
-  if (t.quiet || MARKUP_TEXT_BAD.test(t.v) || UNSEEN_CHARACTER.test(t.v) || mixedScripts(referencesRead(t.v)) || t.v.replace(PLAIN_REFERENCE, '').includes('&')) return false;
-  const beside = (x) => Boolean(x) && (x.k === 'tag' || x.k === 'comment');
-  return beside(toks[k - 1]) && beside(toks[k + 1]);
-}
 
 /** @param {Hunk[]} hunks @returns {boolean} every group replaces line for line */
 const equalHunks = (hunks) => hunks.length > 0 && hunks.every((h) => h.removed.length > 0 && h.removed.length === h.added.length);
@@ -2127,18 +1342,16 @@ function emptyLiterals(line) {
 const inexactClause = (display) => `it changes ${display} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
 
 /**
- * Rule 4, the content — judge the whole old and new file with its kind's reader. When a
- * scanner of either side ended inside an unfinished construct or lost its place, the change
- * could not be read (every scanner fails closed); when the markup scanner met something
- * outside its strict subset, the change cannot be read exactly.
- * @param {ChangedFile} f a file {@link kindOf} placed in a qualifying kind
- * @returns {{runs: string[]}|{clause: string, cause: string}}
+ * Rule 4, the content — judge the whole old and new stylesheet. When the scanner of either
+ * side ended inside an unfinished construct or lost its place, the change could not be read
+ * (the scanner fails closed).
+ * @param {ChangedFile} f a file {@link kindOf} placed in the qualifying kind
+ * @returns {(Refusal|null)}
  */
 function ruleContent(f) {
   scanFault = null;
   const judged = readKind(f);
   if (!scanFault) return judged;
-  if (scanFault === 'subset') return { clause: inexactClause(f.display), cause: 'unreadable' };
   const why = scanFault === 'open' ? 'leaves a string, a comment, a bracket or a block open' : 'holds something I cannot follow';
   return { clause: `I could not read the change (${f.display} ${why})`, cause: 'unreadable' };
 }
@@ -2182,14 +1395,13 @@ function kindAs(f, spelt) {
   // name that holds `prompt` (`src/llm/system_prompt.html`), and a file that an instruction
   // file of the last commit names (the tenth round).
   const governing = topFolders.some((p, i) => GOVERNING_FOLDERS.has(p) || p.includes('prompt') || (p === '.github' && GITHUB_GOVERNING.has(topFolders[i + 1])))
-    || lowerBase.includes('prompt') || f.named === true;
+    || lowerBase.includes('prompt');
   const buildFolder = topFolders.some((p) => BUILD_FOLDERS.has(p));
 
   let kind = null;
   // A dependency, build or settings name is neither kind, whatever its extension and its folder.
   if (named === null) {
-    if (MARKUP_EXT.has(ext)) kind = 'markup';
-    else if (ext === '.css') kind = 'colour';
+    if (ext === '.css') kind = 'colour';
   }
   if (kind !== null && governing) return unrecognised;
   // A side emptied, or filled from empty, holds the content of a removal or an addition.
@@ -2215,11 +1427,11 @@ function kindAs(f, spelt) {
 }
 
 /**
- * Rule 4, the content — the wording one file's change alters, read by the reader of the kind
- * {@link kindOf} placed it in, or the clause that refuses it; the scanners' faults are read
- * by {@link ruleContent}.
+ * Rule 4, the content — null when one stylesheet's change is a change of colour values in
+ * standard colour properties and nothing else, or the clause that refuses it; the scanner's
+ * faults are read by {@link ruleContent}.
  * @param {ChangedFile} f
- * @returns {{runs: string[]}|{clause: string, cause: string}}
+ * @returns {(Refusal|null)}
  */
 function readKind(f) {
   const d = f.display;
@@ -2240,40 +1452,18 @@ function readKind(f) {
   // one that moves from a line to another is a change the diff does not show either.
   if (marked(oldText) !== marked(newText) || returns(oldText) !== returns(newText) || (oldEnds.length === newEnds.length && oldEnds !== newEnds)) return unrecognised;
   const body = (text) => lineFeeds(text).slice(marked(text) ? 1 : 0);
-  // One reader per kind, looked up by the kind's own name: a kind no reader is written for
-  // stops the check, never a fall-back to another reader (and no name an object carries by
-  // itself, `toString` say, is a kind).
-  const reader = Object.prototype.hasOwnProperty.call(READERS, String(kind)) ? READERS[/** @type {keyof READERS} */ (kind)] : null;
-  if (reader === null) throw new Error(`no reader for the kind ${kind}`);
-  return reader(f, body(oldText), body(newText));
+  // One kind, one reader: a kind no reader is written for stops the check, never a fall-back.
+  if (kind !== 'colour') throw new Error(`no reader for the kind ${kind}`);
+  const o = body(oldText);
+  const n = body(newText);
+  const oldRead = readCss(o);
+  const newRead = readCss(n);
+  // A changed custom property is a setting, whatever it is named and whatever it holds.
+  if (customDeclarations(o, oldRead) !== customDeclarations(n, newRead)) return settingRefusal(d);
+  if (!equalHunks(f.hunks)) return unrecognised;
+  const edit = colourEdit(o, n, oldRead, newRead);
+  return edit === true ? null : edit === 'inexact' ? { clause: inexactClause(d), cause: 'unrecognised' } : unrecognised;
 }
-
-/** @typedef {(f: ChangedFile, o: string, n: string) => ({runs: string[]}|Refusal)} Reader the two sides without a byte-order mark, line feeds only */
-const READERS = {
-  /** @type {Reader} a page: the old and new values of its changed text tokens */
-  markup(f, o, n) {
-    const unrecognised = unrecognisedRefusal(f.display);
-    if (!equalHunks(f.hunks)) return unrecognised;
-    // The bytes were read as UTF-8; a page that names another character set is read otherwise by a browser.
-    if (OTHER_CHARSET.test(/** @type {string} */ (f.oldText)) || OTHER_CHARSET.test(/** @type {string} */ (f.newText))) outside();
-    const texts = changedTexts(scanMarkup(o), scanMarkup(n), markupWording);
-    if (texts.runs === null) return texts.inexact ? { clause: inexactClause(f.display), cause: 'unrecognised' } : unrecognised;
-    // A page in which no text changed is no pass of nothing.
-    if (texts.runs.length === 0) return unrecognised;
-    // Rule 6 reads each changed text as written and as its character references spell it.
-    return { runs: [...texts.runs, ...texts.runs.map(referencesRead)] };
-  },
-  /** @type {Reader} a stylesheet: no wording, so no runs */
-  colour(f, o, n) {
-    const oldRead = readCss(o);
-    const newRead = readCss(n);
-    // A changed custom property is a setting, whatever it is named and whatever it holds.
-    if (customDeclarations(o, oldRead) !== customDeclarations(n, newRead)) return settingRefusal(f.display);
-    if (!equalHunks(f.hunks)) return unrecognisedRefusal(f.display);
-    const edit = colourEdit(o, n, oldRead, newRead);
-    return edit === true ? { runs: [] } : edit === 'inexact' ? { clause: inexactClause(f.display), cause: 'unrecognised' } : unrecognisedRefusal(f.display);
-  }
-};
 
 /**
  * @param {string} part one part of a path: a run of letters, lower case
@@ -2346,19 +1536,11 @@ function ruleSensitiveArea(f, ctoc) {
   let word = wordIn(f.topRel.slice(0, nameAt), false) || wordIn(f.topRel.slice(nameAt), nameParts(f).ext === '.css');
   if (!word && PATH_FORMS.some((form) => isSecretTarget(form(f.topRel)))) word = 'secret';
   if (!word && ctoc && PATH_FORMS.some((form) => isProtectedEnforcementPath(form(f.topRel)) || isProtectedEnforcementPath(form(f.topRel).toLowerCase()))) word = 'enforcement';
-  return word ? { clause: `${f.display} sits in an area named ${word}, and such areas are never a hotfix`, cause: 'sensitive-area' } : null;
-}
-
-/**
- * Rule 6 — the old and new wording of a page carries no risk marker ({@link RISK_MARKER}),
- * no scheme ({@link SCHEME}) and no character a reader does not see
- * ({@link UNSEEN_CHARACTER}). A stylesheet's change holds no wording.
- */
-function ruleRiskMarker(f) {
-  const marked = (r) => RISK_MARKER.test(r) || SCHEME.test(r) || UNSEEN_CHARACTER.test(r);
-  return f.runs.some(marked)
-    ? { clause: `the wording in ${f.display} contains a number, a price, a web address or an e-mail address`, cause: 'risk-marker' }
-    : null;
+  if (word) return { clause: `${f.display} sits in an area named ${word}, and such areas are never a hotfix`, cause: 'sensitive-area' };
+  // A path that holds a character nobody sees names no place this check can vouch for, whatever
+  // it spells without it.
+  UNSEEN_CHARACTER.lastIndex = 0;
+  return UNSEEN_CHARACTER.test(f.topRel) ? unrecognisedRefusal(f.display) : null;
 }
 
 /**
@@ -2379,13 +1561,7 @@ function ruleRefusal(change) {
       if (r) return r;
     }
   }
-  // A change read from a repository carries the text of its instruction files; one that does
-  // not was read by nothing this check knows, and is never judged without it.
-  const instructions = change.instructions;
-  if (change.top && typeof instructions !== 'string') throw new Error('the change carries no text of the instruction files');
   for (const f of change.files) {
-    const base = path.posix.basename(f.topRel);
-    f.named = typeof instructions === 'string' && PATH_FORMS.some((form) => instructions.includes(form(base).toLowerCase()));
     const r = kindOf(f);
     if ('clause' in r) return r;
     f.kind = r.kind;
@@ -2402,17 +1578,14 @@ function ruleRefusal(change) {
   }
   for (const f of change.files) {
     const r = ruleContent(f);
-    if ('clause' in r) return r;
-    f.runs = r.runs;
+    if (r) return r;
   }
   // CTOC's own repository, detected as CTOC detects it everywhere (`package.json` named
   // `ctoc` at the project boundary); a change built by hand (the property test) has no top.
   const ctoc = Boolean(change.top) && isCtocProject(/** @type {string} */ (change.top)).isCtocRepo;
-  for (const rule of [(f) => ruleSensitiveArea(f, ctoc), ruleRiskMarker]) {
-    for (const f of change.files) {
-      const r = rule(f);
-      if (r) return r;
-    }
+  for (const f of change.files) {
+    const r = ruleSensitiveArea(f, ctoc);
+    if (r) return r;
   }
   return null;
 }

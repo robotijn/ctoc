@@ -1,55 +1,37 @@
 'use strict';
 
-// The differential test: the hotfix check's readers against real parsers.
+// The differential test: the hotfix check's stylesheet reader against a real parser.
 //
-// A seeded generator makes HTML documents and stylesheets and one edit of each, of eleven
-// kinds (a word replaced, deleted or added, a mark added or removed, a change at a line start,
-// lines joined or split, a line added or removed, leading or trailing spaces changed), and in
-// a stylesheet mostly a colour replaced. For every edit the check passes (rules 2 to 7 of
-// `ruleRefusal`: no refusal) the real parsers are asked what the edit changed:
-//   HTML      the old and the new document are parsed by parse5, the HTML standard's parser,
-//             with scripting enabled and with scripting disabled (one leading byte-order
-//             mark taken off first, as a browser does). The two trees must be identical
-//             except for the data of exactly one text node, whose every ancestor is a plain
-//             HTML element that does not hold its text.
-//   CSS       both sides are parsed by postcss, and the two trees must be identical except
-//             for the value of exactly one declaration, which postcss-value-parser reads as
-//             exactly one colour on both sides, in a real colour property.
-// (Until the tenth round, the session coordinator's decision of 2026-10-10, this file also
-// held a Markdown section against markdown-it and a YAML section against js-yaml: Markdown
-// prose and catalogue files are no kinds the check reads any more, and the two parsers are
-// no dependencies of this repository's tests.)
-// Anything else is a disagreement: the check called a change wording that a real parser
+// A seeded generator makes stylesheets and one edit of each: mostly a colour replaced, else
+// one of eleven kinds (a word replaced, deleted or added, a mark added or removed, a change at
+// a line start, lines joined or split, a line added or removed, leading or trailing spaces
+// changed). For every edit the check passes (rules 2 to 7 of `ruleRefusal`: no refusal) the
+// real parser is asked what the edit changed: both sides are parsed by postcss, and the two
+// trees must be identical except for the value of exactly one declaration, which
+// postcss-value-parser reads as exactly one colour on both sides, in a real colour property.
+// Anything else is a disagreement: the check called a change a colour that a real parser
 // reads as something else.
 //
-// The test must also notice a weakened rule. So every refusal rule of the HTML reader has a
-// witness written by hand: a document and an edit that the check must refuse. Each witness
-// was proven to bite (2026-10-09): its rule was weakened in a scratch copy of the module, the
-// witness then passed, and the copy was thrown away. The plan's Execution Record holds the
-// table of rules, witnesses and results.
+// (This file held a Markdown section against markdown-it and a YAML section against js-yaml
+// until the tenth round, and an HTML section against parse5 until the re-check of 2026-10-10.
+// Markdown prose, catalogue files and pages are no kinds the check reads any more, and those
+// three parsers are no dependencies of this repository's tests.)
 //
-// parse5, postcss and postcss-value-parser are test-only dependencies of this file
-// (devDependencies, exact versions); the hotfix check requires none of them. parse5 is an
-// ECMAScript module loaded with `require`, which needs Node.js 20.19 or later, or 22.12 or
-// later: the guard below says so in one sentence.
+// The test must also notice a weakened rule. So every refusal rule has a witness written by
+// hand: the smallest change that the rule refuses, with the reason it is refused for.
 //
-// Size: by default 110,000 HTML and 30,000 CSS cases. The long soak (6 million HTML cases
-// and 1 million CSS cases) runs with HOTFIX_DIFFERENTIAL_SOAK=1.
-// Every case is a pure function of the seed and its index, so a failure names both and
-// reproduces:
+// postcss and postcss-value-parser are test-only dependencies of this file (devDependencies,
+// exact versions); the hotfix check requires neither.
+//
+// Size: by default 30,000 cases. The long soak (1 million cases) runs with
+// HOTFIX_DIFFERENTIAL_SOAK=1. Every case is a pure function of the seed and its index, so a
+// failure names both and reproduces:
 //   HOTFIX_DIFFERENTIAL_SEED=<seed>   another seed (default 20261009)
-//   HOTFIX_DIFFERENTIAL_HTML=<count>  another number of HTML cases
-//   HOTFIX_DIFFERENTIAL_CSS=<count>
+//   HOTFIX_DIFFERENTIAL_CSS=<count>   another number of cases
 //   HOTFIX_DIFFERENTIAL_FROM=<index>  the first case index (to run one share of a soak)
-//   HOTFIX_DIFFERENTIAL_SHOW=<count>  also print that many plain visible-text edits the check refuses
+//   HOTFIX_DIFFERENTIAL_SHOW=<count>  also print that many one-colour edits the check refuses
 // Plan: plans/todo/ctoc-checks-that-a-hotfix-is-really-small-and-safe-s1-the-hotfix-check.md,
-// decisions at review of 2026-10-09.
-
-const [NODE_MAJOR, NODE_MINOR] = process.versions.node.split('.').map(Number);
-if (!((NODE_MAJOR === 20 && NODE_MINOR >= 19) || (NODE_MAJOR === 22 && NODE_MINOR >= 12) || NODE_MAJOR > 22)) {
-  throw new Error('The differential test of the hotfix check needs Node.js 20.19 or later, or 22.12 or later, '
-    + `because parse5 is an ECMAScript module loaded with require; this is Node.js ${process.versions.node}.`);
-}
+// decisions at review of 2026-10-09 and 2026-10-10.
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -57,7 +39,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const parse5 = require('parse5');
 const postcss = require('postcss');
 const valueParser = require('postcss-value-parser');
 
@@ -67,7 +48,6 @@ const { ruleRefusal } = require('../src/lib/hotfix-check');
 const SOAK = process.env.HOTFIX_DIFFERENTIAL_SOAK === '1';
 const SEED = Number(process.env.HOTFIX_DIFFERENTIAL_SEED || 20261009);
 const FROM = Number(process.env.HOTFIX_DIFFERENTIAL_FROM || 0);
-const HTML_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_HTML || (SOAK ? 6000000 : 110000));
 const SHOW = Number(process.env.HOTFIX_DIFFERENTIAL_SHOW || 0);
 const CSS_CASES = Number(process.env.HOTFIX_DIFFERENTIAL_CSS || (SOAK ? 1000000 : 30000));
 
@@ -112,559 +92,6 @@ const word = (r) => pick(r, WORDS);
  */
 let wild = 1;
 const W = (weight) => weight * wild;
-
-// ---------------------------------------------------------------------------------------
-// The HTML generator.
-// ---------------------------------------------------------------------------------------
-
-const HOST_INLINE = ['span', 'b', 'i', 'em', 'strong', 'a', 'u', 's', 'small', 'label', 'q', 'cite', 'abbr', 'mark', 'sub',
-  'sup', 'time', 'data', 'bdi', 'bdo', 'dfn', 'ins', 'del', 'button', 'output', 'meter', 'progress', 'summary', 'legend'];
-const HOST_BLOCK = ['div', 'p', 'section', 'article', 'aside', 'header', 'footer', 'nav', 'main', 'h1', 'h2', 'h3', 'ul', 'ol',
-  'li', 'dl', 'dt', 'dd', 'blockquote', 'figure', 'figcaption', 'address', 'details', 'dialog', 'form', 'fieldset', 'menu',
-  'hgroup', 'ruby', 'rt', 'rp', 'map', 'object', 'audio', 'video', 'canvas', 'picture', 'td', 'tr', 'th', 'caption', 'tbody',
-  'body', 'html', 'head', 'optgroup', 'option', 'datalist'];
-const HOLDERS = ['code', 'pre', 'kbd', 'samp', 'var', 'template', 'x-foo', 'my-el', 'foo', 'file'];
-const NON_HOST = ['center', 'font', 'big', 'tt', 'strike', 'nobr', 'marquee', 'applet', 'acronym', 'dir', 'listing', 'image',
-  'keygen', 'menuitem', 'rb', 'rtc', 'search', 'bgsound', 'basefont', 'blink', 'frame', 'isindex', 'selectedcontent'];
-const VOIDS = ['br', 'hr', 'img', 'input', 'wbr', 'meta', 'link', 'base', 'area', 'col', 'embed', 'param', 'source', 'track'];
-/** Letters that fold to an ASCII letter in Unicode but not in HTML: the Kelvin sign and the long s. */
-const KELVIN = '\u212a';
-const LONG_S = '\u017f';
-const ODD_SPACES = ['\u00a0', '\u2003', '\u3000', '\f', '\u000b', '\u0085', '\u2028', '\t'];
-/** Characters of the control and format categories: an escape, a zero-width space, a right-to-left override, a soft hyphen, a word joiner, a tag character. */
-const CONTROLS = ['\u001b[1m', '\u200b', '\u202e', '\u00ad', '\u2060', '\u{e0041}'];
-const REFERENCES = ['&amp;', '&amp', '&lt;', '&gt;', '&quot;', '&nbsp;', '&copy;', '&copy', '&#65;', '&#x41;', '&#x41', '&not',
-  '&notin;', '&hellip;', '&', '&x;', '&#;'];
-
-/** A tag name as written: mostly as is, sometimes in capitals, sometimes with a letter that only looks like one. */
-function written(r, name) {
-  const roll = r() / Math.max(wild, 0.2);
-  if (roll < 0.86 || roll >= 1) return name;
-  if (roll < 0.91) return name.toUpperCase();
-  if (roll < 0.94) return name[0].toUpperCase() + name.slice(1);
-  if (roll < 0.97 && /k/.test(name)) return name.replace('k', KELVIN);
-  if (/s/.test(name)) return name.replace('s', LONG_S);
-  return name;
-}
-
-/** Visible text: one to three words, sometimes with a character reference, an odd space or a line break. */
-function htmlText(r) {
-  const parts = [];
-  for (let n = 1 + int(r, 3); n > 0; n--) {
-    parts.push(word(r));
-    if (chance(r, 0.07)) parts.push(pick(r, REFERENCES));
-    if (chance(r, 0.03)) parts.push(pick(r, ['a < b', '>', '"', "'", '=', '/', '.', ',', '!']));
-    if (chance(r, 0.012 * wild)) parts.push(pick(r, CONTROLS));
-  }
-  let sep = ' ';
-  if (chance(r, 0.06)) sep = pick(r, ODD_SPACES);
-  else if (chance(r, 0.08)) sep = '\n';
-  let out = parts.join(sep);
-  if (chance(r, 0.03)) out = `&${out}`; // `&alpha` and `&alpha;` are character references too
-  if (chance(r, 0.03)) out += ';';
-  if (chance(r, 0.1)) out = ` ${out} `;
-  return out;
-}
-
-const ATTRIBUTE_NAMES = ['class', 'id', 'title', 'href', 'value', 'lang', 'data-x', 'is', 'hidden', 'style', 'onclick', 'alt',
-  'src', 'name', 'type', 'color', 'encoding', 'ID', `lin${KELVIN}`, 'definitionurl'];
-/** Zero to two attributes, in every quoting form, well separated or not. */
-function attributes(r) {
-  if (chance(r, 0.62)) return '';
-  let out = '';
-  for (let n = 1 + int(r, 2); n > 0; n--) {
-    const name = pick(r, ATTRIBUTE_NAMES);
-    const v = chance(r, 0.25) ? `${word(r)} ${word(r)}` : word(r);
-    const sep = chance(r, 1 - 0.1 * wild) ? ' ' : pick(r, ['\n', '\t', '/', '\f', '', '\u00a0', ' / ']);
-    out += sep + weighted(r, [
-      [30, () => `${name}="${v}"`],
-      [12, () => `${name}='${v}'`],
-      [12, () => `${name}=${v.replace(' ', '')}`],
-      [6, () => name],
-      [4, () => `${name} = "${v}"`],
-      [W(4), () => `${name}="a>b ${v}"`],
-      [W(3), () => `${name}='${v}"'`],
-      [W(3), () => `${name}=${v.replace(' ', '')}/`],
-      [W(2), () => `${name}="${v}`],
-      [W(2), () => `${name}='${v}`],
-      [2, () => `${name}=""`],
-      [W(2), () => `${name}="${v}"${name}="${word(r)}"`],
-      [W(2), () => `="${v}"`],
-      [W(2), () => `${name}=&quot;${v}&quot;`],
-      [W(1), () => `${name}="{${v}}"`],
-      [W(1), () => `"${v}"`]
-    ])();
-  }
-  if (chance(r, 0.05)) out += pick(r, ['/', ' /', ' ']);
-  return out;
-}
-
-/** The generator's state for one document: the random source and how many more nodes it may make. */
-function htmlKids(g, depth) {
-  if (depth >= 3 || g.left <= 0) return htmlText(g.r);
-  let out = '';
-  for (let n = 1 + int(g.r, 3); n > 0 && g.left > 0; n--) out += htmlNode(g, depth + 1);
-  return out;
-}
-
-function element(g, depth, names) {
-  const r = g.r;
-  const name = pick(r, names);
-  const open = `<${written(r, name)}${attributes(r)}>`;
-  const kids = htmlKids(g, depth);
-  const roll = chance(r, 1 - 0.1 * wild) ? 0 : 0.9 + r() * 0.1;
-  if (roll < 0.9) return `${open}${kids}</${written(r, name)}>`;
-  if (roll < 0.94) return `${open}${kids}`; // never closed
-  if (roll < 0.97) return `${open}${kids}</${written(r, name)} ${pick(r, ['x', '/', `class="${word(r)}"`])}>`;
-  return `${open}${kids}</${pick(r, names)}>`; // closed by another name
-}
-
-const COMMENTS = [
-  (w) => `<!-- ${w} -->`, (w) => `<!--${w}-->`, (w) => `<!-->${w}-->`, (w) => `<!--->${w}-->`,
-  (w) => `<!-- ${w} --!> ${w} -->`, (w) => `<!-- ${w} <!-- ${w} --> ${w} -->`, (w) => `<!-- ${w}`,
-  (w) => `<!${w}>`, (w) => `<?${w}?>`, (w) => `<![CDATA[${w}]]>`, (w) => `</ ${w}>`, (w) => `<!--${w}--!>`,
-  (w) => `<!-- ${w} -- ${w} -->`, () => '<!---->', (w) => `<!-- ${w} ->${w}`, (w) => `<!-- <!-${w}-->`,
-  (w) => `<!--\n${w}\n-->`, (w) => `<!- ${w} -->`, (w) => `<!-- ${w} <!--> ${w}`, (w) => `</>${w}`, (w) => `<!-- ${w} --\n>`
-];
-
-const RAW = [
-  (w, x) => `<script>var a = "${w}";</script>`,
-  (w, x) => `<script>\n${w}\n</script>`,
-  (w, x) => `<script><!-- ${w} </script> ${x} --></script>`,
-  (w, x) => `<script><!--<script>${w}</script>${x}-->${w}</script>`,
-  (w, x) => `<script><!--<script>${w}</script>${x}</script>`,
-  (w, x) => `<script>${w}</script x>${x}`,
-  (w, x) => `<script>${w}</SCRIPT>${x}`,
-  (w, x) => `<script src="${w}"/>${x}</script>`,
-  (w, x) => `<script>${w}`,
-  (w, x) => `<script>${w}</scriptx>${x}</script>`,
-  (w, x) => `<script type="text/plain">${w}<!--</script>${x}-->`,
-  (w, x) => `<style>.a{content:"${w}"}</style>`,
-  (w, x) => `<style>${w}</style\n>${x}`,
-  (w, x) => `<style><!-- ${w} </style> ${x} -->`,
-  (w, x) => `<style>${w}`,
-  (w, x) => `<textarea>${w}</textarea>`,
-  (w, x) => `<textarea><b>${w}</b></textarea>${x}`,
-  (w, x) => `<textarea>${w}`,
-  (w, x) => `<textarea>${w}</textare>${x}</textarea>`,
-  (w, x) => `<title>${w}</title>`,
-  (w, x) => `<title>${w}<b>${x}</b></title>`,
-  (w, x) => `<title>${w}</titl>${x}`,
-  (w, x) => `<title>${w} &amp; ${x}</title>`,
-  (w, x) => `<xmp>${w}<b>${x}</xmp>`,
-  (w, x) => `<iframe>${w}</iframe>${x}`,
-  (w, x) => `<iframe src="${w}"><p>${x}</p></iframe>`,
-  (w, x) => `<noembed>${w}</noembed>${x}`,
-  (w, x) => `<noframes>${w}<p>${x}</noframes>`,
-  (w, x) => `<plaintext>${w}</plaintext>${x}`,
-  (w, x) => `<${LONG_S}cript>${w}</${LONG_S}cript>${x}`,
-  (w, x) => `<${LONG_S}tyle>${w}</${LONG_S}tyle>${x}`,
-  (w, x) => `<lin${KELVIN} href="${w}">${x}`,
-  (w, x) => `<lin${KELVIN}>${w}</lin${KELVIN}>${x}`
-];
-
-const NOSCRIPT = [
-  (g, d, w, x) => `<noscript>${htmlKids(g, d)}</noscript>`,
-  (g, d, w, x) => `<noscript><p>${w}</p></noscript>${x}`,
-  (g, d, w, x) => `<noscript><!-- </noscript> ${w} -->${x}</noscript>`,
-  (g, d, w, x) => `<noscript><style></noscript>${w}</style>${x}`,
-  (g, d, w, x) => `<noscript><p>${w}</noscript>${x}`,
-  (g, d, w, x) => `<noscript><a title="</noscript>${w}">${x}</a></noscript>`,
-  (g, d, w, x) => `<noscript><textarea></noscript>${w}</textarea>${x}`,
-  (g, d, w, x) => `<noscript><code>${w}</noscript>${x}</code>`,
-  (g, d, w, x) => `<noscript><x-foo></noscript>${w}`,
-  (g, d, w, x) => `<noscript><select><option></noscript>${w}</select>`,
-  (g, d, w, x) => `<noscript>${w}`,
-  (g, d, w, x) => `<noscript><img src="/${w}" alt="${x}"></noscript>`,
-  (g, d, w, x) => `<noscript><script>"</noscript>${w}"</script>${x}</noscript>`,
-  (g, d, w, x) => `<noscript></noscript x="${w}">${x}`,
-  (g, d, w, x) => `<noscript>${w}<noscript>${x}</noscript></noscript>`,
-  (g, d, w, x) => `<noscript><p>${w}</p><link rel="${x}"><style>.a{}</style></noscript>`,
-  (g, d, w, x) => `<noscript> ${w} </noscript>${x}`,
-  (g, d, w, x) => `<noscript><p>${w}</noscript>${x}</p></noscript>`,
-  (g, d, w, x) => `<noscript><b>${w}</b></noscript><b>${x}</b>`,
-  (g, d, w, x) => `<noscript><ul><li>${w}<li>${x}</ul></noscript>`,
-  (g, d, w, x) => `<noscript><table><tr><td>${w}</table></noscript>${x}`,
-  (g, d, w, x) => `<noscript></noscript>${w}</noscript>${x}`
-];
-
-function selectBox(g, depth) {
-  const r = g.r;
-  const name = chance(r, 0.75) ? 'select' : 'datalist';
-  let out = `<${written(r, name)}${attributes(r)}>`;
-  for (let n = 1 + int(r, 4); n > 0; n--) {
-    const w = htmlText(r);
-    out += weighted(r, [
-      [18, () => `<option>${w}</option>`],
-      [14, () => `<option value="${word(r)}">${w}</option>`],
-      [10, () => `<option>${w}`],
-      [8, () => `<option value="${word(r)}">${w}`],
-      [4, () => `<option value>${w}</option>`],
-      [3, () => `<option VALUE=x>${w}`],
-      [4, () => `<optgroup label="${word(r)}"><option>${w}</optgroup>`],
-      [4, () => `<optgroup><option value="x">${w}<option>${word(r)}`],
-      [3, () => `<optgroup>${w}</optgroup>`],
-      [4, () => '<hr>'],
-      [5, () => w],
-      [W(3), () => `<b>${w}</b>`],
-      [W(3), () => `<option><b>${w}</b>${word(r)}</option>${word(r)}`],
-      [W(3), () => `<option>${w}<b>${word(r)}<option value="x">${word(r)}`],
-      [W(2), () => `<option value="x"><p>${w}</p>${word(r)}</option>`],
-      [W(2), () => `<div>${w}</div>`],
-      [W(2), () => `<input value="${word(r)}">${w}`],
-      [W(2), () => `<script>${w}</script>`],
-      [W(2), () => `<select>${w}`],
-      [W(2), () => `<textarea>${w}</textarea>`],
-      [W(2), () => `<option>${w}</select>${word(r)}</option>`],
-      [2, () => `<option is="x" value="y">${w}</option>`],
-      [2, () => `<option>${w}<hr>${word(r)}`],
-      [2, () => `<option>${w}<optgroup>${word(r)}`],
-      [W(2), () => `<option><span>${w}</option>${word(r)}</span>`],
-      [2, () => `<!-- ${w} -->`],
-      [W(1), () => `<template>${w}</template>`],
-      [W(1), () => `<option>${w}</div>${word(r)}`],
-      [W(1), () => `<option value="a"><option>${w}</option>${word(r)}</option>`]
-    ])();
-  }
-  if (chance(r, 0.85)) out += `</${written(r, name)}>`;
-  return out + (chance(r, 0.5) ? htmlText(r) : '');
-}
-
-function table(g, depth) {
-  const r = g.r;
-  let out = `<table${attributes(r)}>`;
-  for (let n = 1 + int(r, 4); n > 0; n--) {
-    const w = htmlText(r);
-    out += weighted(r, [
-      [16, () => `<tr><td>${htmlKids(g, depth)}</td></tr>`],
-      [10, () => `<tr><td>${w}<td>${word(r)}`],
-      [6, () => `<tr><th>${w}</th><td>${word(r)}</tr>`],
-      [6, () => `<tbody><tr><td>${w}</td></tr></tbody>`],
-      [4, () => `<thead><tr><th>${w}<tbody><tr><td>${word(r)}<tfoot><tr><td>${word(r)}`],
-      [5, () => `<caption>${w}</caption>`],
-      [3, () => `<caption>${w}`],
-      [4, () => `<colgroup><col><col></colgroup>`],
-      [3, () => `<colgroup>${w}`],
-      [8, () => w],
-      [W(5), () => `<b>${w}</b>`],
-      [W(3), () => `<b>${w}`],
-      [W(3), () => `<code>${w}<tr><td>${word(r)}</td></tr></code>`],
-      [W(3), () => `<x-foo>${w}</x-foo>`],
-      [W(3), () => `<x-foo>${w}<tr><td>${word(r)}</td></tr></x-foo>${word(r)}`],
-      [W(3), () => `<p>${w}`],
-      [W(2), () => `<input type="hidden" value="${word(r)}">${w}`],
-      [W(2), () => `<input value="${word(r)}">${w}`],
-      [W(2), () => `<form>${w}</form>`],
-      [W(2), () => `<script>${w}</script>`],
-      [W(2), () => `<template><td>${w}</td></template>`],
-      [W(2), () => `<select><option>${w}<tr><td>${word(r)}`],
-      [W(2), () => `<td>${w}</td>`],
-      [W(2), () => `<tr>${w}</tr>`],
-      [W(2), () => `<table><tr><td>${w}</table>`],
-      [W(2), () => `<tr><td><table>${w}</td></tr>`],
-      [W(2), () => `<a href="${word(r)}">${w}<tr><td>${word(r)}</a>`],
-      [W(3), () => `<b><table><tr><td>${w}</td></tr></table></b><tr><td><p>${word(r)}</td></tr>`],
-      [W(2), () => `<tr><b><table><tr><td>${w}</td></tr></table></b><td>${word(r)}</td></tr>`],
-      [W(2), () => `<caption><table><tr><td>${w}</td></tr></table></caption>`],
-      [W(2), () => `<template><table></table></template><tr><td>${w}</td></tr>`],
-      [W(2), () => ` ${w}<tr><td>${word(r)}</td></tr>\n ${word(r)}`],
-      [W(2), () => `<tbody> ${w}<tr> ${word(r)}<td>${word(r)}</td></tr></tbody>`],
-      [2, () => `<!-- ${w} -->`],
-      [W(1), () => `</td>${w}`],
-      [W(1), () => `</table>${w}<tr><td>${word(r)}`]
-    ])();
-  }
-  if (chance(r, 0.85)) out += '</table>';
-  return out + (chance(r, 0.5) ? htmlText(r) : '');
-}
-
-/** Lists, definitions, paragraphs and ruby text with the end tags the standard lets a writer leave out. */
-function optionalEnds(g, depth) {
-  const r = g.r;
-  const w = () => htmlText(r);
-  const k = () => htmlKids(g, depth);
-  return weighted(r, [
-    [10, () => `<ul><li>${k()}<li>${w()}</ul>`],
-    [6, () => `<ol${attributes(r)}><li>${w()}<li${attributes(r)}>${w()}</li><li>${w()}</ol>`],
-    [4, () => `<ul><li><p>${w()}<li>${w()}<p>${w()}</ul>`],
-    [8, () => `<p>${w()}<p${attributes(r)}>${k()}`],
-    [5, () => `<div><p>${w()}</div>${w()}`],
-    [W(5), () => `<p>${w()}<div>${w()}</div>${w()}</p>${w()}`],
-    [5, () => `<dl><dt>${w()}<dd>${w()}<dt${attributes(r)}>${w()}<dd>${k()}</dl>`],
-    [4, () => `<ruby>${w()}<rt>${w()}<rp>${w()}</ruby>`],
-    [3, () => `<ruby>${w()}<rp>(<rt${attributes(r)}>${w()}<rp>)</ruby>${w()}`],
-    [W(3), () => `<ruby>${w()}<span><rt>${w()}<rt>${w()}</span></ruby>${w()}`],
-    [W(2), () => `<ruby><p>${w()}<rt>${w()}<rp>${w()}</ruby>`],
-    [W(2), () => `<ruby><b>${w()}<rp>${w()}<rt>${w()}</b></ruby>`],
-    [4, () => `<li>${w()}<li>${w()}`],
-    [3, () => `<blockquote><p>${w()}</blockquote>${w()}`],
-    [3, () => `<section><h1>${w()}</h1><p>${w()}</section>`],
-    [W(3), () => `<p>${w()}<ul><li>${w()}</ul>${w()}</p>`],
-    [W(3), () => `<p>${w()}<table><tr><td>${w()}</table>${w()}</p>`],
-    [3, () => `<p${attributes(r)}>${w()}<h2>${w()}</h2>${w()}`],
-    [W(3), () => `<a href="/x"><p>${w()}</a>${w()}`],
-    [W(2), () => `<button><p>${w()}</button>${w()}`],
-    [2, () => `<p>${w()}<hr>${w()}<pre>${w()}</pre>${w()}`],
-    [W(2), () => `<dd>${w()}<li>${w()}</dd>${w()}`],
-    [W(2), () => `<ul><li>${w()}</ul></li>${w()}`],
-    [W(2), () => `<td>${w()}<td>${w()}</tr>${w()}`]
-  ])();
-}
-
-/** Formatting elements and others closed in the wrong order, opened twice, or never. */
-function misnested(g, depth) {
-  const r = g.r;
-  const w = () => htmlText(r);
-  const a = pick(r, ['b', 'i', 'a', 'em', 'code', 'span', 'x-foo', 'font', 'nobr', 'u', 'button', 'h1', 'form', 'tt', 'label']);
-  const b = pick(r, ['p', 'div', 'b', 'i', 'a', 'span', 'li', 'code', 'x-foo', 'h2', 'td', 'ul', 'section', 'object', 'button']);
-  // The elements that bound a scope: what stands open outside one is not closed from inside it.
-  const scope = pick(r, ['object', 'marquee', 'applet', 'template']);
-  return weighted(r, [
-    [14, () => `<${a}${attributes(r)}>${w()}<${b}>${w()}</${a}>${w()}</${b}>${w()}`],
-    [6, () => `<${a}>${w()}<${a}${attributes(r)}>${w()}</${a}>${w()}</${a}>${w()}`],
-    [6, () => `<${a}>${w()}<${a}>${w()}`],
-    [6, () => `<p><${a}${attributes(r)}>${w()}</p>${w()}`],
-    [5, () => `<${a}${attributes(r)}>${w()}<${b}>${w()}</${b}>${w()}</${b}>${w()}</${a}>${w()}`],
-    [5, () => `<div><${a}${attributes(r)}>${w()}</div>${w()}`],
-    [4, () => `<${a}${attributes(r)}><table><tr><td>${w()}</${a}>${w()}</td></tr></table>${w()}`],
-    [4, () => `<p><${a}${attributes(r)}><div>${w()}</div>${w()}</${a}>${w()}</p>${w()}`],
-    [4, () => `<${b}><${a}${attributes(r)}>${w()}</${b}>${w()}`],
-    [3, () => `<${a}><${a}><${a}><${a}${attributes(r)}>${w()}</${a}></${a}></${a}></${a}>${w()}`],
-    [3, () => `<h1>${w()}<h2>${w()}</h1>${w()}</h2>${w()}`],
-    [3, () => `<form${attributes(r)}>${w()}<div><form>${w()}</form>${w()}</div>${w()}</form>${w()}`],
-    [3, () => `<table><${a}${attributes(r)}><tr><td>${w()}</td></tr></table>${w()}`],
-    [3, () => `<${a}${attributes(r)}><li>${w()}</${a}>${w()}`],
-    [2, () => `<object><${a}${attributes(r)}>${w()}</object>${w()}</${a}>${w()}`],
-    [2, () => `<marquee><code>${w()}</marquee>${w()}`],
-    [2, () => `<applet><${a}>${w()}</applet>${w()}`],
-    [3, () => `<p>${w()}<${scope}><p>${w()}</${scope}>${w()}</p>${w()}`],
-    [3, () => `<ul><li>${w()}<${scope}><li>${w()}</${scope}>${w()}</ul>`],
-    [2, () => `<a href="/x">${w()}<${scope}><a href="/y">${w()}</a></${scope}>${w()}</a>`],
-    [2, () => `<button>${w()}<${scope}><button>${w()}</button></${scope}>${w()}</button>`],
-    [2, () => `<table><tr><td>${w()}<${scope}><td>${w()}</td></${scope}>${w()}</td></tr></table>`]
-  ])();
-}
-
-/** Stray tags: an end tag with nothing to close, a start tag never closed, and the document's own tags in odd places. */
-function stray(g, depth) {
-  const r = g.r;
-  const w = htmlText(r);
-  const any = pick(r, [...HOST_INLINE, ...HOST_BLOCK, ...HOLDERS, ...NON_HOST]);
-  return weighted(r, [
-    [8, () => `</${written(r, any)}>${w}`],
-    [8, () => `<${written(r, any)}${attributes(r)}>${w}`],
-    [3, () => `</br>${w}`],
-    [3, () => `</p>${w}`],
-    [4, () => `</body>${w}`],
-    [4, () => `</html>${w}`],
-    [4, () => `<body${attributes(r)}>${w}`],
-    [4, () => `<html${attributes(r)}>${w}`],
-    [2, () => `<body is="x">${w}</body>`],
-    [2, () => `<html is="x">${w}`],
-    [2, () => `<head>${w}</head>${word(r)}`],
-    [2, () => `</head>${w}`],
-    [2, () => `<div><body></body>${w}</div>`],
-    [2, () => `<${written(r, any)}/>${w}`],
-    [1, () => `<${word(r)}>${w}`],
-    [1, () => `<a${pick(r, ODD_SPACES)}href="${word(r)}">${w}</a>`],
-    [1, () => `< p>${w}</p>`],
-    [1, () => `<p${word(r)}`]
-  ])();
-}
-
-function foreign(g, depth) {
-  const r = g.r;
-  const w = () => htmlText(r);
-  if (chance(r, 0.65)) {
-    let out = `<svg${attributes(r)}>`;
-    for (let n = 1 + int(r, 3); n > 0; n--) {
-      out += weighted(r, [
-        [10, () => `<g><text x="1">${w()}</text></g>`],
-        [6, () => `<title>${w()}</title>`],
-        [5, () => `<desc>${w()}<b>${w()}</b></desc>`],
-        [6, () => `<foreignObject><p>${w()}</p></foreignObject>`],
-        [4, () => `<foreignObject>${htmlKids(g, depth)}</foreignObject>`],
-        [5, () => `<p>${w()}</p>`],
-        [3, () => `<div>${w()}`],
-        [3, () => `<b>${w()}</b>`],
-        [3, () => `<font color="${word(r)}">${w()}</font>`],
-        [3, () => `<font>${w()}</font>`],
-        [3, () => `<img src="${word(r)}">${w()}`],
-        [2, () => `<br>${w()}`],
-        [3, () => `<script>${w()}</script>`],
-        [3, () => `<style>${w()}</style>`],
-        [3, () => `<![CDATA[${w()}]]>`],
-        [3, () => `<a href="${word(r)}">${w()}</a>`],
-        [3, () => `<path d="${word(r)}"/>${w()}`],
-        [2, () => `<g/>${w()}`],
-        [2, () => `<g>${w()}`],
-        [2, () => `</g>${w()}`],
-        [2, () => `<textarea>${w()}</textarea>`],
-        [2, () => `<title><b>${w()}</title>${w()}</b>`],
-        [2, () => `<!-- ${w()} -->`],
-        [2, () => `</p>${w()}`],
-        [2, () => `</br>${w()}`],
-        [2, () => `<svg>${w()}</svg>`],
-        [2, () => `<math><mi>${w()}</mi></math>`],
-        [2, () => `<foreignobject><p>${w()}</p></foreignobject>`],
-        [1, () => `<table>${w()}`],
-        [1, () => w()]
-      ])();
-    }
-    return out + (chance(r, 0.85) ? '</svg>' : '') + (chance(r, 0.6) ? w() : '');
-  }
-  let out = `<math${attributes(r)}>`;
-  for (let n = 1 + int(r, 3); n > 0; n--) {
-    out += weighted(r, [
-      [10, () => `<mi>${w()}</mi>`],
-      [5, () => `<mtext><b>${w()}</b></mtext>`],
-      [5, () => `<mo>${w()}<p>${w()}</mo>`],
-      [4, () => `<annotation-xml encoding="text/html"><p>${w()}</p></annotation-xml>`],
-      [4, () => `<annotation-xml encoding="application/xhtml+xml">${htmlKids(g, depth)}</annotation-xml>`],
-      [3, () => `<annotation-xml><p>${w()}</p></annotation-xml>`],
-      [3, () => `<mglyph>${w()}</mglyph>`],
-      [3, () => `<mi><mglyph>${w()}</mglyph></mi>`],
-      [3, () => `<malignmark>${w()}`],
-      [4, () => `<p>${w()}</p>`],
-      [3, () => `<mrow><span>${w()}</span></mrow>`],
-      [3, () => `<ms>${w()}<script>${w()}</script></ms>`],
-      [2, () => `<mn>${w()}</mn>${w()}`],
-      [2, () => `<svg><text>${w()}</text></svg>`],
-      [2, () => `<mi/>${w()}`],
-      [2, () => `<title>${w()}</title>`],
-      [2, () => `<![CDATA[${w()}]]>`],
-      [2, () => `</mi>${w()}`],
-      [1, () => w()]
-    ])();
-  }
-  return out + (chance(r, 0.85) ? '</math>' : '') + (chance(r, 0.6) ? w() : '');
-}
-
-const FRAMES = [
-  (w, x) => `<frameset><frame src="${w}"></frameset>${x}`,
-  (w, x) => `<frameset>${w}</frameset>`,
-  (w, x) => `<frame src="${w}">${x}`,
-  (w, x) => `<div></div><frameset><frame name="${w}"></frameset><noframes>${x}</noframes>`,
-  (w, x) => `<frameset></frameset>${w}`,
-  (w, x) => `<FRAMESET><frame>${w}</FRAMESET>`
-];
-
-/** The names whose start and end tags change what the parser has open: the soup is made of them. */
-const SOUP = ['p', 'p', 'li', 'ul', 'ol', 'div', 'div', 'hr', 'x-foo', 'code', 'a', 'b', 'span', 'table', 'tr', 'td', 'th',
-  'tbody', 'thead', 'caption', 'colgroup', 'col', 'option', 'optgroup', 'select', 'datalist', 'form', 'button', 'h1', 'h2',
-  'dl', 'dt', 'dd', 'ruby', 'rt', 'rp', 'template', 'object', 'body', 'html', 'head', 'section', 'blockquote', 'pre', 'nobr',
-  'font', 'input', 'br', 'image', 'keygen', 'menu', 'details', 'summary', 'fieldset', 'label', 'address', 'search', 'center',
-  'marquee', 'applet', 'noscript'];
-
-/**
- * Tag soup: a walk that opens elements, closes the innermost, closes one further out (which
- * leaves end tags out), closes one that is not open, and writes text in between. It reaches
- * the parser's rules for closing elements by itself in every order.
- */
-function soup(g) {
-  const r = g.r;
-  const open = [];
-  let out = '';
-  for (let n = 3 + int(r, 10); n > 0; n--) {
-    const roll = r();
-    if (roll < 0.4) {
-      const name = pick(r, SOUP);
-      const attrs = chance(r, 0.12) ? pick(r, [' is="x"', ` value="${word(r)}"`, ` href="/${word(r)}"`, ` title="${word(r)}"`]) : '';
-      out += `<${name}${attrs}>`;
-      if (!VOIDS.includes(name)) open.push(name);
-    } else if (roll < 0.66) {
-      if (open.length > 0) out += `</${open.pop()}>`;
-    } else if (roll < 0.74) {
-      if (open.length > 1) out += `</${open.splice(int(r, open.length - 1), open.length)[0]}>`;
-    } else if (roll < 0.78) {
-      out += `</${pick(r, SOUP)}>`;
-    } else {
-      out += chance(r, 0.85) ? word(r) : htmlText(r);
-    }
-  }
-  if (chance(r, 0.85)) while (open.length > 0) out += `</${open.pop()}>`;
-  return out + (chance(r, 0.6) ? word(r) : '');
-}
-
-function htmlNode(g, depth) {
-  const r = g.r;
-  g.left--;
-  const w = word(r);
-  const x = word(r);
-  return weighted(r, [
-    [34, () => htmlText(r)],
-    [14, () => element(g, depth, HOST_INLINE)],
-    [14, () => element(g, depth, HOST_BLOCK)],
-    [7, () => element(g, depth, HOLDERS)],
-    [3, () => element(g, depth, NON_HOST)],
-    [7, () => optionalEnds(g, depth)],
-    [9, () => soup(g)],
-    [5, () => `<${written(r, pick(r, VOIDS))}${attributes(r)}>`],
-    [W(5), () => pick(r, COMMENTS)(w)],
-    [W(5), () => pick(r, RAW)(w, x)],
-    [W(3), () => pick(r, NOSCRIPT)(g, depth, w, x)],
-    [5, () => selectBox(g, depth)],
-    [5, () => table(g, depth)],
-    [W(5), () => misnested(g, depth)],
-    [W(4), () => stray(g, depth)],
-    [W(4), () => foreign(g, depth)],
-    [W(1), () => pick(r, FRAMES)(w, x)]
-  ])();
-}
-
-const DOCTYPES = ['<!DOCTYPE html>\n', '<!doctype html>\n', '<!DOCTYPE HTML>\n', ''];
-const OLD_DOCTYPES = ['<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN">\n', '<!DOCTYPE html SYSTEM "about:legacy-compat">\n',
-  '<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">\n', '<!doctype htm>\n', '<!DOCTYPE html >\n'];
-
-/** What may stand before the doctype: white space and a comment leave it the doctype; text or a tag puts the page in quirks mode. */
-const BEFORE_DOCTYPE = ['Draft', '<!-- c -->', '<p>x</p>', ' \n', 'x ', '<br>', '\n<!-- c -->\n'];
-/** The finished document: sometimes something before its doctype, sometimes a byte-order mark (or two) before everything. */
-function marked(r, text) {
-  let out = text;
-  if (chance(r, 0.05 * wild)) out = pick(r, BEFORE_DOCTYPE) + out;
-  if (chance(r, 0.04)) out = `\uFEFF${out}`;
-  if (chance(r, 0.005)) out = `\uFEFF${out}`;
-  return out;
-}
-
-/** One HTML document: a doctype or none, the document's own tags written or left out, and a body of nodes. */
-function htmlDocument(r) {
-  const g = { r, left: 3 + int(r, 9) };
-  wild = pick(r, [0.1, 0.35, 1, 1]);
-  let body = '';
-  for (let n = 1 + int(r, 4); n > 0 && g.left > 0; n--) body += `${htmlNode(g, 0)}${chance(r, 0.6) ? '\n' : ''}`;
-  const doctype = pick(r, chance(r, 0.2 * wild) ? OLD_DOCTYPES : DOCTYPES);
-  const shape = r();
-  if (shape < 0.3) return marked(r, `${doctype}${body}\n`);
-  const head = weighted(r, [
-    [30, () => `<title>${word(r)}</title>\n`],
-    [10, () => ''],
-    [6, () => `<meta charset="utf-8">\n<title>${word(r)}</title>\n<link rel="stylesheet" href="/${word(r)}.css">\n`],
-    [5, () => `<style>.a { color: red; } /* ${word(r)} */</style>\n`],
-    [5, () => `<script src="/${word(r)}.js"></script>\n`],
-    [W(5), () => `${pick(r, NOSCRIPT)(g, 2, word(r), word(r))}\n`],
-    [W(4), () => `${word(r)}\n`],
-    [W(3), () => ` ${word(r)}\n<title>${word(r)}</title>\n`],
-    [W(4), () => `<p>${word(r)}</p>\n`],
-    [3, () => `<base href="/${word(r)}/">\n`],
-    [3, () => `<template>${word(r)}</template>\n`],
-    [2, () => `<!-- ${word(r)} -->\n`]
-  ])();
-  if (shape < 0.72) return marked(r, `${doctype}<html${attributes(r)}>\n<head>\n${head}</head>\n<body${attributes(r)}>\n${body}\n</body>\n</html>\n`);
-  const keep = () => chance(r, 0.5);
-  let out = doctype;
-  if (keep()) out += `<html${attributes(r)}>${chance(r, 0.15 * wild) ? pick(r, [' ', ` ${word(r)}`, word(r)]) : ''}\n`;
-  if (keep()) out += '<head>\n';
-  out += head;
-  if (keep()) out += '</head>\n';
-  if (keep()) out += `<body${attributes(r)}>\n`;
-  out += `${body}\n`;
-  if (keep()) out += '</body>\n';
-  if (chance(r, 0.3 * wild)) out += weighted(r, [[3, () => `${htmlText(r)}\n`], [2, () => `<!-- ${word(r)} -->\n`], [2, () => `<p>${htmlText(r)}</p>\n`], [3, () => pick(r, [' ', '  \n', '\t\n'])]])();
-  if (keep()) out += '</html>\n';
-  if (chance(r, 0.15 * wild)) out += weighted(r, [[3, () => `${htmlText(r)}\n`], [2, () => `<!-- ${word(r)} -->\n`], [2, () => `<b>${htmlText(r)}</b>\n`]])();
-  return marked(r, out);
-}
 
 // ---------------------------------------------------------------------------------------
 // The CSS generator (the ninth round): rules, at-rules, nesting, comments, strings and
@@ -779,11 +206,6 @@ const EDIT_WORDS = {
     marks: [';', '{', '}', '(', ')', ':', '\\', '"', '/', '*', '!', ',', '#', '-', '[', ']', '@', ' '],
     starts: ['}', '{', '/* ', '@', '  ', ' ', '\t', 'a { ', '--x: ', '*', '//'],
     added: [(r) => `a { color: ${cssColour(r)}; }`, () => '}', (r) => `/* ${word(r)} */`, () => '', (r) => `  color: ${cssColour(r)};`, () => '{', () => '@import "x.css";']
-  },
-  html: {
-    marks: ['<', '>', '&', '"', '\'', '=', '/', ';', '!', '-', '{', '`'],
-    starts: ['<p>', '</p>', '<', ' ', '\t', '<!--', 'x', '</', '  ', '<b>', '&'],
-    added: [(r) => `<p>${word(r)}</p>`, () => '<div>', () => '</div>', (r) => `<!-- ${word(r)} -->`, (r) => word(r), () => '', () => '<br>', () => '</body>']
   }
 };
 
@@ -880,7 +302,7 @@ function hunksOf(oldText, newText) {
   return removed.length + added.length === 0 ? [] : [{ oldStart: p + 1, newStart: p + 1, removed, added }];
 }
 
-const FILES = { html: 'site/page.html', css: 'site/page.css' };
+const FILES = { css: 'site/page.css' };
 
 /** What the rules say of one edit of the file at `rel`; `carried`: what else the change holds (its repository's top, the linked files). */
 function judgeAt(rel, oldText, newText, carried = {}) {
@@ -896,98 +318,6 @@ const judge = (kind, oldText, newText) => judgeAt(FILES[kind], oldText, newText)
 // ---------------------------------------------------------------------------------------
 // The oracle: what the real parsers say the edit changed.
 // ---------------------------------------------------------------------------------------
-
-const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
-/** The HTML element names: the oracle's own copy of the 111 names of Vue's `isHTMLTag` list. */
-const HOST = new Set((
-  'html,body,base,head,link,meta,style,title,address,article,aside,footer,header,hgroup,h1,h2,h3,h4,h5,h6,'
-  + 'nav,section,div,dd,dl,dt,figcaption,figure,picture,hr,img,li,main,ol,p,pre,ul,a,b,abbr,bdi,bdo,br,cite,'
-  + 'code,data,dfn,em,i,kbd,mark,q,rp,rt,ruby,s,samp,small,span,strong,sub,sup,time,u,var,wbr,area,audio,map,'
-  + 'track,video,embed,object,param,source,canvas,script,noscript,del,ins,caption,col,colgroup,table,thead,'
-  + 'tbody,td,th,tr,button,datalist,fieldset,form,input,label,legend,meter,optgroup,option,output,progress,'
-  + 'select,textarea,details,dialog,menu,summary,template,blockquote,iframe,tfoot').split(','));
-assert.equal(HOST.size, 111);
-const HOLDS_TEXT = new Set(['script', 'style', 'textarea', 'template', 'code', 'pre', 'kbd', 'samp', 'var']);
-
-/**
- * Walk two trees side by side. Returns the first difference that is no text node's data,
- * as a sentence, or null; `changed` gains every text node whose data differs, with its
- * ancestors (the template content of a `<template>` counts as inside it).
- */
-function treeDifference(a, b, ancestors, changed) {
-  if (a.nodeName !== b.nodeName) return 'the tree has another shape';
-  if (a.nodeName === '#text') {
-    if (a.value !== b.value) changed.push(ancestors.slice());
-    return null;
-  }
-  if (a.nodeName === '#comment') return a.data === b.data ? null : 'a comment differs';
-  if (a.nodeName === '#documentType') {
-    return a.name === b.name && a.publicId === b.publicId && a.systemId === b.systemId ? null : 'the doctype differs';
-  }
-  if (a.tagName) {
-    if (a.namespaceURI !== b.namespaceURI || a.attrs.length !== b.attrs.length) return 'the tree has another shape';
-    for (let i = 0; i < a.attrs.length; i++) {
-      const x = a.attrs[i];
-      const y = b.attrs[i];
-      if (x.name !== y.name) return 'an attribute name differs';
-      if (x.value !== y.value) {
-        if (x.name === 'href' || x.name === 'src') return 'a link destination differs';
-        if (x.name === 'value') return 'a form value differs';
-        return 'an attribute differs';
-      }
-    }
-    ancestors.push(a);
-  } else if (a.mode !== b.mode) return 'the document mode differs';
-  let found = null;
-  if (a.childNodes.length !== b.childNodes.length) found = 'the tree has another shape';
-  for (let i = 0; !found && i < a.childNodes.length; i++) found = treeDifference(a.childNodes[i], b.childNodes[i], ancestors, changed);
-  if (!found && a.content) found = treeDifference(a.content, b.content, ancestors, changed);
-  if (a.tagName) ancestors.pop();
-  return found;
-}
-
-/** Why a changed text node is no plain visible text, from its ancestors; null when it is. */
-function heldBy(ancestors) {
-  let select = false;
-  for (const el of ancestors) {
-    const name = el.tagName;
-    if (el.namespaceURI !== HTML_NAMESPACE) return 'text inside svg or math changes';
-    if (!HOST.has(name) || name.includes('-')) return 'text inside a custom or unknown element changes';
-    if (el.attrs.some((x) => x.name === 'is')) return 'text inside an element with an is attribute changes';
-    if (name === 'script') return 'script text changes';
-    if (name === 'style') return 'style text changes';
-    if (HOLDS_TEXT.has(name)) return `text inside a ${name} element changes`;
-    if (name === 'select') select = true;
-    if (name === 'option') {
-      if (!el.attrs.some((x) => x.name === 'value')) return 'the text of an option without a value changes';
-      select = false;
-    }
-  }
-  return select ? 'text inside a select, outside an option, changes' : null;
-}
-
-/** A browser takes one leading byte-order mark off the page before it reads it. */
-const withoutMark = (text) => (text[0] === '\ufeff' ? text.slice(1) : text);
-
-/**
- * What the HTML parser says about one edit of an HTML document, with scripting enabled and
- * disabled: null when it is a change to one plain visible text node and nothing else, or
- * the first reason it is not.
- */
-function htmlOracle(oldText, newText) {
-  for (const scriptingEnabled of [true, false]) {
-    const a = parse5.parse(withoutMark(oldText), { scriptingEnabled });
-    const b = parse5.parse(withoutMark(newText), { scriptingEnabled });
-    const changed = [];
-    const difference = treeDifference(a, b, [], changed);
-    if (difference) return difference;
-    if (changed.length === 0) return 'no text changes';
-    if (changed.length > 1) return 'more than one text node changes';
-    const held = heldBy(changed[0]);
-    if (held) return held;
-  }
-  return null;
-}
 
 /** The oracle's own copy of the named colours of CSS Color Module Level 4, and `transparent`. */
 const ORACLE_COLOUR_NAMES = new Set(('aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue blueviolet brown burlywood '
@@ -1069,9 +399,9 @@ function cssOracle(oldText, newText) {
   return null;
 }
 
-const ORACLES = { html: htmlOracle, css: cssOracle };
-/** Whether the real parser calls the edit a change to plain text, or to one colour, and nothing else (for the count of such edits the check refuses). */
-const PLAIN = { html: (o, n) => htmlOracle(o, n) === null, css: (o, n) => cssOracle(o, n) === null };
+const ORACLES = { css: cssOracle };
+/** Whether the real parser calls the edit a change to one colour and nothing else (for the count of such edits the check refuses). */
+const PLAIN = { css: (o, n) => cssOracle(o, n) === null };
 
 // ---------------------------------------------------------------------------------------
 // The run.
@@ -1091,9 +421,9 @@ function cssEdit(r, text) {
   return edit(r, text, EDIT_WORDS.css);
 }
 
-const DOCUMENTS = { html: htmlDocument, css: cssDocument };
+const DOCUMENTS = { css: cssDocument };
 /** Each kind has a stream of its own (those of the earlier rounds). */
-const SEED_OFFSET = { html: 0, css: 1299709 };
+const SEED_OFFSET = { css: 1299709 };
 function caseOf(kind, index, seed = SEED) {
   const r = stream(seed + SEED_OFFSET[kind], index);
   const oldText = DOCUMENTS[kind](r);
@@ -1142,15 +472,6 @@ function shrink(kind, oldText, newText, reason) {
  * occur, so that zero disagreements can never mean that the check passes nothing of a kind.
  */
 const INGREDIENTS = {
-  html: {
-    'a comment': /<!--/, 'a doctype': /<!doctype html>/i, 'no doctype': /^\ufeff?(?!<!doctype)/i, 'a table': /<table/, 'a list': /<li/,
-    'an end tag left out': /<li>[^<]*<li>|<p>[^<]*<p>|<td>[^<]*<td>|<dt>[^<]*<dd>/, 'a select': /<select/, 'an option with a value': /<option value="/,
-    'a script': /<script/, 'a style': /<style/, 'a textarea': /<textarea/, 'a title': /<title/, 'a noscript': /<noscript/, 'a template': /<template/,
-    'svg or math': /<svg|<math/, 'a void element': /<(?:br|hr|img|input|wbr)\b/, 'an attribute': /<\w+ \w+=/, 'a code element': /<(?:code|pre|kbd)\b/,
-    'a custom element': /<x-foo|<my-el/, 'a character reference': /&\w+;/, 'text over two lines': /[a-z]\n[a-z]/, 'a formatting element': /<(?:b|i|em|strong|a)\b/,
-    'html, head and body': /<html[\s\S]*<head[\s\S]*<body/, 'capitals in a tag name': /<[A-Z]/, 'a byte-order mark': /^\ufeff/,
-    'a ruby': /<ruby/, 'an object, marquee or applet': /<(?:object|marquee|applet)\b/, 'white space after the body': /<\/body>\s/
-  },
   css: {
     'an at-rule with a block': /@media|@supports|@container/, 'an at-rule without one': /@import|@charset|@layer/, 'a nested rule': /\{[^{}]*\{[^{}]*\{|&/, 'a comment': /\/\*/,
     'a string': /"/, 'an escape': /\\/, 'a custom property': /--[a-z-]+: /i, 'a custom property that is read': /var\(/, 'a colour function': /rgb|hsl/,
@@ -1162,7 +483,6 @@ const INGREDIENTS = {
 
 /** The kinds of edit that add or remove a line. No such edit may pass. */
 const NEVER_PASSES = {
-  html: ['lines joined', 'a line split', 'a line added', 'a line removed'],
   // In a stylesheet nothing but a colour may change. Ten of the eleven kinds of edit never
   // pass; the eleventh, a mark removed, passes where the mark is a space inside a colour
   // function (`hsla(210, 50%, 40%, 0.9)` to `hsla(210, 50%,40%, 0.9)`): one colour written
@@ -1170,15 +490,13 @@ const NEVER_PASSES = {
   css: EDITS.filter((name) => name !== 'a mark removed')
 };
 /** The kinds of edit of which the check must pass some, per language. */
-const MUST_PASS = { html: EDITS.slice(0, 3), css: ['a colour replaced'] };
+const MUST_PASS = { css: ['a colour replaced'] };
 /**
- * The share of the generated edits the check must pass, per language: 90% of the share
- * measured on the default seed and size on 2026-10-10, after the tenth round's last change to
- * a reader (HTML 6,092 of 104,044 edits, 5.855%; CSS 1,714 of 27,083, 6.329%), so that a rule
- * which starts to refuse a tenth more than it did fails here. (Until then the minimum was
- * about half the measured share.)
+ * The share of the generated edits the check must pass: 90% of the share measured on the
+ * default seed and size after the last change to the reader (the re-check of 2026-10-10), so
+ * that a rule which starts to refuse a tenth more than it did fails here.
  */
-const PASS_FLOOR = { html: 0.0527, css: 0.0569 };
+const PASS_FLOOR = { css: 0.0569 };
 
 function run(kind, count) {
   const started = Date.now();
@@ -1251,11 +569,6 @@ function assertRun(t, kind, count) {
   if (stats.cases >= 10000) assert.deepEqual(missing, [], `the check passed no edit in a document with: ${missing.join(', ')}`);
 }
 
-// Measured on 2026-10-10, seed 20261009, default size: 104,044 edits, 6,092 passed (5.9%).
-test('HTML: every edit the check passes is a change to plain visible text for the HTML parser', (t) => {
-  assertRun(t, 'html', HTML_CASES);
-});
-
 // Measured on 2026-10-10, seed 20261009, default size: 27,083 edits, 1,714 passed (6.3%). (The
 // ninth round's reader passed 12.3%: custom properties named for a colour and the colour
 // functions written with spaces passed then.) Beyond this test, 120,000 edits the ninth round's
@@ -1263,108 +576,6 @@ test('HTML: every edit the check passes is a change to plain visible text for th
 test('CSS: every stylesheet edit the check passes changes exactly one colour for postcss', (t) => {
   assertRun(t, 'css', CSS_CASES);
 });
-
-// ---------------------------------------------------------------------------------------
-// The witnesses: one document and edit per refusal rule of the HTML reader.
-// ---------------------------------------------------------------------------------------
-//
-// A million generated cases did not notice some rules being taken out of the reader (a
-// security run of 2026-10-09 weakened them one at a time), because the generator seldom
-// writes the one shape a rule exists for. So each rule has a witness here: the smallest
-// document in which that rule, and no other, refuses the edit. Each row is
-// [the rule, the old document, the new document]; without a new document the word `alpha`
-// becomes `zulu`. To prove that a witness bites, weaken its rule in a scratch copy of
-// `src/lib/hotfix-check.js` and run this test against the copy: that witness, and only
-// witnesses of that rule, must fail. The plan's Execution Record holds the last such run.
-/** Refused because the page holds something outside the strict subset: "cannot read exactly", cause `unreadable`. */
-const SUBSET_WITNESSES = [
-  // The tag reader.
-  ['an attribute name cannot start with a quote, `<` or `=`', '<p>alpha</p><br "x">'],
-  ['an attribute value in quotes must end', '<p>alpha</p><br title="x>'],
-  ['a tag must end', '<p>alpha</p><br class'],
-  ['a tag holds no brace', '<p title="{x}">alpha</p>'],
-  ['names are lower-cased as HTML does it, the ASCII letters only', '<lin\u212a>x<p>alpha</p>'],
-  // Comments, the doctype, and what a browser ends by rules of its own.
-  ['a comment must end', '<p>alpha</p><!-- x'],
-  ['a comment does not start with `>`', '<!--><br>--><p>alpha</p>'],
-  ['a comment does not start with `->`', '<!---><br>--><p>alpha</p>'],
-  ['a comment holds no `<!--`', '<!-- a <!-- b --><p>alpha</p>'],
-  ['a comment holds no `--!>`', '<!-- a --!> b --><p>alpha</p>'],
-  ['a comment does not end in `<!-`', '<!-- a <!---><p>alpha</p>'],
-  ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '<!x><p>alpha</p>'],
-  ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '<?x?><p>alpha</p>'],
-  ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '</ x><p>alpha</p>'],
-  ['`<!`, `<?` and `</` start only a standard comment, `<!DOCTYPE html>` or an end tag', '<!DOCTYPE html PUBLIC "x"><p>alpha</p>'],
-  ['only white space stands before the doctype', 'Draft<!DOCTYPE html><p>alpha</p>'],
-  ['only white space stands before the doctype', '<br><!DOCTYPE html><p>alpha</p>'],
-  ['only white space stands before the doctype', '<!-- c --><!DOCTYPE html><p>alpha</p>'],
-  // Raw text: a script block's comment marks.
-  ['in a script, `<!--` is not followed at once by `>` or `->`', '<script><!--> x</script><p>alpha</p>'],
-  ['in a script, a `<!--` holds no second `<!--`', '<script><!-- a <!-- b --></script><p>alpha</p>'],
-  ['in a script, a `<!--` holds no `--!>`', '<script><!-- a --!> b --></script><p>alpha</p>'],
-  // `<svg>` and `<math>`: one opaque piece each.
-  ['inside svg or math an end tag closes the element on top', '<svg><g></path></svg><p>alpha</p>'],
-  ['inside svg or math no tag stands where HTML is read again', '<svg><title><g></g></title></svg><p>alpha</p>'],
-  ['inside svg or math no HTML element name stands', '<svg><b>x</b></svg><p>alpha</p>'],
-  ['inside svg or math no name stands that the parser treats in a way of its own', '<svg><font>x</font></svg><p>alpha</p>'],
-  ['svg or math must end', '<p>alpha</p><svg><g>'],
-  // The structure a browser builds.
-  ['inside a select only options are followed', '<select><b>x</b></select><p>alpha</p>'],
-  ['after the body\'s end no tag follows', '<body><p>alpha</p></body><br>'],
-  ['after the body\'s end no text follows', '<body><p>alpha</p></body>x'],
-  ['an end tag closes the element on top, or elements that may leave their end tag out', '<p>alpha</p></div>'],
-  ['an end tag closes the element on top, or elements that may leave their end tag out', '<p>alpha</p><span></div></span>'],
-  ['a frameset refuses the file', '<p>alpha</p><frameset></frameset>'],
-  ['a frame refuses the file', '<p>alpha</p><frame></frame>'],
-  ['`html` carries no `is` attribute', '<p>alpha</p><html is="x"></html>'],
-  ['`body` carries no `is` attribute', '<p>alpha</p><body is="x"></body>'],
-  ['an item\'s start tag closes an open item only where that item is on top', '<ul><li><span>x<li>y</li></span></li></ul><p>alpha</p>'],
-  ['an item\'s start tag closes an open item only where that item is on top', '<dl><dt><span>x<dd>y</dd></span></dt></dl><p>alpha</p>'],
-  ['a tag that ends a paragraph closes it only where the paragraph is on top', '<p><span>x<div>y</div></span></p><p>alpha</p>'],
-  ['without a doctype a table stays inside the paragraph (quirks mode)', '<p is="x">x<table><tr><td>alpha</td></tr></table>'],
-  ['a link, a button or a nobr closes an open one of its own only where that is on top', '<a href="/a"><span>x<a href="/b">y</a></span></a><p>alpha</p>'],
-  ['no form stands in a form', '<form><div><form>x</form></div></form><p>alpha</p>'],
-  ['in a ruby, `rt` and `rp` do not follow an element whose end tag the parser would add', '<ruby><p>x<rt>y</rt></p></ruby><p>alpha</p>'],
-  ['in a ruby, `rb` and `rtc` are outside the subset', '<ruby><rb>x</rb></ruby><p>alpha</p>'],
-  ['`rt` and `rp` close an open one only directly inside the ruby', '<ruby><span><rt>x<rt>y</rt></span></ruby><p>alpha</p>'],
-  ['a part of a table stands only where a table has it', '<div><td>x</td></div><p>alpha</p>'],
-  ['no table starts among a table\'s rows', '<table><table></table></table><p>alpha</p>'],
-  ['no table starts among a table\'s rows', '<table><b><table></table></b><tr><td>x</td></tr></table><p>alpha</p>'],
-  ['a column group holds columns only', '<table><colgroup><b>x</b></colgroup></table><p>alpha</p>'],
-  ['a column group holds no text', '<table><colgroup>x</colgroup></table><p>alpha</p>'],
-  ['a noscript ends where its raw text ends', '<noscript><!-- </noscript> --></noscript><p>alpha</p>'],
-  ['an element must be closed', '<div><p>alpha</p>'],
-  ['an element must be closed', '<p>alpha</p><style>x'],
-  ['an element must be closed', '<p>alpha</p><script>x'],
-  ['an element must be closed', '<p>alpha</p><title>x']
-];
-/** Refused because the change is no change to plain visible text: "I do not recognise". */
-const UNRECOGNISED_WITNESSES = [
-  ['white space after the body\'s end is no wording', '<html><body><p>x</p></body> </html>', '<html><body><p>x</p></body>  </html>'],
-  // What may change: text between two tags or comments, and nothing else.
-  ['nothing but text between tags may change', '<p class="alpha">x</p>'],
-  ['nothing but text between tags may change', '<p>x</p>', '<p>x<br></p>'],
-  ['nothing but text between tags may change', '<script>alpha()</script>'],
-  ['a group of changed lines keeps its number of lines', '<p>alpha\nbravo</p>\n', '<p>alpha bravo</p>\n'],
-  ['a byte-order mark neither comes nor goes', '\ufeff<p>alpha</p>', '<p>alpha</p>'],
-  ['text inside a code element is code', '<p><code>alpha</code></p>'],
-  ['text inside a template is not shown', '<template><p>alpha</p></template>'],
-  ['an option without a value sends its text', '<datalist><option>alpha</option></datalist>'],
-  ['inside a select only the text of an option with a value is wording', '<select>alpha<option value="x">y</option></select>'],
-  ['the text of a noscript is not shown to every reader', '<noscript>alpha</noscript>'],
-  ['changed text holds no character reference but the plain ones', '<p>alpha &commat;</p>'],
-  ['changed text holds no control or format character', '<p>alpha\u200b</p>'],
-  ['changed text stands between two tags or comments', 'alpha<p>x</p>'],
-  ['text neither comes nor goes whole', '<p>alpha<b>x</b></p>', '<p> <b>x</b></p>'],
-  ['text read before the body, or directly inside a table, keeps its leading white space', '<html><head> alpha</head><body></body></html>', '<html><head>alpha</head><body></body></html>'],
-  ['text read before the body, or directly inside a table, keeps its leading white space', '<table> alpha<tr><td>x</td></tr></table>', '<table>alpha<tr><td>x</td></tr></table>']
-];
-/** Refused because the changed text stands where the check cannot vouch for it (a component, `<svg>`): "cannot read exactly", cause `unrecognised`. */
-const INEXACT_WITNESSES = [
-  ['nothing but text between tags may change', '<svg><text>alpha</text></svg>'],
-  ['an element whose name is no HTML element holds its text', '<x-foo>alpha</x-foo>'],
-  ['an element with an `is` attribute holds its text', '<p is="x">alpha</p>']
-];
 
 /**
  * The reason a refusal gives, as one word (the tenth round: each witness asserts the reason it
@@ -1385,22 +596,6 @@ function reasonOf(refusal) {
   return clause;
 }
 
-test('witnesses: every refusal rule of the HTML reader refuses the one document written for it, for its own reason', (t) => {
-  const wrong = [];
-  const all = [['subset', SUBSET_WITNESSES], ['unrecognised', UNRECOGNISED_WITNESSES], ['inexact', INEXACT_WITNESSES]];
-  for (const [reason, witnesses] of all) {
-    for (const [rule, oldText, changed] of witnesses) {
-      const newText = changed === undefined ? oldText.replace('alpha', 'zulu') : changed;
-      assert.notEqual(newText, oldText, `${rule}: the witness holds an edit`);
-      const given = reasonOf(judge('html', oldText, newText));
-      if (given !== reason) wrong.push(`${rule}: ${JSON.stringify(oldText)} answered "${given}", not "${reason}"`);
-    }
-  }
-  const rows = all.flatMap(([, witnesses]) => witnesses);
-  t.diagnostic(`${rows.length} witnesses for ${new Set(rows.map((w) => w[0])).size} rules`);
-  assert.deepEqual(wrong, [], 'each of these rules no longer refuses its witness, or no longer for its own reason');
-});
-
 // ---------------------------------------------------------------------------------------
 // The witnesses of the ninth and tenth rounds: one change per refusal rule those rounds added.
 // ---------------------------------------------------------------------------------------
@@ -1415,15 +610,13 @@ test('witnesses: every refusal rule of the HTML reader refuses the one document 
 // answer otherwise, and fail here. (Until the tenth round this table also held the witnesses
 // of the Markdown, catalogue and custom-property rules; those kinds are taken out.)
 const CSS_FILE = 'site/page.css';
-const HTML_FILE = 'site/page.html';
-const PAGE = '<p>alpha</p>';
 const COLOUR = 'a { color: red }\n';
 /** The plain change of each kind: every one of these passes, so a witness is refused for what it adds. */
-const PLAIN_CHANGES = [[CSS_FILE, COLOUR], [HTML_FILE, PAGE], ['src/styles/design-tokens.css', COLOUR], ['src/author/page.html', PAGE]];
+const PLAIN_CHANGES = [[CSS_FILE, COLOUR], ['src/styles/design-tokens.css', COLOUR], ['src/author/site.css', COLOUR]];
 const LATER_WITNESSES = [
   // Byte-order marks and line endings.
   ['a byte-order mark stands on both sides or on neither', 'unrecognised', CSS_FILE, COLOUR, 'BOMa { color: blue }\n'],
-  ['as many carriage returns', 'unrecognised', HTML_FILE, '<p>alpha beta</p>', '<p>zulu\rbeta</p>'],
+  ['as many carriage returns', 'unrecognised', CSS_FILE, 'a { color: red; } b { margin: 0 }', 'a { color: blue; }\r b { margin: 0 }'],
   ['the same ending on every line', 'unrecognised', CSS_FILE, 'a { color: red }\r\nb { margin: 0 }\n', 'a { color: blue }\nb { margin: 0 }\r\n'],
   // Stylesheets: the strict subset.
   ['a semicolon inside round brackets ends no statement', 'unrecognised', CSS_FILE, 'a { grid-area: (a; color: red; x: y) }\n'],
@@ -1467,38 +660,22 @@ const LATER_WITNESSES = [
   ['a changed custom property is a setting', 'setting', CSS_FILE, 'a { --shape: (a; color: red; x: y) }\n'],
   ['a changed custom property is a setting', 'setting', CSS_FILE, ':root { --gap: 4px }\n', ':root { --gap: 8px }\n'],
   // Paths and names.
-  ['a folder named prompts governs the work', 'unrecognised', 'prompts/page.html', PAGE],
+  ['a folder named prompts governs the work', 'unrecognised', 'prompts/site.css', COLOUR],
   ['a folder named output-styles governs the work', 'unrecognised', 'output-styles/page.css', COLOUR],
-  ['a sensitive word counts anywhere inside a part of the path', 'area key', 'src/APIKey/page.html', PAGE],
-  ['a sensitive word counts anywhere inside a part of the path', 'area auth', 'src/oauth/page.html', PAGE],
-  ['a sensitive word counts anywhere inside a part of the path', 'area deploy', 'src/pages/deployment.html', PAGE],
-  ['security is a sensitive word', 'area security', 'src/security/page.html', PAGE],
-  ['a part of the path that holds `prompt` governs the work', 'unrecognised', 'src/llm/system_prompt.html', PAGE],
-  ['a file an instruction file names governs the work', 'unrecognised', 'docs/rules.html', PAGE, undefined, { top: os.tmpdir(), instructions: 'read docs/rules.html first' }],
-  ['a file an instruction file names governs the work', 'unrecognised', 'docs/Rules.css', COLOUR, undefined, { top: os.tmpdir(), instructions: '@docs/rules.css' }],
-  ['a page or stylesheet in a dot-folder never qualifies', 'unrecognised', '.storybook/page.html', PAGE],
-  ['a path is asked as its letters read', 'area payment', 'src/payZWSPment/page.html', PAGE],
-  ['a path is asked as its letters read', 'area payment', 'src/pAACUTEyment/page.html', PAGE],
-  ['a path is asked as it is written', 'area auth', 'src/authZWSPlogin/page.html', PAGE],
-  ['a path is asked with compatibility letters as plain ones', 'area auth', 'src/FWAuthZWSPpanel/page.html', PAGE],
+  ['a sensitive word counts anywhere inside a part of the path', 'area key', 'src/APIKey/site.css', COLOUR],
+  ['a sensitive word counts anywhere inside a part of the path', 'area auth', 'src/oauth/site.css', COLOUR],
+  ['a sensitive word counts anywhere inside a part of the path', 'area deploy', 'src/styles/deployment.css', COLOUR],
+  ['security is a sensitive word', 'area security', 'src/security/site.css', COLOUR],
+  ['a part of the path that holds `prompt` governs the work', 'unrecognised', 'src/llm/system_prompt.css', COLOUR],
+  ['a page or stylesheet in a dot-folder never qualifies', 'unrecognised', '.storybook/site.css', COLOUR],
+  ['a path is asked as its letters read', 'area payment', 'src/payZWSPment/site.css', COLOUR],
+  ['a path is asked as its letters read', 'area payment', 'src/pAACUTEyment/site.css', COLOUR],
+  ['a path is asked as it is written', 'area auth', 'src/authZWSPlogin/site.css', COLOUR],
+  ['a path is asked with compatibility letters as plain ones', 'area auth', 'src/FWAuthZWSPpanel/site.css', COLOUR],
   ['in a stylesheet\'s name only `tokens` keeps its plural', 'area payment', 'src/styles/payments.css', COLOUR],
-  ['a test folder is found in every form of the path', 'test', 'teZWSPsts/page.html', PAGE],
-  ['a governing folder is found in every form of the path', 'unrecognised', 'promZWSPpts/page.html', PAGE],
-  ['a page or stylesheet is one as its name is written', 'unrecognised', 'site/page.htZWSPml', PAGE],
-  // Markup: what the tenth round added.
-  ['a default-ignorable character is one nobody sees: the Hangul filler', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u3164</p>'],
-  ['a default-ignorable character is one nobody sees: the combining grapheme joiner', 'unrecognised', HTML_FILE, PAGE, '<p>zu\u034flu</p>'],
-  ['a default-ignorable character is one nobody sees: a variation selector', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u{e0101}</p>'],
-  ['a private-use or unassigned code point is a character nobody sees', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\ue000</p>'],
-  ['a private-use or unassigned code point is a character nobody sees', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u0378</p>'],
-  ['a line or paragraph separator is a character nobody sees', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u2028</p>'],
-  ['the blank Braille pattern is a character nobody sees', 'unrecognised', HTML_FILE, PAGE, '<p>zulu\u2800</p>'],
-  ['no word mixes Latin letters with Cyrillic or Greek ones', 'unrecognised', HTML_FILE, PAGE, '<p>zul\u0430</p>'],
-  ['no word mixes Latin letters with Cyrillic or Greek ones', 'unrecognised', HTML_FILE, PAGE, '<p>\u0396ulu</p>'],
-  ['a dollar sign is a price: rule 6 says so', 'risk', HTML_FILE, PAGE, '<p>$zulu</p>'],
-  // Markup: what the ninth round added.
-  ['a changed text is read as its references spell it', 'risk', HTML_FILE, '<p>alpha&shy;beta</p>'],
-  ['a page names no character set but UTF-8', 'subset', HTML_FILE, '<meta charset="shift_jis"><p>alpha</p>']
+  ['a test folder is found in every form of the path', 'test', 'teZWSPsts/site.css', COLOUR],
+  ['a governing folder is found in every form of the path', 'unrecognised', 'promZWSPpts/site.css', COLOUR],
+  ['a page or stylesheet is one as its name is written', 'unrecognised', 'site/page.cZWSPss', COLOUR],
 ];
 const SPELT = [['CTRL', '\u0001'], ['EACUTE', '\u00e9'], ['ZWSP', '\u200b'], ['BOM', '\ufeff'], ['KELVIN', '\u212a'], ['AACUTE', '\u00e1'], ['FWA', '\uff41']];
 const spelt = (text) => SPELT.reduce((t, [name, character]) => t.replaceAll(name, character), text);
@@ -1522,68 +699,10 @@ test('witnesses of the ninth and tenth rounds: every refusal rule they added ref
 
 // ---------------------------------------------------------------------------------------
 // Documents written by hand: the classes the security runs of 2026-10-09 found, the cases
-// the readers' rules were reasoned from, and everyday shapes. In a page every word is edited
-// in turn, in a stylesheet every colour; whatever the check passes must be plain text, or one
-// colour, for the real parsers.
+// the reader's rules were reasoned from, and everyday shapes. Every colour is edited in
+// turn; whatever the check passes must be one colour for the real parser.
 // ---------------------------------------------------------------------------------------
 const BY_HAND = {
-  html: [
-    // names, frames, options, noscript, end tags
-    `<lin${KELVIN}>alpha</lin${KELVIN}>bravo<br>`, `<${LONG_S}cript>alpha</${LONG_S}cript><p>bravo</p>`, '<LINK rel="alpha"><p>bravo</p>',
-    '<div></div><frameset></frameset>\n<p>alpha</p>', '<p>alpha</p><frame>bravo', '<frameset><frame src="alpha"></frameset><p>bravo</p>',
-    '<select>alpha<option>bravo<option value="charlie">delta</select>alpha<br>', '<select><optgroup>alpha<option>bravo</optgroup>charlie</select>',
-    '<select><option>alpha<hr>bravo<option value="x">charlie<optgroup label="y">delta<option value="z">alpha</select>',
-    '<datalist><option>alpha<option value="x">bravo</datalist><p>charlie</p>', '<p><small><datalist><hr><option></datalist><small><form>alpha</form></small></small></p>',
-    '<datalist><option>alpha<hr>bravo</datalist><p>charlie</p>', '<select><option value="a">alpha<b>bravo</b></option></select><p>charlie</p>',
-    '<noscript><code></noscript><p>alpha</p></code>', '<noscript><!-- </noscript> alpha --><p>bravo</p></noscript>', '<noscript><p>alpha</p></noscript><p>bravo</p>',
-    '<head><noscript><p>alpha</p></noscript></head><body><p>bravo</p></body>', '<noscript><style></noscript>alpha</style><p>bravo</p>',
-    '<p><noscript><div>alpha</div></noscript>bravo</p>', '<noscript><a title="</noscript>alpha">bravo</a></noscript>',
-    '<b><p>alpha</b>bravo</p>', '<a href="/x">alpha<a href="/y">bravo</a>charlie</a>delta<br>', '<p>alpha</p></div><p>bravo</p>',
-    '<p><span>alpha<div>bravo</div>charlie</span></p>', '<x-foo><p><span><hr><li>alpha</span>bravo</p></x-foo>charlie<br>',
-    '<x-foo><p><ul><hr><li></ul>alpha</p></x-foo>bravo<br>', '<x-foo><td><p>alpha</td>bravo</x-foo>charlie<br>', '<ul><li><span>alpha<li>bravo</span></ul>',
-    '<form><div><form>alpha</form>bravo</div></form>charlie<br>', '<table><tr><td>alpha</td></tr><table><tr><td>bravo</td></tr></table></table>',
-    '<table><colgroup>alpha</colgroup><tr><td>bravo</td></tr></table>', '<ruby>alpha<p>bravo<rt>charlie</ruby>', '<html><body><p>alpha</p></body>bravo</html>',
-    '<p>alpha</p>\n<body is="x"></body>', '<html is="x"><body><p>alpha</p></body></html>', '<p is="x">alpha<table><tr><td>bravo</td></tr></table></p>charlie<br>',
-    '<!DOCTYPE html>\n<p is="x">alpha<table><tr><td>bravo</td></tr></table>charlie<br>', '<!DOCTYPE html PUBLIC "x">\n<p>alpha<table><tr><td>bravo</td></tr></table></p>',
-    '<table><code><tr><td>alpha</td></tr></code></table>bravo<br>', '<table><x-foo><tr><td>alpha</td></tr></x-foo></table>bravo<br>',
-    '<code><table><tr><td>alpha</code>bravo</td></tr></table>charlie<br>', '<p><code><div>alpha</div>bravo</code>charlie</p>delta<br>',
-    '<button is="x">alpha<button>bravo</button>charlie</button>delta<br>', '<h1 is="x">alpha<h2>bravo</h2>charlie</h1>delta<br>',
-    // the end tags that may be left out
-    '<ul><li><p>alpha<li>bravo</ul>\n<ol><li>charlie</li><li>delta</ol>', '<div><p>alpha<p>bravo</div>\n<blockquote><p>charlie</blockquote>',
-    '<dl><dt>alpha<dd>bravo<dt>charlie<dd>delta</dl>', '<ruby>alpha<rp>(<rt>bravo<rp>)</ruby>',
-    '<table><caption>alpha<colgroup><col><thead><tr><th>bravo<tbody><tr><td>charlie<td>delta<tr><td>alpha<tfoot><tr><td>bravo</table>',
-    '<!DOCTYPE html>\n<html><head><title>alpha</title><body><h1>bravo<h2>charlie</h2><p>delta</html>',
-    '<p><a href="/a">alpha<a href="/b">bravo</a></p>\n<button>charlie<button>delta</button>',
-    // text over lines, references, comments
-    '<p>\n  alpha your bravo\n  now\n</p>', '<p>alpha &amp; bravo &mdash; charlie&hellip;</p>', '<p>alpha<!-- note --> bravo</p>', '<p>&alpha; &bravo</p>',
-    '<table>alpha<tr><td>bravo</td></tr></table>', '<html><body><p is="x">alpha</body>bravo</html>', '<body><div><p is="x">alpha</div></body><!-- bravo -->',
-    // The second security run of 2026-10-09 (its own generator, parse5 and a headless Chromium),
-    // the smallest case of each of its classes: text before the doctype puts the page in
-    // quirks mode; a table started among another table's rows through an inline element; the
-    // content of a noscript, read as markup; `rt` and `rp` under another element than the
-    // ruby; text before the body and directly inside a table; control and format characters;
-    // a byte-order mark; white space after the body's end.
-    'Draft<!DOCTYPE html><p is="x">alpha<table><tr><td>bravo</td></tr></table>charlie<br>',
-    '<p>x</p><!DOCTYPE html><p is="x">alpha<table><tr><td>bravo</td></tr></table>charlie<br>',
-    '<!-- c -->\n<!DOCTYPE html><p is="x">alpha<table><tr><td>bravo</td></tr></table>charlie<br>',
-    '<x-foo><table><b><table><tr><td>alpha</td></tr></table></b><tr><td><p>bravo</td></tr></table></x-foo><p>charlie</p>',
-    '<table><b><table></table></b><tr><td>alpha</td></tr></table><p>bravo</p>', '<table><tr><b><table><tr><td>alpha</td></tr></table></b><td>bravo</td></tr></table>',
-    '<noscript><p>alpha</noscript>bravo</p><p>charlie</p>', '<noscript>alpha<noscript>bravo</noscript>charlie</noscript><p>delta</p>',
-    '<head><noscript>alpha</noscript></head><body><p>bravo</p></body>', '<noscript><p>alpha</p><b>bravo</b></noscript><p>charlie</p>',
-    '<head><noscript><link rel="alpha"><style>.bravo{}</style></noscript></head><p>charlie</p>', '<noscript></noscript x><p>alpha</p>',
-    '<ruby>alpha<span><rt>bravo<rt>charlie</span></ruby><p>delta</p>', '<ruby><p>alpha<rt>bravo<rp>charlie</ruby><p>delta</p>',
-    '<ruby>alpha<rt>bravo<rt>charlie<rp>delta</ruby>', '<ruby><b>alpha<rp>bravo<rt>charlie</b></ruby>',
-    '<html> alpha<head><title>bravo</title></head><body><p>charlie</p></body></html>', '<head>\n alpha\n<title>bravo</title></head>',
-    '<html><head></head> alpha<body><p>bravo</p></body></html>', '<table> alpha<tr><td>bravo</td></tr> charlie</table>',
-    '<table><tbody> alpha<tr> bravo<td>charlie</td></tr></tbody></table>',
-    '<p>alpha\u200bbravo</p><p>charlie\u202edelta</p>', '<p>alpha\u001b[1m bravo</p>', '<p>alpha\u00adbravo \u{e0041}charlie</p>',
-    '\ufeff<!DOCTYPE html><p>alpha</p>', '\ufeff\ufeff<p>alpha</p>', '\ufeffalpha<p>bravo</p>',
-    '<html><body><p>alpha</p></body> \n</html>\n', '<body><p>alpha</p></body>\n<!-- bravo -->\n',
-    // scope boundaries
-    '<p>alpha<object><p>bravo</object>charlie</p>', '<ul><li>alpha<marquee><li>bravo</marquee>charlie</ul>', '<a href="/x">alpha<applet><a href="/y">bravo</a></applet>charlie</a>',
-    '<table><tr><td>alpha<template><td>bravo</td></template>charlie</td></tr></table>', '<p>alpha<template><p>bravo</template>charlie</p>',
-    '<button>alpha<object><button>bravo</button></object>charlie</button>'
-  ],
   css: [
     // Everyday shapes: every colour that is the whole value of a colour property passes.
     'a { color: red; }\n', '.btn {\n  color: #0a58ca;\n  background-color: #fff;\n  border-color: rgb(1, 2, 3);\n}\n',
@@ -1607,12 +726,12 @@ const BY_HAND = {
   ]
 };
 /** The edits of a hand-written document: in a page each word becomes another, in a stylesheet each colour. */
-const HAND_EDITS = { html: [WORD, 'zulu'], css: [CSS_COLOUR_TOKEN, 'green'] };
+const HAND_EDITS = { css: [CSS_COLOUR_TOKEN, 'green'] };
 
 test('documents written by hand: the classes found, and everyday shapes', (t) => {
   const wrong = [];
-  const counts = { html: [0, 0], css: [0, 0] };
-  for (const kind of ['html', 'css']) {
+  const counts = { css: [0, 0] };
+  for (const kind of ['css']) {
     const [pattern, replacement] = HAND_EDITS[kind];
     for (const oldText of BY_HAND[kind]) {
       for (const m of oldText.matchAll(pattern)) {
@@ -1625,19 +744,18 @@ test('documents written by hand: the classes found, and everyday shapes', (t) =>
       }
     }
   }
-  t.diagnostic(`HTML: ${counts.html[1]} of ${counts.html[0]} edits passed in ${BY_HAND.html.length} documents; `
-    + `CSS: ${counts.css[1]} of ${counts.css[0]} in ${BY_HAND.css.length}`);
+  t.diagnostic(`${counts.css[1]} of ${counts.css[0]} edits passed in ${BY_HAND.css.length} stylesheets`);
   assert.deepEqual(wrong, []);
-  for (const kind of ['html', 'css']) {
+  for (const kind of ['css']) {
     assert.ok(counts[kind][1] > counts[kind][0] / 6, `the check passes edits in the everyday ${kind} shapes (${counts[kind][1]} of ${counts[kind][0]})`);
   }
 });
 
 test('the real menu route answers a sample of the generated edits as the rules do', async (t) => {
   // The sample is made here, from a seed of its own, so that this test stands alone: the
-  // first four edits the rules pass and the first four they refuse, of pages and of stylesheets.
+  // first four edits the rules pass and the first four they refuse.
   const sample = [];
-  for (const kind of ['html', 'css']) {
+  for (const kind of ['css']) {
     const kept = { passed: 0, refused: 0 };
     for (let index = 0; kept.passed + kept.refused < 8 && index < 20000; index++) {
       const c = caseOf(kind, index, 4242);

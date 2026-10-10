@@ -32,7 +32,6 @@ const setting = (f) => `it changes a setting in ${f}, and settings changes are a
 // The functional plan's clause (amended 2026-10-09) for a file whose format the check reads
 // but whose change it cannot vouch for.
 const inexact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
-const riskMarker = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
 
 const page = (inner) => `<!doctype html>\n<html>\n<body>\n${inner}\n</body>\n</html>\n`;
 const lines = (...l) => l.join('\n') + '\n';
@@ -40,14 +39,10 @@ const lines = (...l) => l.join('\n') + '\n';
 // Every base file of the repository, keyed by path.
 const BASE = {
   // qualify
-  'src/pages/home.html': page('<button>Save</button>'),
-  'src/pages/welcome.html': page('<p>Welcome back!</p>'),
-  'site/about.htm': page('<h2>About us</h2>'),
   'src/components/Greeting.jsx': lines('export function Greeting() {', '  return (', '    <h1>Hello there</h1>', '  );', '}'),
   'src/components/CancelButton.tsx': lines('export const CancelButton = () => (', '  <span className="x">Cancel</span>', ');'),
   'src/components/NameField.vue': lines('<template>', '  <label>Name</label>', '</template>'),
   'src/components/Loading.svelte': lines('<p>Loading</p>'),
-  'src/pages/nav.html': page('<a class="nav" href="/home">Home</a>'),
   'translations/de.po': lines('msgid "Save"', 'msgstr "Speichern"'),
   'src/styles/button.css': lines('.save { background-color: #0a58ca; }'),
   'src/styles/theme.scss': lines('$brand: #0a58ca;'),
@@ -56,24 +51,30 @@ const BASE = {
   // under `locales/` and a `<math>` trap.
   'src/styles/indented.sass': lines('.save', '  color: #0a58ca'),
   'locales/de.po': lines('msgid "Save"', 'msgstr "Speichern"'),
-  'src/pages/formula.html': page('<p>Area</p><math><mtext>Save</mtext></math>'),
   'src/styles/link.css': lines('a {', '  color: hsl(210, 50%, 40%);', '}'),
   'src/styles/vars.css': lines(':root {', '  --brand: #ffffff;', '}'),
   'src/styles/custom.css': lines(':root {', '  --accent: red;', '}'),
   'README.md': lines('# Fixture', '', 'This project shows the old wording.'),
-  'src/pages/intro.html': '<h1>Intro</h1>\r\n\r\n<p>The intro says hello.</p>\r\n',
-  'src/pages/long.html': lines(...Array.from({ length: 12 }, (_, i) => `<p>Old long line ${String.fromCharCode(97 + i)}.</p>`)),
-  'site/a.html': lines('<p>Alpha old.</p>'),
-  'site/b.html': lines('<p>Bravo old.</p>'),
-  'site/c.html': lines('<p>Charlie old.</p>'),
-  'site/d.html': lines('<p>Delta old.</p>'),
-  'src/pages/big.html': lines(...Array.from({ length: 13 }, (_, i) => `<p>Big old line ${String.fromCharCode(97 + i)}.</p>`)),
-  'src/pages/limit.html': lines(...Array.from({ length: 11 }, (_, i) => `<p>Limit old line ${String.fromCharCode(97 + i)}.</p>`)),
-  'src/hooks/notes.html': page('<p>Old notes.</p>'),
-  'site/privacy/index.html': page('<p>We keep little.</p>'),
-  'docs/passwords.html': page('<p>Old notes.</p>'),
-  'docs/id_rsa.html': page('<p>Old notes.</p>'),
-  'docs/tokens.html': page('<p>Old notes.</p>'),
+  'src/pages/home.html': page('<button>Save</button>'),
+  'src/styles/intro.css': 'h1 { color: red; }\r\n\r\np { margin: 0; }\r\n',
+  'src/styles/long.css': lines(...Array.from({ length: 12 }, (_, i) => `.long-${String.fromCharCode(97 + i)} { color: red; }`)),
+  'site/a.css': lines('a { color: red; }'),
+  'site/b.css': lines('b { color: red; }'),
+  'site/c.css': lines('i { color: red; }'),
+  'site/d.css': lines('u { color: red; }'),
+  'src/styles/big.css': lines(...Array.from({ length: 13 }, (_, i) => `.big-${String.fromCharCode(97 + i)} { color: red; }`)),
+  'src/styles/limit.css': lines(...Array.from({ length: 11 }, (_, i) => `.limit-${String.fromCharCode(97 + i)} { color: red; }`)),
+  'src/hooks/notes.css': lines('a { color: red; }'),
+  'src/styles/Author.css': lines('a { color: red; }'),
+  'site/privacy/site.css': lines('a { color: red; }'),
+  'billing/site.css': lines('a { color: red; }'),
+  'src/payments/site.css': lines('a { color: red; }'),
+  'agents/card.css': lines('a { color: red; }'),
+  'docs/passwords.css': lines('a { color: red; }'),
+  'docs/id_rsa.css': lines('a { color: red; }'),
+  'docs/tokens/site.css': lines('a { color: red; }'),
+  'src/styles/AuthPanel.css': lines('a { color: red; }'),
+  'src/styles/paymentForm.css': lines('a { color: red; }'),
   'docs/guide.rst': lines('Guide', '=====', '', 'Read this guide first.'),
   'notes/todo.txt': lines('Write the welcome page.'),
   // traps
@@ -96,21 +97,8 @@ const BASE = {
   'plans/notes.md': lines('# Notes', '', 'Old plan notes.'),
   'src/commands/help.md': lines('# Help', '', 'Old help text.'),
   '.claude/theme.css': lines('.save { color: #0a58ca; }'),
-  'agents/card.html': page('<p>Hello</p>'),
-  'src/pages/links.html': page('<a href="/a">Home</a>'),
-  'src/pages/offer.html': page('<p>Only 9 euro a month</p>'),
-  'src/pages/visit.html': page('<p>Visit example.org</p>'),
-  'src/pages/days.html': page('<p>Only seven days</p>'),
-  'src/pages/site.html': page('<p>Visit our site</p>'),
-  'src/pages/contact.html': page('<p>Write to us</p>'),
-  'src/pages/script-block.html': page(lines('<script>', 'const s = "', '<b>Save</b>', '";', '</script>').trimEnd()),
-  'src/pages/style-block.html': page(lines('<style>', '/*', '<b>Save</b>', '*/', '</style>').trimEnd()),
-  'src/pages/textarea-block.html': page(lines('<textarea>', '<b>Save</b>', '</textarea>').trimEnd()),
   'src/components/Hello.jsx': lines('export const Hello = ({ name }) => (', '  <p>Hello {name}</p>', ');'),
   'src/components/Msg.vue': lines('<template>', '  <p>{{ msg }} now</p>', '</template>'),
-  'src/pages/multiline.html': page(lines('<p>', '  Save your work', '</p>').trimEnd()),
-  'src/pages/crossing.html': page('<b>Save</b> now'),
-  'src/pages/rules.html': page('<p>Terms &amp; rules</p>'),
   'src/styles/selector.css': lines('.red {', '  color: red;', '}'),
   'src/styles/property.css': lines('.box {', '  color: red;', '}'),
   'src/styles/display.css': lines('.box {', '  display: none;', '}'),
@@ -122,21 +110,14 @@ const BASE = {
   'src/components/Generic.tsx': lines('import { useState } from "react";', 'export function useLabel() {', '  return useState<string>("a");', '}'),
   'tests/home.test.js': lines("const test = require('node:test');", "test('shows Save', () => {});"),
   'src/__tests__/cart.spec.js': lines("it('adds', () => {});"),
-  'src/pages/login.html': page('<button>Sign in</button>'),
-  'billing/index.html': page('<p>Your statement</p>'),
   'docs/old.md': lines('# Old', '', 'An old page.'),
   'docs/logo.png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02]),
-  '.gitattributes': lines('src/pages/big.html -diff'),
+  '.gitattributes': lines('src/styles/big.css -diff'),
   'public/robots.txt': lines('User-agent: *', 'Allow: /'),
   'src/styles/mask.css': lines('.fade {', '  mask: url(#fade);', '}'),
   'src/styles/motion.css': lines('.pulse {', '  animation: red 2s;', '}'),
   // The security check's second round (2026-10-08).
-  'src/pages/size-pick.html': page('<select><option value="m">Medium</option></select>'),
-  'src/pages/onclick.html': page('<button onclick="if (a>b) save(); else stop(c<d)">Go</button>'),
   'src/components/Limit.vue': lines('<template>', '  <button :disabled="count>max || count<min">Go</button>', '</template>'),
-  'src/pages/angular.html': page('<button (click)="a>b ? save() : stop(c<d)">Go</button>'),
-  'src/pages/help-link.html': page('<a title="a>b" href="/help" data-x="c<d">Help</a>'),
-  'src/pages/banner.html': page('<div title="a>b" style="background: url(/one.png)" data-y="c<d">Hi</div>'),
   'deps/dev-requirements.txt': lines('pytest==8.0.0'),
   'deps/test-requirements.txt': lines('coverage==7.0.0'),
   'app/packages.txt': lines('libpq-dev'),
@@ -147,13 +128,8 @@ const BASE = {
   '.cursor/rules/style.md': lines('# Style', '', 'Old style rules.'),
   '.changeset/brave-cats.md': lines('---', '"corpus": patch', '---', '', 'Old change note.'),
   'src/styles/nav.css': lines('nav:hover #add {display:none}'),
-  'src/pages/colour-pick.html': page('<select><option>Red</option></select>'),
-  'src/pages/dotted.html': page(lines('<p>\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130\u0130</p><script>a()</script><script>', "el.innerHTML = '<b>Save</b>';", '</script>').trimEnd()),
   // The security check's third round and the re-review (2026-10-09): whole-file scanners.
   '.github/workflows/README.md': lines('# Workflows', '', 'The old build notes.'),
-  'src/pages/wrapped.html': page(lines('<button', '  class="x">Save</button>').trimEnd()),
-  'src/pages/tip.html': page(lines('<button title="x', ' <i>tip</i>" onclick="go(\'one\')<b">Save</button>').trimEnd()),
-  'src/pages/status-pick.html': page('<select><option><b>Pending</b></option></select>'),
   'docs/raw.rst': lines('Title', '=====', '', '.. raw:: html', '', '   <b>one</b>'),
   'CLAUDE.local.md': lines('# Local', '', 'Old local rules.'),
   '.windsurf/rules/style.md': lines('# Style', '', 'Old style rules.'),
@@ -164,13 +140,10 @@ const BASE = {
   'src/styles/commented.css': lines('#add /* ; */ {display:none}'),
   'docs/code.rst': lines('Setup', '=====', '', '.. code-block:: sh', '', '   pip install requests'),
   'docs/inc.rst': lines('Guide', '=====', '', '.. include:: one.rst'),
-  'src/pages/entity.html': page('<a title="a&gt;b" href="/x">Go</a>'),
-  'src/pages/unquoted.html': page('<a href=/one>Home</a>'),
   'src/components/Clicker.vue': lines('<template>', '  <button @click="go(\'one\')">Go</button>', '</template>'),
   'src/components/Bind.vue': lines('<template>', '  <p v-bind:title="one">Hi</p>', '</template>'),
   'src/components/Nested.jsx': lines('export const N = () => (', '  <button onClick={() => { if (a > b) { go(\'one\'); } }}>Go</button>', ');'),
   'tokens.txt': lines('Old note.'),
-  'src/payments/index.html': page('<p>Old</p>'),
   // The commit security review (2026-10-09): instruction files by class, reStructuredText roles.
   'docs/sub/AGENTS.md': lines('# Agents', '', 'Old rules.'),
   'pkg/CLAUDE.md': lines('# Rules', '', 'Old rules.'),
@@ -187,7 +160,6 @@ const BASE = {
   // The fourth round (2026-10-09): the security attack and the code review.
   'src/components/RunSql.jsx': lines('export const Q = () => <RunSql>SELECT name FROM users</RunSql>;'),
   'src/components/Charge.vue': lines('<template>', '  <MyAction>charge</MyAction>', '</template>'),
-  'src/pages/widget.html': page('<my-widget>x</my-widget>'),
   'src/components/SlotPass.vue': lines('<template>', '  <MyAction>', '    <template #label>charge</template>', '  </MyAction>', '</template>'),
   'src/components/Pay.svelte': lines('<Charge>charge</Charge>'),
   'src/styles/flags.css': lines(':root {', '  --enabled: green;', '  --mode: red;', '}'),
@@ -201,19 +173,11 @@ const BASE = {
   'docs/toctree.rst': lines('.. toctree::', '   :maxdepth: 2', '', '   intro', '   usage'),
   'docs/automodule.rst': lines('.. automodule:: one', '   :members:'),
   'docs/note-class.rst': lines('.. note::', '   :class: one', '', '   Old words.'),
-  'src/pages/code-el.html': page('<p>Run <code>pip install requests</code></p>'),
-  'src/pages/titled.html': lines('<!doctype html>', '<html>', '<head>', '<title>Save</title>', '</head>', '</html>'),
   'src/components/Cond.vue': lines('<template>', '  <div>', '    <template v-if="a"><p>Save</p></template>', '    <template v-else>Cancel</template>', '  </div>', '</template>'),
   'src/styles/tokens.css': lines('.save {', '  color: #0a58ca;', '}'),
   'src/components/GenStr.tsx': lines('export const f = <T,>(x: T) => x;', 'export const s = "<b>Save</b>";'),
   // The fifth round (2026-10-09): the owner's decision and the fixes that still apply.
   'docs/page.mdx': lines('# Page', '', 'Old words.'),
-  'src/pages/mixed.html': page('<DIV>Save</div>'),
-  'src/pages/is.html': page('<button is="run-sql">SELECT name FROM users</button>'),
-  'src/pages/runsql.html': page('<runsql>SELECT name FROM users</runsql>'),
-  'src/pages/stack.html': page('<run-sql><div></run-sql>SELECT name FROM users</div></run-sql>'),
-  'src/pages/listing.html': page('<listing>pip install requests</listing>'),
-  'src/pages/tt.html': page('<p>Run <tt>pip install requests</tt></p>'),
   'src/styles/login.css': lines('a {', '  color: red;', '}'),
   'src/styles/payment.css': lines('a {', '  color: red;', '}'),
   'src/styles/color-mode.css': lines(':root {', '  --color-mode: dark;', '}'),
@@ -223,22 +187,8 @@ const BASE = {
   'src/styles/button-colour.css': lines(':root {', '  --button-colour: red;', '}'),
   // The sixth round (2026-10-09): the strict HTML subset, folded and camel-case paths, and the
   // functional plan's sentence for a change the check cannot read exactly.
-  'src/pages/brace-tag.html': page('<button { is="run-sql" }>SELECT name FROM users</button>'),
-  'src/pages/brace-el.html': page('{<run-sql>}<span>SELECT name FROM users</span></run-sql>'),
-  'src/pages/brace-script.html': page('{<script>/*}<b></b>*/ run() /*<b></b>*/</script>'),
-  'src/pages/comment-abrupt.html': page('<!--><run-sql>--><span>SELECT name FROM users</span></run-sql>'),
-  'src/pages/svg-pre.html': page('<svg><style><pre></style><span>pip install requests</span></pre></svg>'),
-  'src/pages/unknown.html': page('<unknown>Save</unknown>'),
-  'src/pages/svg-text.html': page('<svg><text>Save</text></svg>'),
-  'src/pages/card.html': page('<my-card>Save</my-card>'),
-  'src/pages/open-div.html': '<!doctype html>\n<div>\n<p>Save</p>\n',
   'src/styles/border.css': lines('.save { border: 1px solid #0a58ca; }'),
-  '\uff21\uff35\uff34\uff28/index.html': page('<p>Save</p>'),
-  'src/pages/AuthPanel.html': page('<p>Save</p>'),
-  'src/pages/paymentForm.html': page('<p>Save</p>'),
-  'src/pages/Author.html': page('<p>Save</p>'),
   // The eighth and ninth rounds: what is left of their base files.
-  'src/pages/lead-comment.html': '<!-- Draft -->\n<!DOCTYPE html>\n<p>Save</p>\n',
   'deps.txt': lines('requests'),
   'templates/email/welcome.txt': lines('Hello {name}, welcome.'),
   'exclude.txt': lines('build', 'cache'),
@@ -263,36 +213,20 @@ const BASE = {
 };
 
 const QUALIFY = [
-  ['src/pages/home.html', page('<button>Store</button>')],
-  ['src/pages/welcome.html', page('<p>Welcome home!</p>')],
-  ['site/about.htm', page('<h2>Who we are</h2>')],
-  ['src/pages/nav.html', page('<a class="nav" href="/home">Start</a>')],
   ['src/styles/button.css', lines('.save { background-color: #0b5ed7; }')],
   ['src/styles/link.css', lines('a {', '  color: hsla(210, 50%, 40%, 0.9);', '}')],
-  ['src/pages/intro.html', '<h1>Intro</h1>\r\n\r\n<p>The intro says welcome.</p>\r\n'],
-  // 20 changed lines in one file: ten lines reworded, the size limit exactly.
-  ['src/pages/long.html', BASE['src/pages/long.html'].replace(/Old long line ([a-j])\./g, 'New long line $1.')],
+  ['src/styles/intro.css', 'h1 { color: blue; }\r\n\r\np { margin: 0; }\r\n'],
+  // 20 changed lines in one file: ten rules recoloured, the size limit exactly.
+  ['src/styles/long.css', BASE['src/styles/long.css'].replace(/\.long-([a-j]) \{ color: red/g, '.long-$1 { color: blue')],
   // 6 changed lines in 3 files: the file limit exactly.
-  [{ 'site/a.html': lines('<p>Alpha new.</p>'), 'site/b.html': lines('<p>Bravo new.</p>'), 'site/c.html': lines('<p>Charlie new.</p>') }],
-  // The text of an option with a `value` attribute is wording; the value is what is sent.
-  ['src/pages/size-pick.html', page('<select><option value="m">Middle</option></select>')],
-  // A tag whose attributes run over two lines: the whole-file scanner still sees the text.
-  ['src/pages/wrapped.html', page(lines('<button', '  class="x">Store</button>').trimEnd())],
-  // The fourth round (2026-10-09). A title is wording; a design-token stylesheet with a real
-  // colour property; a React project's `src/hooks/` page (CTOC's enforcement list is CTOC's
-  // own, and this repository is not CTOC).
-  ['src/pages/titled.html', BASE['src/pages/titled.html'].replace('Save', 'Store')],
+  [{ 'site/a.css': lines('a { color: blue; }'), 'site/b.css': lines('b { color: blue; }'), 'site/c.css': lines('i { color: blue; }') }],
+  // The fourth round (2026-10-09). A design-token stylesheet with a real colour property; a
+  // React project's `src/hooks/` stylesheet (CTOC's enforcement list is CTOC's own, and this
+  // repository is not CTOC).
   ['src/styles/tokens.css', BASE['src/styles/tokens.css'].replace('#0a58ca', '#0b5ed7')],
-  ['src/hooks/notes.html', BASE['src/hooks/notes.html'].replace('Old', 'New')],
-  // The fifth round (2026-10-09). An element name is matched in any letter case.
-  ['src/pages/mixed.html', page('<DIV>Store</div>')],
-  // The sixth round (2026-10-09). `Author` is not `auth`.
-  ['src/pages/Author.html', BASE['src/pages/Author.html'].replace('Save', 'Store')],
-  // The seventh round (the decision at review of 2026-10-09). Two false refusals let go, the
-  // differential test at zero disagreements: text that runs over several lines of one text
-  // node, and a plain character reference (`&amp;`) in the changed sentence. Both were traps.
-  ['src/pages/multiline.html', BASE['src/pages/multiline.html'].replace('Save your work', 'Store your work')],
-  ['src/pages/rules.html', page('<p>Terms &amp; conditions</p>')],
+  ['src/hooks/notes.css', BASE['src/hooks/notes.css'].replace('red', 'blue')],
+  // `Author` is not `auth`.
+  ['src/styles/Author.css', BASE['src/styles/Author.css'].replace('red', 'blue')],
   // A real colour property beside a custom property that stays as it is.
   ['src/styles/brand.css', BASE['src/styles/brand.css'].replace('background-color: red', 'background-color: blue')]
 ];
@@ -324,20 +258,6 @@ const TRAPS = [
   [{ 'src/commands/help.md': lines('# Help', '', 'New help text.') }, null, unrecognised('src/commands/help.md')],
   // The places that govern the work never qualify, whatever the kind.
   [{ '.claude/theme.css': lines('.save { color: #0b5ed7; }') }, null, unrecognised('.claude/theme.css')],
-  [{ 'agents/card.html': page('<p>Hi</p>') }, null, unrecognised('agents/card.html')],
-  [{ 'src/pages/links.html': page('<a href="/b">Home</a>') }, null, unrecognised('src/pages/links.html')],
-  [{ 'src/pages/offer.html': page('<p>Only 7 euro a month</p>') }, null, riskMarker('src/pages/offer.html')],
-  [{ 'src/pages/days.html': page('<p>Only \uff17 days</p>') }, null, riskMarker('src/pages/days.html')],
-  [{ 'src/pages/visit.html': page('<p>Visit www.example.org</p>') }, null, riskMarker('src/pages/visit.html')],
-  [{ 'src/pages/site.html': page('<p>Visit WWW.EXAMPLE.ORG</p>') }, null, riskMarker('src/pages/site.html')],
-  [{ 'src/pages/contact.html': page('<p>Write to help@example.org</p>') }, null, riskMarker('src/pages/contact.html')],
-  [{ 'src/pages/script-block.html': BASE['src/pages/script-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/script-block.html')],
-  [{ 'src/pages/style-block.html': BASE['src/pages/style-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/style-block.html')],
-  [{ 'src/pages/textarea-block.html': BASE['src/pages/textarea-block.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/textarea-block.html')],
-  // Text that moves across a tag: one text node gains words and the next is emptied.
-  [{ 'src/pages/crossing.html': page('<b>Save now</b>') }, null, unrecognised('src/pages/crossing.html')],
-  // A character reference that is none of the plain ones may spell a digit, a price or an address.
-  [{ 'src/pages/rules.html': page('<p>Terms &commat; rules</p>') }, null, unrecognised('src/pages/rules.html')],
   [{ 'src/styles/selector.css': BASE['src/styles/selector.css'].replace('.red {', '.blue {') }, null, unrecognised('src/styles/selector.css')],
   [{ 'src/styles/property.css': BASE['src/styles/property.css'].replace('color: red;', 'background: red;') }, null, unrecognised('src/styles/property.css')],
   [{ 'src/styles/display.css': BASE['src/styles/display.css'].replace('none', 'block') }, null, unrecognised('src/styles/display.css')],
@@ -347,31 +267,12 @@ const TRAPS = [
   [{ 'public/robots.txt': lines('User-agent: *', 'Disallow: /') }, null, 'it changes a setting in public/robots.txt, and settings changes are a common cause of outages'],
   [{ 'src/styles/mask.css': BASE['src/styles/mask.css'].replace('#fade', '#face') }, null, unrecognised('src/styles/mask.css')],
   [{ 'src/styles/motion.css': BASE['src/styles/motion.css'].replace('red 2s', 'blue 2s') }, null, unrecognised('src/styles/motion.css')],
-  // Only the closing-element rule catches these two: the `<` after the text must close the
-  // element whose opening tag ends at the `>` before it.
   [{ 'tests/home.test.js': BASE['tests/home.test.js'].replace('shows Save', 'shows Store'), 'src/pages/home.html': page('<button>Store</button>') }, null, 'it changes a test (tests/home.test.js)'],
   [{ 'src/__tests__/cart.spec.js': lines("it('adds items', () => {});") }, null, 'it changes a test (src/__tests__/cart.spec.js)'],
   [{ 'src/components/Button.spec.tsx': lines("it('renders', () => { render(<Button>Store</Button>); });") }, null, 'it changes a test (src/components/Button.spec.tsx)'],
-  [{ 'src/pages/login.html': page('<button>Log in</button>') }, null, 'src/pages/login.html sits in an area named login, and such areas are never a hotfix'],
-  [{ 'billing/index.html': page('<p>Your summary</p>') }, null, 'billing/index.html sits in an area named billing, and such areas are never a hotfix'],
-  [{ 'site/privacy/index.html': page('<p>We keep very little.</p>') }, null, 'site/privacy/index.html sits in an area named privacy, and such areas are never a hotfix'],
-  [{ 'src/pages/about.html': page('<p>About</p>') }, null, 'it adds, removes or renames src/pages/about.html'],
   [{ 'docs/old.md': null }, ['docs/old.md'], 'it adds, removes or renames docs/old.md'],
   [{ 'docs/logo.png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x03]) }, null, 'I could not read the change (docs/logo.png is not text)'],
   ['symlink', ['link'], unrecognised('link')],
-  // A document whose attributes say `-diff` still counts its real lines (13 reworded).
-  [{ 'src/pages/big.html': BASE['src/pages/big.html'].replace(/Big old line/g, 'Big new line') }, null, 'it changes 26 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
-  // 21 changed lines in one file, 11 removed and 10 added. A page that gains or loses a line is
-  // refused by its reader; since the ninth round (the decision at review of 2026-10-09) the
-  // size rule runs before any reader reads a file's content, so this change gets the size clause.
-  [{ 'src/pages/limit.html': lines(...Array.from({ length: 10 }, (_, i) => `<p>Limit new line ${String.fromCharCode(97 + i)}.</p>`)) }, null, 'it changes 21 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
-  [{ 'site/a.html': lines('<p>Alpha new.</p>'), 'site/b.html': lines('<p>Bravo new.</p>'), 'site/c.html': lines('<p>Charlie new.</p>'), 'site/d.html': lines('<p>Delta new.</p>') }, null, 'it changes 8 lines in 4 files and a hotfix is at most 20 lines in at most 3 files'],
-  // The security check's second round (2026-10-08). Code inside an attribute value that
-  // holds `>` before the change and `<` plus a letter after it is never visible text.
-  [{ 'src/pages/onclick.html': BASE['src/pages/onclick.html'].replace('save()', 'drop()') }, null, unrecognised('src/pages/onclick.html')],
-  [{ 'src/pages/angular.html': BASE['src/pages/angular.html'].replace('save()', 'drop()') }, null, unrecognised('src/pages/angular.html')],
-  [{ 'src/pages/help-link.html': BASE['src/pages/help-link.html'].replace('href="/help"', 'href="javascript:steal()"') }, null, unrecognised('src/pages/help-link.html')],
-  [{ 'src/pages/banner.html': BASE['src/pages/banner.html'].replace('url(/one.png)', 'url(/evil.png)') }, null, unrecognised('src/pages/banner.html')],
   // Dependency and build lists that end in `.txt`.
   [{ 'deps/dev-requirements.txt': lines('pytest==8.0.1') }, null, 'it changes the dependencies in deps/dev-requirements.txt'],
   [{ 'deps/test-requirements.txt': lines('coverage==7.0.1') }, null, 'it changes the dependencies in deps/test-requirements.txt'],
@@ -386,15 +287,6 @@ const TRAPS = [
   [{ '.changeset/brave-cats.md': BASE['.changeset/brave-cats.md'].replace('Old change note.', 'New change note.') }, null, 'it changes how the project is built or shipped in .changeset/brave-cats.md'],
   // A selector that reads like a hexadecimal colour.
   [{ 'src/styles/nav.css': lines('nav:hover #bad {display:none}') }, null, unrecognised('src/styles/nav.css')],
-  // An option with no `value` attribute submits its text.
-  [{ 'src/pages/colour-pick.html': page('<select><option>Blue</option></select>') }, null, unrecognised('src/pages/colour-pick.html')],
-  // A letter whose lower case is longer (U+0130) must not move the end of a script block.
-  [{ 'src/pages/dotted.html': BASE['src/pages/dotted.html'].replace('<b>Save</b>', '<b>Store</b>') }, null, unrecognised('src/pages/dotted.html')],
-  // The security check's third round (2026-10-09). The high finding: a tag whose quoted
-  // value runs over two lines, so the second line looks like text after a tag.
-  [{ 'src/pages/tip.html': BASE['src/pages/tip.html'].replace("'one'", "'two'") }, null, unrecognised('src/pages/tip.html')],
-  // An option with no `value` sends its text, whatever tags sit inside it.
-  [{ 'src/pages/status-pick.html': BASE['src/pages/status-pick.html'].replace('Pending', 'Approved') }, null, inexact('src/pages/status-pick.html')],
   // Other assistants' instruction files.
   [{ 'CLAUDE.local.md': BASE['CLAUDE.local.md'].replace('Old', 'New') }, null, unrecognised('CLAUDE.local.md')],
   [{ '.windsurf/rules/style.md': BASE['.windsurf/rules/style.md'].replace('Old', 'New') }, null, unrecognised('.windsurf/rules/style.md')],
@@ -406,16 +298,10 @@ const TRAPS = [
   [{ 'src/styles/commented.css': BASE['src/styles/commented.css'].replace('#add', '#bad') }, null, unrecognised('src/styles/commented.css')],
   // A workflow folder's Markdown.
   [{ '.github/workflows/README.md': BASE['.github/workflows/README.md'].replace('old', 'new') }, null, 'it changes how the project is built or shipped in .github/workflows/README.md'],
-  // Attribute shapes: a character reference in a value, an unquoted value.
-  [{ 'src/pages/entity.html': BASE['src/pages/entity.html'].replace('a&gt;b', 'a&gt;c') }, null, unrecognised('src/pages/entity.html')],
-  [{ 'src/pages/unquoted.html': BASE['src/pages/unquoted.html'].replace('/one', '/two') }, null, unrecognised('src/pages/unquoted.html')],
   // CTOC's own lists: sensitive words in the plural, the secret-file guard. A `.txt` file is no
   // kind the check reads, so rule 4 refuses `tokens.txt` before rule 5 reads its name;
-  // `docs/tokens.html` below keeps the plural word pinned.
+  // `docs/tokens/site.css` below keeps the plural word pinned.
   [{ 'tokens.txt': lines('New note.') }, null, unrecognised('tokens.txt')],
-  [{ 'src/payments/index.html': page('<p>New</p>') }, null, 'src/payments/index.html sits in an area named payment, and such areas are never a hotfix'],
-  [{ 'docs/passwords.html': BASE['docs/passwords.html'].replace('Old', 'New') }, null, 'docs/passwords.html sits in an area named password, and such areas are never a hotfix'],
-  [{ 'docs/id_rsa.html': BASE['docs/id_rsa.html'].replace('Old', 'New') }, null, 'docs/id_rsa.html sits in an area named secret, and such areas are never a hotfix'],
   // The commit security review (2026-10-09). Instruction files at any depth.
   [{ 'docs/sub/AGENTS.md': BASE['docs/sub/AGENTS.md'].replace('Old', 'New') }, null, unrecognised('docs/sub/AGENTS.md')],
   [{ 'pkg/CLAUDE.md': BASE['pkg/CLAUDE.md'].replace('Old', 'New') }, null, unrecognised('pkg/CLAUDE.md')],
@@ -424,9 +310,6 @@ const TRAPS = [
   [{ 'prompts/review.prompt.md': lines('New prompt.') }, null, unrecognised('prompts/review.prompt.md')],
   [{ '.cursor/rules/a.mdc': lines('New rules.') }, null, unrecognised('.cursor/rules/a.mdc')],
   [{ 'rules.mdc': lines('New rules.') }, null, unrecognised('rules.mdc')],
-  // The fourth round (2026-10-09). Text inside a component or a custom element is whatever
-  // the component makes of it (a query, an action name), never wording.
-  [{ 'src/pages/widget.html': BASE['src/pages/widget.html'].replace('>x<', '>y<') }, null, inexact('src/pages/widget.html')],
   // A custom property is a setting a script can read, whatever colour it holds.
   [{ 'src/styles/flags.css': BASE['src/styles/flags.css'].replace('green', 'red') }, null, setting('src/styles/flags.css')],
   [{ 'src/styles/flags.css': BASE['src/styles/flags.css'].replace('--mode: red', '--mode: lime') }, null, setting('src/styles/flags.css')],
@@ -434,17 +317,6 @@ const TRAPS = [
   [{ 'src/styles/vars.css': lines(':root {', '  --brand: #fafafa;', '}') }, null, setting('src/styles/vars.css')],
   // Plain text is no kind the check reads.
   [{ 'notes/doctest.txt': BASE['notes/doctest.txt'].replace(/old$/m, 'new') }, null, unrecognised('notes/doctest.txt')],
-  // Text inside an HTML code element is code.
-  [{ 'src/pages/code-el.html': BASE['src/pages/code-el.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/code-el.html')],
-  // The fifth round (2026-10-09), each trap an answer of `checking` on `6de2f75c`. Host
-  // elements are a fixed list: an `is` attribute and an unknown name hold their text.
-  [{ 'src/pages/is.html': BASE['src/pages/is.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/is.html')],
-  [{ 'src/pages/runsql.html': BASE['src/pages/runsql.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/runsql.html')],
-  // An end tag that does not close the element on top, while a holder is open, cannot be followed.
-  [{ 'src/pages/stack.html': BASE['src/pages/stack.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/stack.html')],
-  // `listing` and `tt` are code elements.
-  [{ 'src/pages/listing.html': BASE['src/pages/listing.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/listing.html')],
-  [{ 'src/pages/tt.html': BASE['src/pages/tt.html'].replace('requests', 'reqests') }, null, unrecognised('src/pages/tt.html')],
   // A sensitive word that is a stylesheet's own name still counts (its plural does not).
   [{ 'src/styles/login.css': BASE['src/styles/login.css'].replace('red', 'blue') }, null, 'src/styles/login.css sits in an area named login, and such areas are never a hotfix'],
   [{ 'src/styles/payment.css': BASE['src/styles/payment.css'].replace('red', 'blue') }, null, 'src/styles/payment.css sits in an area named payment, and such areas are never a hotfix'],
@@ -457,44 +329,19 @@ const TRAPS = [
   [{ 'src/styles/color-brand.css': BASE['src/styles/color-brand.css'].replace('#0b5ed7', '#1a73e8') }, null, setting('src/styles/color-brand.css')],
   [{ 'src/styles/button-colour.css': BASE['src/styles/button-colour.css'].replace('red', 'blue') }, null, setting('src/styles/button-colour.css')],
   [{ 'src/styles/brand.css': BASE['src/styles/brand.css'].replace('#0a58ca', '#0b5ed7') }, null, setting('src/styles/brand.css')],
-  // The sixth round (2026-10-09), each trap but the last two an answer of `checking` on
-  // `5326daae`. The strict HTML subset: a brace inside a tag, a comment that a browser ends
-  // early, text inside `<svg>`, a name that is no HTML element, an element never closed.
-  [{ 'src/pages/brace-tag.html': BASE['src/pages/brace-tag.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/brace-tag.html')],
-  [{ 'src/pages/brace-el.html': BASE['src/pages/brace-el.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/brace-el.html')],
-  [{ 'src/pages/brace-script.html': BASE['src/pages/brace-script.html'].replace('run()', 'drop()') }, null, unrecognised('src/pages/brace-script.html')],
-  [{ 'src/pages/comment-abrupt.html': BASE['src/pages/comment-abrupt.html'].replace('SELECT name FROM users', 'SELECT pass FROM admins') }, null, inexact('src/pages/comment-abrupt.html')],
-  [{ 'src/pages/svg-pre.html': BASE['src/pages/svg-pre.html'].replace('requests', 'reqests') }, null, inexact('src/pages/svg-pre.html')],
-  [{ 'src/pages/unknown.html': BASE['src/pages/unknown.html'].replace('Save', 'Store') }, null, inexact('src/pages/unknown.html')],
-  [{ 'src/pages/svg-text.html': BASE['src/pages/svg-text.html'].replace('Save', 'Store') }, null, inexact('src/pages/svg-text.html')],
-  [{ 'src/pages/formula.html': BASE['src/pages/formula.html'].replace('Save', 'Store') }, null, inexact('src/pages/formula.html')],
-  [{ 'src/pages/open-div.html': BASE['src/pages/open-div.html'].replace('Save', 'Store') }, null, inexact('src/pages/open-div.html')],
   // A colour that is not the whole value of its property (the functional plan's scenario).
   [{ 'src/styles/border.css': BASE['src/styles/border.css'].replace('#0a58ca', '#0b5ed7') }, null, inexact('src/styles/border.css')],
-  // A sensitive word in full-width letters, and as a camel-case sub-word.
-  [{ '\uff21\uff35\uff34\uff28/index.html': BASE['\uff21\uff35\uff34\uff28/index.html'].replace('Save', 'Store') }, null, '\uff21\uff35\uff34\uff28/index.html sits in an area named auth, and such areas are never a hotfix'],
-  [{ 'src/pages/AuthPanel.html': BASE['src/pages/AuthPanel.html'].replace('Save', 'Store') }, null, 'src/pages/AuthPanel.html sits in an area named auth, and such areas are never a hotfix'],
-  [{ 'src/pages/paymentForm.html': BASE['src/pages/paymentForm.html'].replace('Save', 'Store') }, null, 'src/pages/paymentForm.html sits in an area named payment, and such areas are never a hotfix'],
-  // Refused on `5326daae` too, with another sentence: text inside a custom element.
-  [{ 'src/pages/card.html': BASE['src/pages/card.html'].replace('Save', 'Store') }, null, inexact('src/pages/card.html')],
 ];
 
 // The traps of the eighth and ninth rounds that are no case of a kind removed in the tenth.
 TRAPS.push(
   [{ 'notes/todo.txt': lines('Write the start page.') }, null, unrecognised('notes/todo.txt')],
-  // The size rule itself: eleven lines reworded line for line are 22 changed lines.
-  [{ 'src/pages/long.html': BASE['src/pages/long.html'].replace(/Old long line ([a-k])\./g, 'New long line $1.') }, null, 'it changes 22 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
-  // A sensitive word in the plural.
-  [{ 'docs/tokens.html': BASE['docs/tokens.html'].replace('Old', 'New') }, null, 'docs/tokens.html sits in an area named token, and such areas are never a hotfix'],
   // Plain text is no kind the check reads: a dependency name, a template's placeholder, an
   // exclusion list, build options.
   [{ 'deps.txt': lines('request') }, null, unrecognised('deps.txt')],
   [{ 'templates/email/welcome.txt': lines('Hello {nome}, welcome.') }, null, unrecognised('templates/email/welcome.txt')],
   [{ 'exclude.txt': lines('build', 'cache-old') }, null, unrecognised('exclude.txt')],
   [{ 'cmake/options.txt': lines('option(SLOW ON)') }, null, unrecognised('cmake/options.txt')],
-  // Only white space may stand before the doctype (the decision at review of 2026-10-09): a
-  // comment there leaves a current browser in standards mode, and is refused all the same.
-  [{ 'src/pages/lead-comment.html': BASE['src/pages/lead-comment.html'].replace('Save', 'Store') }, null, inexact('src/pages/lead-comment.html')],
   // A dependency, build or settings name is decided by the name, also in a catalogue folder;
   // every other file there is a settings file by its extension.
   [{ 'packages/i18n/package.json': BASE['packages/i18n/package.json'].replace('Old texts', 'New texts') }, null, 'it changes the dependencies in packages/i18n/package.json'],
@@ -514,7 +361,27 @@ TRAPS.push(
   [{ 'src/styles/escaped-url.css': BASE['src/styles/escaped-url.css'].replace('red', 'blue') }, null, unrecognised('src/styles/escaped-url.css')],
   [{ 'src/styles/animated.css': BASE['src/styles/animated.css'].replace('red', 'blue') }, null, setting('src/styles/animated.css')],
   [{ 'src/styles/queried.css': BASE['src/styles/queried.css'].replace('--brand-color: red;', '--brand-color: blue;') }, null, setting('src/styles/queried.css')],
-  [{ 'src/styles/stray-word.css': BASE['src/styles/stray-word.css'].replace('red', 'blue') }, null, 'I could not read the change (src/styles/stray-word.css holds something I cannot follow)']
+  [{ 'src/styles/stray-word.css': BASE['src/styles/stray-word.css'].replace('red', 'blue') }, null, 'I could not read the change (src/styles/stray-word.css holds something I cannot follow)'],
+  // After the re-check of 2026-10-10 a page is no kind the check reads (the page traps of the
+  // earlier rounds, which asserted what the page reader said, are deleted with it).
+  [{ 'src/pages/home.html': page('<button>Store</button>') }, null, unrecognised('src/pages/home.html')],
+  // The path rules, on stylesheets: sensitive areas, a governing folder, the size rule.
+  [{ 'site/privacy/site.css': BASE['site/privacy/site.css'].replace('red', 'blue') }, null, 'site/privacy/site.css sits in an area named privacy, and such areas are never a hotfix'],
+  [{ 'billing/site.css': BASE['billing/site.css'].replace('red', 'blue') }, null, 'billing/site.css sits in an area named billing, and such areas are never a hotfix'],
+  [{ 'src/payments/site.css': BASE['src/payments/site.css'].replace('red', 'blue') }, null, 'src/payments/site.css sits in an area named payment, and such areas are never a hotfix'],
+  [{ 'docs/passwords.css': BASE['docs/passwords.css'].replace('red', 'blue') }, null, 'docs/passwords.css sits in an area named password, and such areas are never a hotfix'],
+  [{ 'docs/id_rsa.css': BASE['docs/id_rsa.css'].replace('red', 'blue') }, null, 'docs/id_rsa.css sits in an area named secret, and such areas are never a hotfix'],
+  [{ 'docs/tokens/site.css': BASE['docs/tokens/site.css'].replace('red', 'blue') }, null, 'docs/tokens/site.css sits in an area named token, and such areas are never a hotfix'],
+  [{ 'src/styles/AuthPanel.css': BASE['src/styles/AuthPanel.css'].replace('red', 'blue') }, null, 'src/styles/AuthPanel.css sits in an area named auth, and such areas are never a hotfix'],
+  [{ 'src/styles/paymentForm.css': BASE['src/styles/paymentForm.css'].replace('red', 'blue') }, null, 'src/styles/paymentForm.css sits in an area named payment, and such areas are never a hotfix'],
+  [{ 'agents/card.css': BASE['agents/card.css'].replace('red', 'blue') }, null, unrecognised('agents/card.css')],
+  [{ 'src/styles/about.css': lines('a { color: red; }') }, null, 'it adds, removes or renames src/styles/about.css'],
+  // A stylesheet whose attributes say `-diff` still counts its real lines (13 recoloured).
+  [{ 'src/styles/big.css': BASE['src/styles/big.css'].replace(/color: red/g, 'color: blue') }, null, 'it changes 26 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
+  // 21 changed lines in one file, 11 removed and 10 added: the size rule answers before the reader.
+  [{ 'src/styles/limit.css': lines(...Array.from({ length: 10 }, (_, i) => `.limit-${String.fromCharCode(97 + i)} { color: blue; }`)) }, null, 'it changes 21 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
+  [{ 'src/styles/long.css': BASE['src/styles/long.css'].replace(/\.long-([a-k]) \{ color: red/g, '.long-$1 { color: blue') }, null, 'it changes 22 lines in 1 file and a hotfix is at most 20 lines in at most 3 files'],
+  [{ 'site/a.css': lines('a { color: blue; }'), 'site/b.css': lines('b { color: blue; }'), 'site/c.css': lines('i { color: blue; }'), 'site/d.css': lines('u { color: blue; }') }, null, 'it changes 8 lines in 4 files and a hotfix is at most 20 lines in at most 3 files']
 );
 
 const REMOVED_FORMATS = [
@@ -565,9 +432,9 @@ const REMOVED_FORMATS = [
 ];
 TRAPS.push(...REMOVED_FORMATS);
 
-assert.equal(QUALIFY.length, 19, 'the corpus holds 19 shapes that qualify');
+assert.equal(QUALIFY.length, 9, 'the corpus holds 9 shapes that qualify');
 assert.equal(REMOVED_FORMATS.length, 44, 'the corpus holds 44 cases of removed formats');
-assert.equal(TRAPS.length, 189, 'the corpus holds 189 traps, the removed formats among them');
+assert.equal(TRAPS.length, 149, 'the corpus holds 149 traps, the removed formats among them');
 
 let root;
 
@@ -685,12 +552,9 @@ for (const [writes, named, clause] of TRAPS) {
 // each such pass must be named below, with the reason it is still wording.
 const INSERTED = ['<', '>', '"', "'", '{', '}', '(', ')', '=', ':', '/', '\\', '@', '#', ';', '*',
   '`', '&', '$', '[', ']', '|', '_'];
-const plain = (chars, why) => Object.fromEntries([...chars].map((c) => [c, () => why]));
-const ALLOWED = {
-  markup: plain('"\'()=:/\\#;*[]|_', 'plain punctuation in an element\'s visible text, shown as typed'),
-  colour: {}
-};
-const kindOf = (rel) => (path.extname(rel).toLowerCase() === '.css' ? 'colour' : 'markup');
+// In a stylesheet nothing but a colour may change, so no inserted character is allowed.
+const ALLOWED = { colour: {} };
+const kindOf = () => 'colour';
 
 /** One group per changed line, as git's `-U0` diff gives for two texts with the same lines. */
 function hunksOf(oldText, newText) {
@@ -868,8 +732,6 @@ function growth(at, n, limit) {
 test('the whole-file scanners stay linear on input built against them', (t) => {
   const cases = {
     'docs/raws.rst': (n) => `Old words.\n${'.. raw:: html\n'.repeat(10 * n)}`,
-    'src/pages/quotes.html': (n) => `<p>Old</p>\n${'<a b="'.repeat(20 * n)}\n`,
-    'src/pages/escapes.html': (n) => `<p>Old</p>\n${'<script><!--'.repeat(10 * n)}\n`,
     'src/components/Braces.jsx': (n) => `export const P = () => <p>Old</p>;\n${'{'.repeat(100 * n)}\n`,
     'src/components/Tags.jsx': (n) => `export const P = () => <p>Old</p>;\n${'x = <a>'.repeat(20 * n)}\n`,
     'src/components/Nest.vue': (n) => `<template>\n<p>Old</p>\n${'<template>'.repeat(10 * n)}\n</template>\n`,
@@ -885,35 +747,14 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     'src/styles/vars.scss': (n) => `a { color: red; }\n${'$a: b;'.repeat(16 * n)}\n`,
     // The fifth round's scanners: a deep stack of open elements closed by end tags of other
     // names, with and without a holder open; many custom properties.
-    'src/pages/stack.html': (n) => `<p>Old</p>\n${'<a>'.repeat(15 * n)}${'</b>'.repeat(15 * n)}\n`,
-    'src/pages/held.html': (n) => `<p>Old</p>\n<x-y>${'<a>'.repeat(15 * n)}${'</b>'.repeat(15 * n)}\n`,
-    'src/pages/names.html': (n) => `<p>Old</p>\n${Array.from({ length: 6 * n }, (_, i) => `<a${i}>`).join('')}${'</b></a0>'.repeat(6 * n)}\n`,
     'src/styles/properties.css': (n) => `a { color: red; }\n:root {${'--color-a: red;'.repeat(6 * n)}}\n`,
     // The sixth round's scanners: foreign content nested deep, many pieces of it, and never
     // closed; comments that hold a comment start; script blocks full of comment marks; one long value.
-    'src/pages/svg-deep.html': (n) => `<p>Old</p>\n<svg>${'<g>'.repeat(15 * n)}${'</g>'.repeat(15 * n)}</svg>\n`,
-    'src/pages/svg-many.html': (n) => `<p>Old</p>\n${'<svg><g/></svg>'.repeat(6 * n)}\n`,
-    'src/pages/svg-open.html': (n) => `<p>Old</p>\n${'<svg>'.repeat(20 * n)}\n`,
-    'src/pages/comments.html': (n) => `<p>Old</p>\n${'<!-- a <!-- b -->'.repeat(6 * n)}\n`,
-    'src/pages/comment-starts.html': (n) => `<p>Old</p>\n${'<!-- a '.repeat(15 * n)}\n`,
-    'src/pages/script-marks.html': (n) => `<p>Old</p>\n<script>${'<!-- --!> '.repeat(10 * n)}</script>\n`,
-    'src/pages/selects.html': (n) => `<p>Old</p>\n<select>${'<b>'.repeat(30 * n)}</select>\n`,
     'src/styles/value.css': (n) => `a { color: red; }\nb { margin:${' 1px'.repeat(25 * n)} !important; }\n`,
     // The seventh round's reader (the review of 2026-10-09): HTML with the end tags that may be
     // left out, the start tags that close an open element, table parts and `<noscript>` content.
-    'src/pages/implied.html': (n) => `<p>Old</p>\n<div>${'<p>'.repeat(30 * n)}</div>\n`,
-    'src/pages/implied-wrong.html': (n) => `<p>Old</p>\n<div><span>${'<p>a'.repeat(12 * n)}${'</div>'.repeat(12 * n)}\n`,
-    'src/pages/items.html': (n) => `<p>Old</p>\n<ul>${'<li>a'.repeat(20 * n)}</ul>\n`,
-    'src/pages/items-deep.html': (n) => `<p>Old</p>\n<ul><li><ol>${'<span>'.repeat(8 * n)}${'<li></li>'.repeat(8 * n)}\n`,
-    'src/pages/cells.html': (n) => `<p>Old</p>\n<table>${'<tr><td>a<td>b'.repeat(8 * n)}</table>\n`,
-    'src/pages/noscripts.html': (n) => `<p>Old</p>\n${'<noscript><p>x</p></noscript>'.repeat(4 * n)}\n`,
-    'src/pages/options.html': (n) => `<p>Old</p>\n<select>${'<option>a<optgroup>'.repeat(6 * n)}</select>\n`,
     // The eighth round's HTML reader: text inside many open elements; the content of
     // `<noscript>` read in place, with no end tag, with one far away, and with many.
-    'src/pages/deep-text.html': (n) => `<p>Old</p>\n${'<i>a'.repeat(20 * n)}\n`,
-    'src/pages/noscript-open.html': (n) => `<p>Old</p>\n${'<noscript>'.repeat(10 * n)}\n`,
-    'src/pages/noscript-deep.html': (n) => `<p>Old</p>\n${'<noscript>'.repeat(10 * n)}</noscript>\n`,
-    'src/pages/noscript-many.html': (n) => `<p>Old</p>\n${'<noscript><b>x</b></noscript>'.repeat(4 * n)}\n`,
     // The ninth round's stylesheet reader: many brackets, deep brackets, many reads of a
     // custom property, many names that only look like one, and many statements (a real colour
     // property stands first in each, so the change is a colour's).
@@ -924,8 +765,6 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
     'src/styles/statements.css': (n) => `a { color: red; }\n${'@media (min-width: 1px) { b { margin: 0; padding: 0 } }\n'.repeat(5 * n)}`,
     // What the coordinator's points at review added: a character set named many times, a text
     // read as its references spell it, and the ending of every line.
-    'src/pages/charsets.html': (n) => `<p>Old</p>\n${'<meta charset = "utf-8">\n'.repeat(10 * n)}`,
-    'src/pages/references.html': (n) => `<p>Old ${'&amp; &nbsp; &mdash; '.repeat(40 * n)}</p>\n`,
     'src/styles/charsets.css': (n) => `@charset "utf-8";\na { color: red; }\n${'/* @charset "utf-8" */\n'.repeat(10 * n)}`,
     'src/styles/endings.css': (n) => `a { color: red; }\r\n${'b { margin: 0; }\r\n'.repeat(12 * n)}`,
   };
@@ -946,17 +785,17 @@ test('the whole-file scanners stay linear on input built against them', (t) => {
   }
 });
 
-test('mode change: an executable bit on a page is not wording (where git tracks the bit)', async () => {
-  git(['update-index', '--chmod=+x', 'src/pages/home.html']);
-  git(['commit', '-q', '-m', 'make the page executable']);
+test('mode change: an executable bit on a stylesheet is not wording (where git tracks the bit)', async () => {
+  git(['update-index', '--chmod=+x', 'src/styles/button.css']);
+  git(['commit', '-q', '-m', 'make the stylesheet executable']);
   // The working copy keeps its old mode, so the change against the last commit is a
   // mode change, plus one wording edit.
-  write('src/pages/home.html', page('<button>Store</button>'));
-  const res = await judge(['src/pages/home.html']);
+  write('src/styles/button.css', lines('.save { background-color: #0b5ed7; }'));
+  const res = await judge(['src/styles/button.css']);
   const fileModeTracked = spawnSync('git', ['config', '--get', 'core.filemode'], { cwd: root, encoding: 'utf8' }).stdout.trim() !== 'false';
   if (process.platform !== 'win32' && fileModeTracked) {
-    assert.equal(res.text, refusal(unrecognised('src/pages/home.html')));
+    assert.equal(res.text, refusal(unrecognised('src/styles/button.css')));
   } else {
-    assertChecking(res, ['src/pages/home.html']);
+    assertChecking(res, ['src/styles/button.css']);
   }
 });

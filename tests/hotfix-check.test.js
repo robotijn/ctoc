@@ -56,8 +56,10 @@ const inexact = (f) => `it changes ${f} in a way the check cannot read exactly, 
 
 const SETTING = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
 
-const HOME = '<!doctype html>\n<html>\n<body>\n<button>Save</button>\n</body>\n</html>\n';
-const HOME_STORE = HOME.replace('<button>Save</button>', '<button>Store</button>');
+// The fixture every mechanics test changes: one colour in a stylesheet (until the re-check of
+// 2026-10-10 it was a button's wording in a page; pages are no kind the check reads any more).
+const HOME = '.save {\n  background-color: #0a58ca;\n}\n';
+const HOME_STORE = HOME.replace('#0a58ca', '#0b5ed7');
 
 /**
  * A node:test file. It records the folder it runs in under CTOC_HOTFIX_PROBE (when set),
@@ -80,8 +82,8 @@ function nodeTest(name, body, { marker = 'ran.txt', prelude = '' } = {}) {
     ''
   ].join('\n');
 }
-const PASSING_TEST = nodeTest('has a button', "  assert.ok(read('src/pages/home.html').includes('<button>'));");
-const FAILING_TEST = nodeTest('shows Save', "  assert.ok(read('src/pages/home.html').includes('Save'));");
+const PASSING_TEST = nodeTest('has a rule', "  assert.ok(read('src/styles/home.css').includes('.save'));");
+const FAILING_TEST = nodeTest('shows Save', "  assert.ok(read('src/styles/home.css').includes('#0a58ca'));");
 const SCRIPT = 'node --test tests/*.test.js';
 
 const REAL_TMP = os.tmpdir();
@@ -149,7 +151,7 @@ function makeRepo(files, { testScript = null, autocrlf = false, init = true, com
 }
 
 const testedProject = (extra = {}, script = SCRIPT) => makeRepo({
-  'src/pages/home.html': HOME, 'tests/home.test.js': PASSING_TEST, ...extra
+  'src/styles/home.css': HOME, 'tests/home.test.js': PASSING_TEST, ...extra
 }, { testScript: script });
 
 /** Run `fn` with the given environment variables set, restoring them after. */
@@ -263,9 +265,9 @@ function assertPass(res, files) {
 }
 
 async function buttonWording(root) {
-  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
-  const first = await check(root, 'src/pages/home.html');
-  const second = await check(root, '--run-tests', 'src/pages/home.html');
+  fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
+  const first = await check(root, 'src/styles/home.css');
+  const second = await check(root, '--run-tests', 'src/styles/home.css');
   return { first, second };
 }
 
@@ -312,20 +314,20 @@ function addStaleWorktree(root) {
 
 test('case 1 + 26: a button wording change passes in two calls; the process is restored', async () => {
   const root = testedProject();
-  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
-  const first = await check(root, 'src/pages/home.html');
-  assertChecking(first, ['src/pages/home.html']);
-  assert.equal(first.next, "hotfix check --run-tests 'src/pages/home.html'", 'byte-identical to the acceptance criterion');
+  fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
+  const first = await check(root, 'src/styles/home.css');
+  assertChecking(first, ['src/styles/home.css']);
+  assert.equal(first.next, "hotfix check --run-tests 'src/styles/home.css'", 'byte-identical to the acceptance criterion');
 
   const cwdBefore = process.cwd();
   const logBefore = console.log;
-  const second = await check(root, '--run-tests', 'src/pages/home.html');
+  const second = await check(root, '--run-tests', 'src/styles/home.css');
   assert.equal(process.cwd(), cwdBefore, 'case 26: the working directory is restored');
   assert.equal(console.log, logBefore, 'case 26: console.log is restored');
-  assertPass(second, ['src/pages/home.html']);
-  assert.equal(second.commit.add, "git --literal-pathspecs add -- 'src/pages/home.html'");
+  assertPass(second, ['src/styles/home.css']);
+  assert.equal(second.commit.add, "git --literal-pathspecs add -- 'src/styles/home.css'");
   assert.equal(second.commit.message,
-    "git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- 'src/pages/home.html'");
+    "git --literal-pathspecs commit --only -m 'hotfix: <what changed>' -- 'src/styles/home.css'");
   assert.equal(second.tests, '1 test passed.');
 });
 
@@ -352,7 +354,7 @@ test('case 4: other uncommitted work is neither judged nor committed', async () 
   assert.deepEqual(b.second, a.second);
   assert.equal(b.second.verdict, 'hotfix', JSON.stringify(b.second));
   runCommit(busy, b.second.commit);
-  assert.equal(git(busy, ['show', '--name-only', '--format=', 'HEAD']).trim(), 'src/pages/home.html');
+  assert.equal(git(busy, ['show', '--name-only', '--format=', 'HEAD']).trim(), 'src/styles/home.css');
   assert.match(git(busy, ['status', '--porcelain']), /^ M notes\.md$/m);
 });
 
@@ -379,35 +381,27 @@ test('case 7: text inside program code is refused', async () => {
     'it changes text inside program code in src/server.js, and no check can tell whether people read that text or the program depends on it');
 });
 
-test('case 8: a price in wording is refused', async () => {
-  const root = testedProject({ 'src/pages/home.html': HOME.replace('<button>Save</button>', '<p>Only 9 euro a month</p>') });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME.replace('<button>Save</button>', '<p>Only 7 euro a month</p>'));
-  await refusedUntouched(root, ['src/pages/home.html'],
-    'the wording in src/pages/home.html contains a number, a price, a web address or an e-mail address');
-});
-
-test('case 9: a sensitive area is refused even for wording', async () => {
-  const root = testedProject({ 'src/pages/login.html': '<button>Sign in</button>\n' });
-  fs.writeFileSync(path.join(root, 'src/pages/login.html'), '<button>Log in</button>\n');
-  await refusedUntouched(root, ['src/pages/login.html'],
-    'src/pages/login.html sits in an area named login, and such areas are never a hotfix');
+test('case 9: a sensitive area is refused even for a colour', async () => {
+  const root = testedProject({ 'src/styles/login.css': 'button { color: red; }\n' });
+  fs.writeFileSync(path.join(root, 'src/styles/login.css'), 'button { color: blue; }\n');
+  await refusedUntouched(root, ['src/styles/login.css'],
+    'src/styles/login.css sits in an area named login, and such areas are never a hotfix');
 });
 
 test('case 10: more than 20 changed lines is refused with the counts', async () => {
-  const lines = (word, n) => Array.from({ length: n }, (_, i) => `<p>${word} line ${String.fromCharCode(97 + i)}</p>`).join('\n') + '\n';
-  const root = testedProject({ 'src/pages/one.html': lines('Old', 7), 'src/pages/two.html': lines('Old', 6) });
-  // 13 lines reworded line for line in two files: 26 changed lines.
-  fs.writeFileSync(path.join(root, 'src/pages/one.html'), lines('New', 7));
-  fs.writeFileSync(path.join(root, 'src/pages/two.html'), lines('New', 6));
-  await refusedUntouched(root, ['src/pages/one.html', 'src/pages/two.html'],
+  const lines = (colour, n) => Array.from({ length: n }, (_, i) => `.line-${String.fromCharCode(97 + i)} { color: ${colour}; }`).join('\n') + '\n';
+  const root = testedProject({ 'src/styles/one.css': lines('red', 7), 'src/styles/two.css': lines('red', 6) });
+  // 13 lines recoloured line for line in two files: 26 changed lines.
+  fs.writeFileSync(path.join(root, 'src/styles/one.css'), lines('blue', 7));
+  fs.writeFileSync(path.join(root, 'src/styles/two.css'), lines('blue', 6));
+  await refusedUntouched(root, ['src/styles/one.css', 'src/styles/two.css'],
     'it changes 26 lines in 2 files and a hotfix is at most 20 lines in at most 3 files');
   // The functional plan's own numbers, 13 lines removed and 12 added (25 lines in 2 files). A
-  // page that gains or loses a line is refused by its reader; the size rule runs once the
-  // kind of every file is known and before any reader reads a file's content (the decision
-  // at review of 2026-10-09), so the scenario gets its own clause. (Until the tenth round the
-  // two files were Markdown; a Markdown file is no kind the check reads any more.)
-  fs.writeFileSync(path.join(root, 'src/pages/one.html'), lines('New', 6));
-  await refusedUntouched(root, ['src/pages/one.html', 'src/pages/two.html'],
+  // stylesheet that gains or loses a line is refused by its reader; the size rule runs once
+  // the kind of every file is known and before the reader reads a file's content (the
+  // decision at review of 2026-10-09), so the scenario gets its own clause.
+  fs.writeFileSync(path.join(root, 'src/styles/one.css'), lines('blue', 6));
+  await refusedUntouched(root, ['src/styles/one.css', 'src/styles/two.css'],
     'it changes 25 lines in 2 files and a hotfix is at most 20 lines in at most 3 files');
 });
 
@@ -419,22 +413,22 @@ test('case 11: a new file is refused', async () => {
 
 test('case 12: a failing existing test refuses the hotfix and is named (TAP and spec reporters)', async () => {
   for (const reporter of ['tap', 'spec']) {
-    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': FAILING_TEST },
+    const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': FAILING_TEST },
       { testScript: `node --test --test-reporter=${reporter} tests/*.test.js` });
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-    assertChecking(await check(root, 'src/pages/home.html'), ['src/pages/home.html']);
-    await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'],
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+    assertChecking(await check(root, 'src/styles/home.css'), ['src/styles/home.css']);
+    await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'],
       'the existing tests fail (tests/home.test.js: shows Save)');
   }
 });
 
 test('case 13: an edited test is refused by both calls and no test runs', async () => {
   const probe = probeDir();
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': PASSING_TEST }, { testScript: SCRIPT });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': PASSING_TEST }, { testScript: SCRIPT });
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
   fs.writeFileSync(path.join(root, 'tests/home.test.js'), PASSING_TEST + '// edited\n');
   await withEnv({ CTOC_HOTFIX_PROBE: probe }, async () => {
-    for (const args of [['src/pages/home.html', 'tests/home.test.js'], ['--run-tests', 'src/pages/home.html', 'tests/home.test.js']]) {
+    for (const args of [['src/styles/home.css', 'tests/home.test.js'], ['--run-tests', 'src/styles/home.css', 'tests/home.test.js']]) {
       await refusedUntouched(root, args, 'it changes a test (tests/home.test.js)');
     }
   });
@@ -443,25 +437,25 @@ test('case 13: an edited test is refused by both calls and no test runs', async 
 
 test('case 14: a run in which no test ran is not a pass', async () => {
   for (const script of ['node --test empty/*.test.js', 'node -e ""']) {
-    const root = makeRepo({ 'src/pages/home.html': HOME, 'empty/.gitkeep': '' }, { testScript: script });
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-    assertChecking(await check(root, 'src/pages/home.html'), ['src/pages/home.html']);
-    await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], NO_TEST);
+    const root = makeRepo({ 'src/styles/home.css': HOME, 'empty/.gitkeep': '' }, { testScript: script });
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+    assertChecking(await check(root, 'src/styles/home.css'), ['src/styles/home.css']);
+    await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'], NO_TEST);
   }
 });
 
 test('case 15: a change that cannot be read is refused and never passes', async () => {
-  const notRepo = makeRepo({ 'src/pages/home.html': HOME }, { init: false });
-  const noCommit = makeRepo({ 'src/pages/home.html': HOME }, { commit: false });
-  for (const args of [['src/pages/home.html'], ['--run-tests', 'src/pages/home.html']]) {
+  const notRepo = makeRepo({ 'src/styles/home.css': HOME }, { init: false });
+  const noCommit = makeRepo({ 'src/styles/home.css': HOME }, { commit: false });
+  for (const args of [['src/styles/home.css'], ['--run-tests', 'src/styles/home.css']]) {
     const a = await check(notRepo, ...args);
     assert.equal(a.text, unreadable('this folder is not a git repository'));
     const b = await check(noCommit, ...args);
     assert.equal(b.text, unreadable('this folder has no commit to compare with'));
   }
   const root = testedProject();
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  for (const args of [['src/pages/home.html'], ['--run-tests', 'src/pages/home.html']]) {
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  for (const args of [['src/styles/home.css'], ['--run-tests', 'src/styles/home.css']]) {
     const res = await withEnv({ PATH: tmpDir() }, () => check(root, ...args));
     assert.equal(res.verdict, 'refused');
     assert.equal(res.text, unreadable('git is not installed'));
@@ -475,48 +469,45 @@ test('case 16: an unrecognised file kind is refused', async () => {
 });
 
 test('case 17: without a test command nothing passes: a page reads "no test ran", and a README is no kind the check reads', async () => {
-  const root = makeRepo({ 'README.md': '# Fixture\n\nThis is the old wording.\n', 'src/pages/home.html': HOME });
+  const root = makeRepo({ 'README.md': '# Fixture\n\nThis is the old wording.\n', 'src/styles/home.css': HOME });
   fs.writeFileSync(path.join(root, 'README.md'), '# Fixture\n\nThis is the new wording.\n');
   for (const args of [['README.md'], ['--run-tests', 'README.md']]) await refusedUntouched(root, args, gone('README.md'));
 
   fs.writeFileSync(path.join(root, 'README.md'), '# Fixture\n\nThis is the old wording.\n');
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  assertChecking(await check(root, 'src/pages/home.html'), ['src/pages/home.html']);
-  await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], NO_TEST);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  assertChecking(await check(root, 'src/styles/home.css'), ['src/styles/home.css']);
+  await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'], NO_TEST);
 });
 
 test('case 18: the same change checked twice gives the same answers (core.autocrlf=true)', async () => {
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': PASSING_TEST },
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': PASSING_TEST },
     { testScript: SCRIPT, autocrlf: true });
   const a = await buttonWording(root);
   const b = await buttonWording(root);
   assert.equal(JSON.stringify(b.first), JSON.stringify(a.first));
   assert.equal(JSON.stringify(b.second), JSON.stringify(a.second));
-  assertPass(a.second, ['src/pages/home.html']);
+  assertPass(a.second, ['src/styles/home.css']);
 });
 
 test('case 19: Windows line endings do not count as changed lines', async () => {
-  const base = Array.from({ length: 30 }, (_, i) => `Line ${String.fromCharCode(97 + (i % 26))} of the guide.`);
+  const base = Array.from({ length: 30 }, (_, i) => `.line-${i} { color: red; }`);
   const edited = base.slice();
-  edited[3] = 'Line d of the handbook.';
-  const page = (rows) => rows.map((l) => `<p>${l}</p>`);
-  // A page with Windows line endings on both sides, and one word changed: 2 changed lines.
-  const root = testedProject({ 'src/pages/guide.html': page(base).join('\r\n') + '\r\n', 'src/pages/unix.html': page(base).join('\n') + '\n' });
-  fs.writeFileSync(path.join(root, 'src/pages/guide.html'), page(edited).join('\r\n') + '\r\n');
-  assertChecking(await check(root, 'src/pages/guide.html'), ['src/pages/guide.html']);
-  assertPass(await check(root, '--run-tests', 'src/pages/guide.html'), ['src/pages/guide.html']);
+  edited[3] = '.line-3 { color: blue; }';
+  // A stylesheet with Windows line endings on both sides, and one colour changed: 2 changed lines.
+  const root = testedProject({ 'src/styles/guide.css': base.join('\r\n') + '\r\n', 'src/styles/unix.css': base.join('\n') + '\n' });
+  fs.writeFileSync(path.join(root, 'src/styles/guide.css'), edited.join('\r\n') + '\r\n');
+  assertChecking(await check(root, 'src/styles/guide.css'), ['src/styles/guide.css']);
+  assertPass(await check(root, '--run-tests', 'src/styles/guide.css'), ['src/styles/guide.css']);
   const lines = logLines(root);
   assert.equal(lines.length, 1);
   assert.equal(lines[0].lines, 2);
   assert.equal(lines[0].files, 1);
-  // A page whose every line ending changed from LF to CRLF with that one word passed until the
-  // ninth round. Since the decision at review of 2026-10-09 the number of carriage returns
-  // stays as it is in a page, a catalogue and a stylesheet: the diff the size is counted from
-  // ignores them, so a changed line ending would ride along unseen. The change is refused,
-  // and the line endings still count as no changed line: 2 lines in the log.
-  fs.writeFileSync(path.join(root, 'src/pages/guide.html'), page(base).join('\r\n') + '\r\n');
-  fs.writeFileSync(path.join(root, 'src/pages/unix.html'), page(edited).join('\r\n') + '\r\n');
-  await refusedUntouched(root, ['src/pages/unix.html'], 'I do not recognise src/pages/unix.html as wording or a colour');
+  // Every line ending changed from LF to CRLF with that one colour: the number of carriage
+  // returns stays as it is (the decision at review of 2026-10-09), because the diff the size
+  // is counted from ignores them. Refused, and the line endings count as no changed line.
+  fs.writeFileSync(path.join(root, 'src/styles/guide.css'), base.join('\r\n') + '\r\n');
+  fs.writeFileSync(path.join(root, 'src/styles/unix.css'), edited.join('\r\n') + '\r\n');
+  await refusedUntouched(root, ['src/styles/unix.css'], 'I do not recognise src/styles/unix.css as wording or a colour');
   assert.equal(logLines(root)[1].lines, 2);
 });
 
@@ -524,11 +515,11 @@ test('case 20: a path written with backslashes gives the same answers', async ()
   const root = testedProject();
   const fwd = await buttonWording(root);
   const back = {
-    first: await check(root, 'src\\pages\\home.html'),
-    second: await check(root, '--run-tests', 'src\\pages\\home.html')
+    first: await check(root, 'src\\styles\\home.css'),
+    second: await check(root, '--run-tests', 'src\\styles\\home.css')
   };
-  assertChecking(back.first, ['src/pages/home.html']);
-  assertPass(back.second, ['src/pages/home.html']);
+  assertChecking(back.first, ['src/styles/home.css']);
+  assertPass(back.second, ['src/styles/home.css']);
   assert.deepEqual(back.first, fwd.first);
   assert.deepEqual(back.second, fwd.second);
 });
@@ -541,8 +532,8 @@ test('case 21: a file outside the project is refused', async () => {
 
 test('case 22: a named unchanged file, and nothing changed at all', async () => {
   const root = testedProject();
-  await refusedUntouched(root, ['src/pages/home.html'],
-    'I could not read the change (src/pages/home.html holds no change that git would commit)');
+  await refusedUntouched(root, ['src/styles/home.css'],
+    'I could not read the change (src/styles/home.css holds no change that git would commit)');
   await refusedUntouched(root, [], 'I could not read the change (nothing has changed since the last commit)');
 });
 
@@ -558,15 +549,15 @@ test('case 24: nothing in the project is touched, also when its own tests write 
     + "  fs.writeFileSync(path.join('out', 'report.txt'), 'report');\n"
     + "  require('child_process').execFileSync('git', ['add', '-A'], { stdio: 'ignore' });\n";
   const fixtures = [
-    [nodeTest('has a button', writer + "  assert.ok(read('src/pages/home.html').includes('<button>'));"), 'hotfix'],
-    [nodeTest('shows Save', writer + "  assert.ok(read('src/pages/home.html').includes('Save'));"), 'refused']
+    [nodeTest('has a rule', writer + "  assert.ok(read('src/styles/home.css').includes('.save'));"), 'hotfix'],
+    [nodeTest('shows Save', writer + "  assert.ok(read('src/styles/home.css').includes('#0a58ca'));"), 'refused']
   ];
   for (const [body, verdict] of fixtures) {
-    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': body, 'docs/untouched.md': 'Never edited.\n' },
+    const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': body, 'docs/untouched.md': 'Never edited.\n' },
       { testScript: SCRIPT });
     fs.writeFileSync(path.join(root, 'docs/untouched.md'), 'A stashed edit.\n');
     git(root, ['stash', '-q']);
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
     for (const args of [[], ['--run-tests']]) {
       // The situation in which git rewrote `.git/index` under every option tried (Decision
       // 44): a committed file whose modification time moved while its content did not.
@@ -597,20 +588,20 @@ test('case 25: through the real menu process, standard output is exactly one JSO
   const bare = spawnSync(NODE, [START], { cwd: root, encoding: 'utf8', env });
   assert.equal(bare.status, 0, bare.stderr);
   writeFiles(root, {
-    'src/pages/home.html': HOME,
+    'src/styles/home.css': HOME,
     'tests/home.test.js': PASSING_TEST,
     'package.json': packageJson(SCRIPT)
   });
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'base']);
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
 
-  const first = spawnSync(NODE, [START, 'hotfix', 'check', 'src/pages/home.html'], { cwd: root, encoding: 'utf8', env });
+  const first = spawnSync(NODE, [START, 'hotfix', 'check', 'src/styles/home.css'], { cwd: root, encoding: 'utf8', env });
   assert.equal(first.status, 0, first.stderr);
-  assertChecking(JSON.parse(first.stdout), ['src/pages/home.html']);
-  const second = spawnSync(NODE, [START, 'hotfix', 'check', '--run-tests', 'src/pages/home.html'], { cwd: root, encoding: 'utf8', env });
+  assertChecking(JSON.parse(first.stdout), ['src/styles/home.css']);
+  const second = spawnSync(NODE, [START, 'hotfix', 'check', '--run-tests', 'src/styles/home.css'], { cwd: root, encoding: 'utf8', env });
   assert.equal(second.status, 0, second.stderr);
-  assertPass(JSON.parse(second.stdout), ['src/pages/home.html']);
+  assertPass(JSON.parse(second.stdout), ['src/styles/home.css']);
 });
 
 test('case 27: an unknown sub-command or option answers the usage text', async () => {
@@ -632,10 +623,10 @@ test('case 27: an unknown sub-command or option answers the usage text', async (
 test('case 28: the log counts verdicts and causes, holds no names or wording, and never changes an answer', async () => {
   const cart = 'function ok(items) {\n  if (items.length > 0) return true;\n  return false;\n}\n';
   const root = testedProject({ 'src/cart.js': cart, 'notes.md': 'Some notes.\n' });
-  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
-  await check(root, 'src/pages/home.html');
+  fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
+  await check(root, 'src/styles/home.css');
   assert.deepEqual(logLines(root), [], 'a checking answer writes no log line');
-  await check(root, '--run-tests', 'src/pages/home.html');
+  await check(root, '--run-tests', 'src/styles/home.css');
   let lines = logLines(root);
   assert.equal(lines.length, 1);
   assert.equal(lines[0].verdict, 'hotfix');
@@ -645,7 +636,7 @@ test('case 28: the log counts verdicts and causes, holds no names or wording, an
   assert.equal(lines[0].lines, 2);
   assert.match(lines[0].at, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
 
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME);
   fs.writeFileSync(path.join(root, 'src/cart.js'), cart.replace('> 0', '>= 0'));
   fs.writeFileSync(path.join(root, 'notes.md'), 'Other notes.\n');
   await check(root, 'src/cart.js');
@@ -680,29 +671,29 @@ test('case 29: an unrelated uncommitted edit that would make a test fail does no
   const answers = await buttonWording(root);
   assert.deepEqual(answers.first, reference.first);
   assert.deepEqual(answers.second, reference.second);
-  assertPass(reference.second, ['src/pages/home.html']);
+  assertPass(reference.second, ['src/styles/home.css']);
 });
 
 test('case 30: the test command comes only from tracked files', async () => {
   const alwaysPass = "process.stdout.write('\\u2139 pass 5\\n\\u2139 fail 0\\n');\n";
   const config = 'languages:\n  javascript:\n    test: node always-pass.js\n';
   // (a) an ignored local quality setting
-  const a = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': FAILING_TEST, 'always-pass.js': alwaysPass,
+  const a = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': FAILING_TEST, 'always-pass.js': alwaysPass,
     '.gitignore': '.ctoc/quality-config.yaml\n' }, { testScript: SCRIPT });
   writeFiles(a, { '.ctoc/quality-config.yaml': config });
-  fs.writeFileSync(path.join(a, 'src/pages/home.html'), HOME_STORE);
-  await refusedUntouched(a, ['--run-tests', 'src/pages/home.html'], 'the existing tests fail (tests/home.test.js: shows Save)');
+  fs.writeFileSync(path.join(a, 'src/styles/home.css'), HOME_STORE);
+  await refusedUntouched(a, ['--run-tests', 'src/styles/home.css'], 'the existing tests fail (tests/home.test.js: shows Save)');
   // (b) an uncommitted change to a committed quality setting, not named
-  const b = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': FAILING_TEST, 'always-pass.js': alwaysPass,
+  const b = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': FAILING_TEST, 'always-pass.js': alwaysPass,
     '.ctoc/quality-config.yaml': '# quality settings\n' }, { testScript: SCRIPT });
   fs.writeFileSync(path.join(b, '.ctoc/quality-config.yaml'), config);
-  fs.writeFileSync(path.join(b, 'src/pages/home.html'), HOME_STORE);
-  await refusedUntouched(b, ['--run-tests', 'src/pages/home.html'], 'the existing tests fail (tests/home.test.js: shows Save)');
+  fs.writeFileSync(path.join(b, 'src/styles/home.css'), HOME_STORE);
+  await refusedUntouched(b, ['--run-tests', 'src/styles/home.css'], 'the existing tests fail (tests/home.test.js: shows Save)');
 });
 
 test('case 31: the check\'s own log never enters the change', async () => {
   const root = testedProject();
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
   const run1 = { first: await check(root), second: await check(root, '--run-tests') };
   assert.equal(logLines(root).length, 1, 'the first run left its log');
   const run2 = { first: await check(root), second: await check(root, '--run-tests') };
@@ -716,9 +707,9 @@ test('case 32: the commit takes only the judged files; a staged unrelated file s
   git(root, ['add', 'docs/other.md']);
   fs.writeFileSync(path.join(root, 'docs/other.md'), 'Other page.\n');
   const { second } = await buttonWording(root);
-  assertPass(second, ['src/pages/home.html']);
+  assertPass(second, ['src/styles/home.css']);
   runCommit(root, second.commit);
-  assert.equal(git(root, ['show', '--name-only', '--format=', 'HEAD']).trim(), 'src/pages/home.html');
+  assert.equal(git(root, ['show', '--name-only', '--format=', 'HEAD']).trim(), 'src/styles/home.css');
   assert.equal(git(root, ['log', '-1', '--format=%s']).trim(), 'hotfix: reword');
   assert.equal(git(root, ['diff', '--cached', '--name-only']).trim(), 'docs/other.md');
 });
@@ -727,7 +718,7 @@ test('case 33: a project folder outside the repository git reports is refused', 
   const root = testedProject();
   const sibling = tmpDir('hotfix-elsewhere-');
   git(root, ['config', 'core.worktree', sibling]);
-  for (const args of [['src/pages/home.html'], ['--run-tests', 'src/pages/home.html']]) {
+  for (const args of [['src/styles/home.css'], ['--run-tests', 'src/styles/home.css']]) {
     const res = await check(root, ...args);
     assert.equal(res.text, unreadable('this folder lies outside the repository git reports'), JSON.stringify(res));
   }
@@ -735,9 +726,9 @@ test('case 33: a project folder outside the repository git reports is refused', 
 
 test('case 34: a fault inside the check is "the check stopped", its message in detail', async () => {
   const root = testedProject();
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
   fs.writeFileSync(path.join(root, '.git', 'index'), 'not an index');
-  for (const args of [['src/pages/home.html'], ['--run-tests', 'src/pages/home.html']]) {
+  for (const args of [['src/styles/home.css'], ['--run-tests', 'src/styles/home.css']]) {
     const res = await check(root, ...args);
     assert.equal(res.verdict, 'refused');
     assert.equal(res.text, unreadable('the check stopped'));
@@ -752,60 +743,60 @@ test('case 34: a fault inside the check is "the check stopped", its message in d
 });
 
 test('case 35: git settings in the repository change no answer', async (t) => {
-  // A page of eight lines, two of them reworded: 4 changed lines.
-  const guide = ['Guide', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'].map((l) => `<p>${l}</p>`).join('\n') + '\n';
-  const GUIDE_TEST = nodeTest('has a guide', "  assert.ok(read('src/pages/guide.html').includes('Guide'));");
-  const edit = (root) => fs.writeFileSync(path.join(root, 'src/pages/guide.html'),
-    guide.replace('one', 'uno').replace('four', 'cuatro'));
+  // A stylesheet of eight rules, two of them recoloured: 4 changed lines.
+  const guide = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((l) => `.${l} { color: red; }`).join('\n') + '\n';
+  const GUIDE_TEST = nodeTest('has a guide', "  assert.ok(read('src/styles/guide.css').includes('.a'));");
+  const edit = (root) => fs.writeFileSync(path.join(root, 'src/styles/guide.css'),
+    guide.replace('.b { color: red', '.b { color: blue').replace('.e { color: red', '.e { color: blue'));
   const both = async (root, args) => ({
     first: await check(root, ...args), second: await check(root, '--run-tests', ...args), log: withoutTime(logLines(root))
   });
   const settings = [['diff.noprefix', 'true'], ['diff.mnemonicPrefix', 'true'], ['diff.interHunkContext', '10'],
     ['diff.algorithm', 'histogram'], ['diff.relative', 'true'], ['diff.context', '5'], ['color.diff', 'always']];
-  const files = { 'src/pages/guide.html': guide, 'tests/guide.test.js': GUIDE_TEST };
+  const files = { 'src/styles/guide.css': guide, 'tests/guide.test.js': GUIDE_TEST };
   const plain = makeRepo(files, { testScript: SCRIPT });
   const set = makeRepo(files, { testScript: SCRIPT, config: settings });
   edit(plain);
   edit(set);
   await t.test('(a) the diff settings', async () => {
-      const reference = await both(plain, ['src/pages/guide.html']);
+      const reference = await both(plain, ['src/styles/guide.css']);
       assert.equal(reference.log[reference.log.length - 1].lines, 4);
-      assert.deepEqual(await both(set, ['src/pages/guide.html']), reference);
+      assert.deepEqual(await both(set, ['src/styles/guide.css']), reference);
       assert.equal(reference.second.verdict, 'hotfix', JSON.stringify(reference.second));
   });
   await t.test('(b) diff.autoRefreshIndex=false beside a file whose modification time moved', async () => {
       const make = (config) => {
-        const root = makeRepo({ ...files, 'src/pages/other.html': '<p>Other.</p>\n' }, { testScript: SCRIPT, config });
+        const root = makeRepo({ ...files, 'src/styles/other.css': 'a { color: red; }\n' }, { testScript: SCRIPT, config });
         edit(root);
         const later = new Date(Date.now() + 60000);
-        fs.utimesSync(path.join(root, 'src/pages/other.html'), later, later);
+        fs.utimesSync(path.join(root, 'src/styles/other.css'), later, later);
         return root;
       };
       const refB = await both(make([]), []);
       assert.deepEqual(await both(make([['diff.autoRefreshIndex', 'false']]), []), refB);
-      assertPass(refB.second, ['src/pages/guide.html']);
+      assertPass(refB.second, ['src/styles/guide.css']);
   });
 });
 
 test('case 36: a failure reported on standard error only is read', async () => {
   const fakeJest = "process.stdout.write('Determining test suites to run...\\n');\n"
     + "process.stderr.write('FAIL tests/home.test.js\\n  \\u25cf shows Save\\n');\nprocess.exit(1);\n";
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'fake-jest.js': fakeJest }, { testScript: 'node fake-jest.js' });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], 'the existing tests fail (tests/home.test.js: shows Save)');
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'fake-jest.js': fakeJest }, { testScript: 'node fake-jest.js' });
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'], 'the existing tests fail (tests/home.test.js: shows Save)');
 });
 
 test('case 37: npm\'s placeholder test script is "no test ran"', async () => {
-  const root = makeRepo({ 'src/pages/home.html': HOME }, { testScript: 'echo "Error: no test specified" && exit 1' });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], NO_TEST);
+  const root = makeRepo({ 'src/styles/home.css': HOME }, { testScript: 'echo "Error: no test specified" && exit 1' });
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'], NO_TEST);
 });
 
 test('case 38: a test runner that is not installed is "no test ran"', async () => {
-  const root = makeRepo({ 'src/pages/home.html': HOME,
+  const root = makeRepo({ 'src/styles/home.css': HOME,
     '.ctoc/quality-config.yaml': 'languages:\n  javascript:\n    test: ctoc-no-such-runner\n' }, { testScript: SCRIPT });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], NO_TEST);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'], NO_TEST);
 });
 
 test('case 39: a log above 1 MiB is rotated by renaming', async () => {
@@ -820,7 +811,7 @@ test('case 39: a log above 1 MiB is rotated by renaming', async () => {
   const lines = logLines(root);
   assert.equal(lines.length, 1);
   assert.equal(lines[0].verdict, 'hotfix');
-  assertPass(second, ['src/pages/home.html']);
+  assertPass(second, ['src/styles/home.css']);
 });
 
 test('case 40: a log that is a hard link is never written', async () => {
@@ -839,7 +830,7 @@ test('case 40: a log that is a hard link is never written', async () => {
   assert.ok(fs.readFileSync(outside).equals(bytes), 'the linked file is unchanged');
   assert.equal(fs.existsSync(path.join(root, `${LOG}.1`)), false);
   assert.deepEqual(answers[1], answers[0]);
-  assertPass(answers[1][1], ['src/pages/home.html']);
+  assertPass(answers[1][1], ['src/styles/home.css']);
 });
 
 test('case 41: the log is never written through a symbolic link', async () => {
@@ -873,8 +864,8 @@ test('case 41: the log is never written through a symbolic link', async () => {
 test('case 42: an unrelated uncommitted edit that a test needs makes the hotfix fail', async () => {
   const root = testedProject({ 'config/flags.txt': 'off\n', 'tests/flags.test.js': FLAGS_TEST });
   fs.writeFileSync(path.join(root, 'config/flags.txt'), 'on\n');
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], 'the existing tests fail (tests/flags.test.js: flags are on)');
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'], 'the existing tests fail (tests/flags.test.js: flags are on)');
 });
 
 /** The quality agent's timeout result, as `runFullTests` answers it. */
@@ -884,10 +875,10 @@ test('case 43: the copy is gone after a pass, a refusal, failing tests, a timeou
   const probe = probeDir();
   const PROBE_SCRIPT = "require('fs').writeFileSync(require('path').join(process.env.CTOC_HOTFIX_PROBE, 'ran.txt'), process.cwd());\n";
   const runs = [
-    ['pass', () => testedProject(), (res) => assertPass(res, ['src/pages/home.html'])],
-    ['refusal after the copy exists', () => makeRepo({ 'src/pages/home.html': HOME, 'probe.js': PROBE_SCRIPT }, { testScript: 'node probe.js' }),
+    ['pass', () => testedProject(), (res) => assertPass(res, ['src/styles/home.css'])],
+    ['refusal after the copy exists', () => makeRepo({ 'src/styles/home.css': HOME, 'probe.js': PROBE_SCRIPT }, { testScript: 'node probe.js' }),
       (res) => assert.equal(res.text, refusal(NO_TEST))],
-    ['failing tests', () => makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': FAILING_TEST }, { testScript: SCRIPT }),
+    ['failing tests', () => makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': FAILING_TEST }, { testScript: SCRIPT }),
       (res) => assert.equal(res.text, refusal('the existing tests fail (tests/home.test.js: shows Save)'))],
     ['a timeout', () => testedProject(), (res) => assert.equal(res.text, refusal(NO_TEST)), () => TIMEOUT_RESULT],
     ['a thrown error', () => testedProject(), (res) => {
@@ -900,14 +891,14 @@ test('case 43: the copy is gone after a pass, a refusal, failing tests, a timeou
       addStaleWorktree(root);
       const before = worktrees(root);
       fs.rmSync(path.join(probe, 'ran.txt'), { force: true });
-      fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+      fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
       if (replacement) {
         t.mock.method(qualityAgent, 'runFullTests', async () => {
           fs.writeFileSync(path.join(probe, 'ran.txt'), process.cwd());
           return replacement();
         });
       }
-      const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+      const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/styles/home.css'));
       t.mock.restoreAll();
       const folder = probeRead(probe);
       assert.ok(folder, `${label}: the tests ran`);
@@ -920,7 +911,7 @@ test('case 43: the copy is gone after a pass, a refusal, failing tests, a timeou
   await t.test('a copy that cannot be removed is named in detail; the verdict stands', async () => {
     const root = testedProject();
     const before = worktrees(root);
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
     const realRm = fs.rmSync;
     t.mock.method(fs, 'rmSync', (p, options) => {
       if (path.basename(String(p)).startsWith('ctoc-hotfix-')) {
@@ -928,7 +919,7 @@ test('case 43: the copy is gone after a pass, a refusal, failing tests, a timeou
       }
       return realRm(p, options);
   });
-  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/styles/home.css'));
   t.mock.restoreAll();
   const parent = copyParent(probeRead(probe));
   assert.equal(res.verdict, 'hotfix');
@@ -943,14 +934,14 @@ test('case 44: a change that does not apply cleanly to a fresh copy is refused a
   const probe = probeDir();
   const shout = path.join(tmpDir('hotfix-filter-'), 'shout.js');
   fs.writeFileSync(shout, "let s = '';\nprocess.stdin.on('data', (d) => { s += d; });\nprocess.stdin.on('end', () => process.stdout.write(s.toUpperCase()));\n");
-  const root = makeRepo({ 'site/guide.html': '<p>Read this guide first.</p>\n', '.gitattributes': 'site/*.html filter=shout\n',
-    'src/pages/home.html': HOME, 'tests/home.test.js': PASSING_TEST }, { testScript: SCRIPT });
+  const root = makeRepo({ 'site/guide.css': '.guide { color: red; }\n', '.gitattributes': 'site/*.css filter=shout\n',
+    'src/styles/home.css': HOME, 'tests/home.test.js': PASSING_TEST }, { testScript: SCRIPT });
   const fwd = (p) => p.split(path.sep).join('/');
   git(root, ['config', 'filter.shout.smudge', `"${fwd(NODE)}" "${fwd(shout)}"`]);
-  fs.writeFileSync(path.join(root, 'site/guide.html'), '<p>Read this handbook first.</p>\n');
+  fs.writeFileSync(path.join(root, 'site/guide.css'), '.guide { color: blue; }\n');
   const before = worktrees(root);
-  assertChecking(await check(root, 'site/guide.html'), ['site/guide.html']);
-  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'site/guide.html'));
+  assertChecking(await check(root, 'site/guide.css'), ['site/guide.css']);
+  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'site/guide.css'));
   assert.equal(res.text, unreadable('the change does not apply cleanly to a fresh copy of the last commit'), JSON.stringify(res));
   assert.equal(typeof res.detail, 'string');
   assert.ok(res.detail.length > 0 && !res.detail.includes('\n'), res.detail);
@@ -962,7 +953,7 @@ test('case 44: a change that does not apply cleanly to a fresh copy is refused a
 /** Case 45's project: ignored installed-package folders, and a build folder that is never linked. */
 function linkedProject(testBody, extra = {}) {
   const root = makeRepo({
-    'src/pages/home.html': HOME,
+    'src/styles/home.css': HOME,
     'packages/a/index.js': 'module.exports = 1;\n',
     '.gitignore': 'node_modules/\n.venv/\nbuild/\n',
     'tests/home.test.js': nodeTest('greets', testBody),
@@ -989,31 +980,31 @@ test('case 45: installed-package folders are linked into the copy, one link each
     const owned = () => ({ ...treeBytes(path.join(root, 'node_modules')), ...treeBytes(path.join(root, 'packages', 'a', 'node_modules')),
       ...treeBytes(path.join(root, '.venv')) });
     const before = owned();
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-    const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+    const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/styles/home.css'));
     assert.notEqual(probeRead(probe), root, 'the tests ran in a copy');
     assert.deepEqual(JSON.parse(probeRead(probe, 'links.json')), { node_modules: true, nested: true, venv: true, build: false });
     assert.deepEqual(owned(), before, 'the owner\'s package folders are byte-identical');
-    assertPass(res, ['src/pages/home.html']);
+    assertPass(res, ['src/styles/home.css']);
   });
   await t.test('(b) a link the tests removed counts as removed', async () => {
     const removing = linkedProject(LINK_REPORT
       + "  if (fs.lstatSync('node_modules').isSymbolicLink()) fs.unlinkSync('node_modules');\n");
     const greet = treeBytes(path.join(removing, 'node_modules'));
-    fs.writeFileSync(path.join(removing, 'src/pages/home.html'), HOME_STORE);
-    const res2 = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(removing, '--run-tests', 'src/pages/home.html'));
+    fs.writeFileSync(path.join(removing, 'src/styles/home.css'), HOME_STORE);
+    const res2 = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(removing, '--run-tests', 'src/styles/home.css'));
     const folder = probeRead(probe);
     assert.equal(fs.existsSync(folder), false);
     assert.equal(fs.existsSync(copyParent(folder)), false);
     assert.deepEqual(treeBytes(path.join(removing, 'node_modules')), greet);
-    assertPass(res2, ['src/pages/home.html']);
+    assertPass(res2, ['src/styles/home.css']);
   });
 });
 
 test('case 46: on Windows the links are directory junctions, elsewhere directory links', async (t) => {
   const root = linkedProject("  assert.equal(require('greet'), 'hello');\n",
     { '.ctoc/quality-config.yaml': `languages:\n  javascript:\n    test: "${NODE}" --test tests/home.test.js\n` });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
   const expected = ['node_modules', 'packages/a/node_modules', '.venv']
     .map((rel) => fs.realpathSync.native(path.join(root, ...rel.split('/')))).sort();
   const record = async (platform) => {
@@ -1023,7 +1014,7 @@ test('case 46: on Windows the links are directory junctions, elsewhere directory
     const saved = Object.getOwnPropertyDescriptor(process, 'platform');
     try {
       if (platform) Object.defineProperty(process, 'platform', { value: platform, configurable: true });
-      await check(root, '--run-tests', 'src/pages/home.html');
+      await check(root, '--run-tests', 'src/styles/home.css');
     } finally {
       Object.defineProperty(process, 'platform', saved);
       t.mock.restoreAll();
@@ -1042,36 +1033,36 @@ test('case 46: on Windows the links are directory junctions, elsewhere directory
 test('case 47: a judged file that changes during the check is refused', async (t) => {
   const probe = probeDir();
   await t.test('(a) while the tests run', async () => {
-    const edits = nodeTest('has a button', "  if (process.env.CTOC_HOTFIX_EDIT) fs.appendFileSync(process.env.CTOC_HOTFIX_EDIT, ' again');\n"
-      + "  assert.ok(read('src/pages/home.html').includes('<button>'));");
-    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': edits }, { testScript: SCRIPT });
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-    const res = await withEnv({ CTOC_HOTFIX_EDIT: path.join(root, 'src', 'pages', 'home.html'), CTOC_HOTFIX_PROBE: probe },
-      () => check(root, '--run-tests', 'src/pages/home.html'));
-    assert.equal(res.text, unreadable('src/pages/home.html changed while it was being checked'), JSON.stringify(res));
+    const edits = nodeTest('has a rule', "  if (process.env.CTOC_HOTFIX_EDIT) fs.appendFileSync(process.env.CTOC_HOTFIX_EDIT, ' again');\n"
+      + "  assert.ok(read('src/styles/home.css').includes('.save'));");
+    const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': edits }, { testScript: SCRIPT });
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+    const res = await withEnv({ CTOC_HOTFIX_EDIT: path.join(root, 'src', 'styles', 'home.css'), CTOC_HOTFIX_PROBE: probe },
+      () => check(root, '--run-tests', 'src/styles/home.css'));
+    assert.equal(res.text, unreadable('src/styles/home.css changed while it was being checked'), JSON.stringify(res));
     assert.equal(logLines(root).pop().cause, 'unreadable');
     assert.ok(probeRead(probe), 'the tests ran');
   });
   await t.test('(b) after the first hashing and before the content reaches the copy', async () => {
     fs.rmSync(path.join(probe, 'ran.txt'), { force: true });
     const other = testedProject();
-    fs.writeFileSync(path.join(other, 'src/pages/home.html'), HOME_STORE);
+    fs.writeFileSync(path.join(other, 'src/styles/home.css'), HOME_STORE);
     // The judged content is staged first; the first hashing then reads the working folder,
     // and its `lstat` of the judged file is the seam between the two (the rules read the
     // staged content, so a read of the working file is no longer one).
-    const judged = path.join(other, 'src', 'pages', 'home.html');
+    const judged = path.join(other, 'src', 'styles', 'home.css');
     const realLstat = safeFs.lstatSync;
     let first = true;
     t.mock.method(safeFs, 'lstatSync', (p, options) => {
       if (first && String(p) === judged) {
         first = false;
-        fs.writeFileSync(judged, HOME_STORE.replace('Store', 'Stored')); // still wording: only the hashes can tell
+        fs.writeFileSync(judged, HOME_STORE.replace('#0b5ed7', '#0b5ed8')); // still a colour: only the hashes can tell
       }
       return realLstat(p, options);
   });
-  const res2 = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(other, '--run-tests', 'src/pages/home.html'));
+  const res2 = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(other, '--run-tests', 'src/styles/home.css'));
   t.mock.restoreAll();
-  assert.equal(res2.text, unreadable('src/pages/home.html changed while it was being checked'), JSON.stringify(res2));
+  assert.equal(res2.text, unreadable('src/styles/home.css changed while it was being checked'), JSON.stringify(res2));
   assert.equal(probeRead(probe), null, 'the project\'s test never ran');
   });
 });
@@ -1109,7 +1100,7 @@ test('case 48: a name the commit command cannot carry is refused', async () => {
 /** Cases 49, 50 and 52: a workspace package linked from an ignored node_modules. */
 function workspaceProject(linkAt = 'greet', requireAs = 'greet', extra = {}) {
   const root = makeRepo({
-    'src/pages/home.html': HOME,
+    'src/styles/home.css': HOME,
     'packages/greet/package.json': '{"name":"greet","main":"index.js"}\n',
     'packages/greet/index.js': "module.exports = 'hello';\n",
     '.gitignore': 'node_modules/\n',
@@ -1127,8 +1118,8 @@ test('case 49: other uncommitted work behind a workspace link is refused and run
   for (const [linkAt, requireAs] of [['greet', 'greet'], ['@acme/greet', '@acme/greet']]) {
     const root = workspaceProject(linkAt, requireAs);
     fs.appendFileSync(path.join(root, 'packages', 'greet', 'index.js'), '// an unrelated edit\n');
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-    const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+    const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/styles/home.css'));
     assert.equal(res.text, unreadable('other uncommitted work is in code the tests load through installed packages: packages/greet'),
       JSON.stringify(res));
     assert.equal(logLines(root).pop().cause, 'unreadable');
@@ -1139,11 +1130,11 @@ test('case 49: other uncommitted work behind a workspace link is refused and run
 test('case 50: the same workspace link with no other work passes, and the test ran in the copy', async () => {
   const probe = probeDir();
   const root = workspaceProject();
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/styles/home.css'));
   assert.ok(probeRead(probe));
   assert.notEqual(probeRead(probe), root, 'the tests ran in a copy');
-  assertPass(res, ['src/pages/home.html']);
+  assertPass(res, ['src/styles/home.css']);
 });
 
 test('case 51: other uncommitted work behind an editable Python install is refused', async () => {
@@ -1153,28 +1144,28 @@ test('case 51: other uncommitted work behind an editable Python install is refus
     writeFiles(root, { '.venv/pyvenv.cfg': 'home = /usr/bin\n' });
     fs.mkdirSync(path.join(root, ...site), { recursive: true });
     fs.writeFileSync(path.join(root, 'pylib/mylib/__init__.py'), 'NAME = "new"\n');
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
     return root;
   };
   const pth = make();
   fs.writeFileSync(path.join(pth, ...site, '_mylib.pth'),
     `# an editable install\nimport site\n${fs.realpathSync.native(path.join(pth, 'pylib'))}\n`);
-  assert.equal((await check(pth, '--run-tests', 'src/pages/home.html')).text,
+  assert.equal((await check(pth, '--run-tests', 'src/styles/home.css')).text,
     unreadable('other uncommitted work is in code the tests load through installed packages: pylib'));
   const finder = make();
   const mylib = fs.realpathSync.native(path.join(finder, 'pylib', 'mylib')).replace(/\\/g, '\\\\');
   fs.writeFileSync(path.join(finder, ...site, '__editable___mylib_finder.py'), `MAPPING = {'mylib': '${mylib}'}\n`);
-  assert.equal((await check(finder, '--run-tests', 'src/pages/home.html')).text,
+  assert.equal((await check(finder, '--run-tests', 'src/styles/home.css')).text,
     unreadable('other uncommitted work is in code the tests load through installed packages: pylib/mylib'));
 });
 
 test('case 52: a judged file under a linked package passes, and the test ran in the copy', async () => {
   const probe = probeDir();
-  const root = workspaceProject('greet', 'greet', { 'packages/greet/page.html': '<p>Greets you.</p>\n' });
-  fs.writeFileSync(path.join(root, 'packages/greet/page.html'), '<p>Welcomes you.</p>\n');
-  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'packages/greet/page.html'));
+  const root = workspaceProject('greet', 'greet', { 'packages/greet/page.css': '.greet { color: red; }\n' });
+  fs.writeFileSync(path.join(root, 'packages/greet/page.css'), '.greet { color: blue; }\n');
+  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'packages/greet/page.css'));
   assert.notEqual(probeRead(probe), root, 'the tests ran in a copy');
-  assertPass(res, ['packages/greet/page.html']);
+  assertPass(res, ['packages/greet/page.css']);
 });
 
 test('case 53: a link whose parent lies outside the copy stops the check before any test runs', async () => {
@@ -1185,8 +1176,8 @@ test('case 53: a link whose parent lies outside the copy stops the check before 
   git(root, ['update-index', '--add', '--cacheinfo', `120000,${blob},vendor`]);
   git(root, ['commit', '-q', '-m', 'vendor is a link']);
   writeFiles(root, { 'vendor/node_modules/x/index.js': 'module.exports = 3;\n' });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/styles/home.css'));
   assert.equal(res.text, unreadable('the check stopped'), JSON.stringify(res));
   assert.equal(res.detail, 'vendor/node_modules');
   assert.equal(probeRead(probe), null, 'no test ran');
@@ -1217,11 +1208,11 @@ test('a file that is not valid UTF-8 is not text', async () => {
 
 test('a name with spaces, a star and letters beyond ASCII passes, and commit.add stages exactly it', async () => {
   // A star cannot stand in a Windows file name; there the name keeps its space and letters.
-  const name = process.platform === 'win32' ? 'docs/a plan \u00e9.html' : 'docs/a plan \u00e9 *.html';
-  const root = makeRepo({ [name]: '<p>Old wording.</p>\n', 'docs/a plan \u00e9 x.html': '<p>Other.</p>\n',
+  const name = process.platform === 'win32' ? 'docs/a plan \u00e9.css' : 'docs/a plan \u00e9 *.css';
+  const root = makeRepo({ [name]: 'a { color: red; }\n', 'docs/a plan \u00e9 x.css': 'b { color: red; }\n',
     'tests/any.test.js': nodeTest('runs', '  assert.ok(true);') }, { testScript: SCRIPT });
-  fs.writeFileSync(path.join(root, ...name.split('/')), '<p>New wording.</p>\n');
-  fs.writeFileSync(path.join(root, 'docs', 'a plan \u00e9 x.html'), '<p>Other, changed.</p>\n');
+  fs.writeFileSync(path.join(root, ...name.split('/')), 'a { color: blue; }\n');
+  fs.writeFileSync(path.join(root, 'docs', 'a plan \u00e9 x.css'), 'b { color: blue; }\n');
   assertChecking(await check(root, name), [name]);
   const res = await check(root, '--run-tests', name);
   assertPass(res, [name]);
@@ -1251,35 +1242,35 @@ test('the first failing test is read from jest, TAP and spec output, or said pla
     ["process.stdout.write('not ok 1 - shows Save\\n  location: \\'' + require('url').pathToFileURL(require('path').join(process.cwd(), 'tests', 'home.test.js')).href + ':2:1\\'\\n')", 'tests/home.test.js: shows Save']
   ];
   for (const [body, shown] of variants) {
-    const root = makeRepo({ 'src/pages/home.html': HOME, 'fail.js': `${body};\nprocess.exit(1);\n` }, { testScript: 'node fail.js' });
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-    await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], `the existing tests fail (${shown})`);
+    const root = makeRepo({ 'src/styles/home.css': HOME, 'fail.js': `${body};\nprocess.exit(1);\n` }, { testScript: 'node fail.js' });
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+    await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'], `the existing tests fail (${shown})`);
   }
 });
 
 test('a run whose counters cannot be read is "no test ran"', async () => {
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'count.js': "process.stdout.write('# tests 1\\n# pass 1\\n');\n" },
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'count.js': "process.stdout.write('# tests 1\\n# pass 1\\n');\n" },
     { testScript: 'node count.js' });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], NO_TEST);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'], NO_TEST);
 });
 
 // The decision at review of 2026-10-09: the whole suite runs in the copy. Until then a test
 // file named after every judged file (`tests/home.test.html` for `home.html`) made the check
 // run that selection alone, and a failing test under another name never ran.
 test('the whole suite runs in the copy, whatever the test files are named', async (t) => {
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.html': '<p>marker</p>\n', 'tests/home.test.js': PASSING_TEST,
-    'tests/other.test.js': PASSING_TEST.replace('has a button', 'still has a button') }, { testScript: SCRIPT });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.html': '<p>marker</p>\n', 'tests/home.test.js': PASSING_TEST,
+    'tests/other.test.js': PASSING_TEST.replace('has a rule', 'still has a button') }, { testScript: SCRIPT });
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
   const selected = [];
   t.mock.method(qualityAgent, 'runSpecificTests', (tools, files) => { selected.push(...files); throw new Error('a selection of tests ran'); });
   const whole = [];
   const real = qualityAgent.runFullTests;
   t.mock.method(qualityAgent, 'runFullTests', (tools) => { whole.push(process.cwd()); return real(tools); });
-  const res = await check(root, '--run-tests', 'src/pages/home.html');
+  const res = await check(root, '--run-tests', 'src/styles/home.css');
   t.mock.restoreAll();
   assert.deepEqual(selected, [], 'no selection of tests runs');
-  assertPass(res, ['src/pages/home.html']);
+  assertPass(res, ['src/styles/home.css']);
   assert.equal(res.tests, '2 tests passed.');
   assert.equal(whole.length, 1, 'the whole suite ran once');
   assert.equal(path.basename(copyParent(whole[0])).startsWith('ctoc-hotfix-'), true, 'and it ran in the copy');
@@ -1289,15 +1280,10 @@ test('edge shapes of every kind give the exact verdict', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   // [path, base content, new content, expected clause, or null for the pass of the test call]
   const shapes = [
-    ['src/pages/lead.html', 'Welcome <b>home</b>\n', 'Hello <b>home</b>\n', un('src/pages/lead.html')],
     // Since the review of 2026-10-09 an end tag with nothing to close is outside the strict subset.
-    ['src/pages/gt.html', '>Save</b>\n', '>Store</b>\n', inexact('src/pages/gt.html')],
-    ['src/pages/comment.html', '<!-- c -->Save</p>\n', '<!-- c -->Store</p>\n', inexact('src/pages/comment.html')],
-    ['src/pages/odd.html', '</1>Save</p>\n', '</1>Store</p>\n', inexact('src/pages/odd.html')],
-    ['src/pages/open.html', '<p>Save\n', '<p>Store\n', inexact('src/pages/open.html')],
-    ['src/pages/tail.html', '<p>Save<\n', '<p>Store<\n', inexact('src/pages/tail.html')],
-    ['src/pages/heart.html', '<p>Save <3</p>\n', '<p>Store <3</p>\n', un('src/pages/heart.html')],
-    ['src/pages/grow.html', '<p>a</p>\n', '<p>a</p>\n<p>b</p>\n', un('src/pages/grow.html')],
+    // A change of line endings alone is no changed line (its log line counts none, asserted
+    // below), and no colour: the number of carriage returns stays as it is.
+    ['src/styles/endings.css', 'a { color: red; }\nb { color: red; }\n', 'a { color: red; }\r\nb { color: red; }\r\n', un('src/styles/endings.css')],
     ['src/styles/start.css', 'a {\n  color:\nred;\n}\n', 'a {\n  color:\nblue;\n}\n', un('src/styles/start.css')],
     ['src/styles/two.css', 'a { border: 1px solid red; color: blue; }\n', 'a { border: 1px solid red; color: green; }\n', NO_TEST],
     ['src/styles/grow.css', 'a { color: red; }\n', 'a { color: red; }\nb { color: red; }\n', un('src/styles/grow.css')],
@@ -1315,13 +1301,10 @@ test('edge shapes of every kind give the exact verdict', async () => {
     ['skills/x/helper.js', 'f(1);\n', 'f(2);\n', 'it changes program logic in skills/x/helper.js, and only wording and colours qualify'],
     // A change of line endings alone is no changed line (its log line counts none, asserted
     // below), and no wording: the number of carriage returns stays as it is in a page.
-    ['src/pages/endings.html', '<p>One.</p>\n<p>Two.</p>\n', '<p>One.</p>\r\n<p>Two.</p>\r\n', un('src/pages/endings.html')],
     // The security check's second round: a `value` inside another attribute's value is no
     // `value` attribute. A stray `}` in a tag was harmless; since the sixth round (the
     // session's decision of 2026-10-09: the strict HTML subset) a brace anywhere inside a tag
     // puts the file outside the subset, so this former pass refuses.
-    ['src/pages/stray.html', '<p data-x=}>Save</p>\n', '<p data-x=}>Store</p>\n', inexact('src/pages/stray.html')],
-    ['src/pages/opt.html', '<option title="no value here">Red</option>\n', '<option title="no value here">Blue</option>\n', un('src/pages/opt.html')],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
     // stay, and each now asserts the "not recognised" refusal.
@@ -1345,46 +1328,46 @@ test('edge shapes of every kind give the exact verdict', async () => {
     fs.writeFileSync(path.join(root, ...p.split('/')), b);
   }
   // Files named out of order are judged in path order: both qualify, and with no test command no test ran.
-  writeFiles(root, { 'src/pages/second.html': '<p>Second.</p>\n' });
+  writeFiles(root, { 'src/styles/second.css': 'a { color: red; }\n' });
   git(root, ['add', '-A']);
   git(root, ['commit', '-q', '-m', 'second']);
-  fs.writeFileSync(path.join(root, 'src/pages/second.html'), '<p>Second, changed.</p>\n');
-  fs.writeFileSync(path.join(root, 'src/pages/endings.html'), '<p>One, changed.</p>\n<p>Two.</p>\n');
-  const twoFiles = await check(root, 'src/pages/second.html', 'src/pages/endings.html');
-  assertChecking(twoFiles, ['src/pages/endings.html', 'src/pages/second.html']);
-  assert.equal((await check(root, '--run-tests', 'src/pages/second.html', 'src/pages/endings.html')).text, refusal(NO_TEST));
-  fs.writeFileSync(path.join(root, 'src/pages/second.html'), '<p>Second.</p>\n');
-  fs.writeFileSync(path.join(root, 'src/pages/endings.html'), '<p>One.</p>\n<p>Two.</p>\n');
-  writeFiles(root, { 'src/pages/nonl.html': '<p>new</p>' });
-  assert.equal((await check(root, 'src/pages/nonl.html')).text, refusal('it adds, removes or renames src/pages/nonl.html'));
+  fs.writeFileSync(path.join(root, 'src/styles/second.css'), 'a { color: blue; }\n');
+  fs.writeFileSync(path.join(root, 'src/styles/endings.css'), 'a { color: blue; }\nb { color: red; }\n');
+  const twoFiles = await check(root, 'src/styles/second.css', 'src/styles/endings.css');
+  assertChecking(twoFiles, ['src/styles/endings.css', 'src/styles/second.css']);
+  assert.equal((await check(root, '--run-tests', 'src/styles/second.css', 'src/styles/endings.css')).text, refusal(NO_TEST));
+  fs.writeFileSync(path.join(root, 'src/styles/second.css'), 'a { color: red; }\n');
+  fs.writeFileSync(path.join(root, 'src/styles/endings.css'), 'a { color: red; }\nb { color: red; }\n');
+  writeFiles(root, { 'src/styles/nonl.css': 'a { color: red; }' });
+  assert.equal((await check(root, 'src/styles/nonl.css')).text, refusal('it adds, removes or renames src/styles/nonl.css'));
   const lines = logLines(root);
   assert.equal(lines[lines.length - 1].lines, 1, 'a new file without a final newline counts its one line');
-  const endings = shapes.findIndex((x) => x[0] === 'src/pages/endings.html');
+  const endings = shapes.findIndex((x) => x[0] === 'src/styles/endings.css');
   assert.deepEqual([lines[endings].verdict, lines[endings].lines], ['refused', 0], 'line endings alone are no changed line');
   assert.equal(lines.filter((l) => l.verdict === 'hotfix').length, 0, 'with no test command nothing passes');
   // git lists changed files before new ones; the check still judges in path order.
-  fs.rmSync(path.join(root, 'src/pages/nonl.html'));
-  fs.writeFileSync(path.join(root, 'src/pages/endings.html'), '<p>One, changed.</p>\n<p>Two.</p>\n');
-  writeFiles(root, { 'src/pages/aaa.html': '<p>New.</p>\n' });
-  assert.equal((await check(root, 'src/pages/endings.html', 'src/pages/aaa.html')).text, refusal('it adds, removes or renames src/pages/aaa.html'));
+  fs.rmSync(path.join(root, 'src/styles/nonl.css'));
+  fs.writeFileSync(path.join(root, 'src/styles/endings.css'), 'a { color: blue; }\nb { color: red; }\n');
+  writeFiles(root, { 'src/styles/aaa.css': 'a { color: red; }\n' });
+  assert.equal((await check(root, 'src/styles/endings.css', 'src/styles/aaa.css')).text, refusal('it adds, removes or renames src/styles/aaa.css'));
 });
 
 test('a project in a sub-folder of the repository judges only its own files, shown from its own root', async () => {
-  const repo = makeRepo({ 'app/page.html': '<p>Old app wording.</p>\n', 'other/page.html': '<p>Old other wording.</p>\n',
-    'app/package.json': packageJson(SCRIPT), 'app/tests/page.test.js': nodeTest('has a page', "  assert.ok(read('page.html').includes('<p>'));") });
-  fs.writeFileSync(path.join(repo, 'app/page.html'), '<p>New app wording.</p>\n');
-  fs.writeFileSync(path.join(repo, 'other/page.html'), '<p>New other wording.</p>\n');
+  const repo = makeRepo({ 'app/page.css': 'a { color: red; }\n', 'other/page.css': 'b { color: red; }\n',
+    'app/package.json': packageJson(SCRIPT), 'app/tests/page.test.js': nodeTest('has a page', "  assert.ok(read('page.css').includes('color'));") });
+  fs.writeFileSync(path.join(repo, 'app/page.css'), 'a { color: blue; }\n');
+  fs.writeFileSync(path.join(repo, 'other/page.css'), 'b { color: blue; }\n');
   const app = path.join(repo, 'app');
-  assertChecking(await check(app), ['page.html']);
-  assertPass(await check(app, '--run-tests'), ['page.html']);
-  assertPass(await check(app, '--run-tests', 'page.html'), ['page.html']);
+  assertChecking(await check(app), ['page.css']);
+  assertPass(await check(app, '--run-tests'), ['page.css']);
+  assertPass(await check(app, '--run-tests', 'page.css'), ['page.css']);
 });
 
 test('a test location that is not a readable file address is shown as written', async () => {
   const body = "process.stdout.write('not ok 1 - shows Save\\n  location: \\'file://remote/tests/home.test.js:2:1\\'\\n')";
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'fail.js': `${body};\nprocess.exit(1);\n` }, { testScript: 'node fail.js' });
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
-  const res = await check(root, '--run-tests', 'src/pages/home.html');
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'fail.js': `${body};\nprocess.exit(1);\n` }, { testScript: 'node fail.js' });
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
+  const res = await check(root, '--run-tests', 'src/styles/home.css');
   assert.equal(res.text, refusal(process.platform === 'win32'
     ? 'the existing tests fail (//remote/tests/home.test.js: shows Save)'
     : 'the existing tests fail (file://remote/tests/home.test.js: shows Save)'));
@@ -1395,14 +1378,14 @@ test('a log folder that cannot be written changes no answer', async () => {
   const ctoc = path.join(root, '.ctoc');
   fs.mkdirSync(ctoc);
   fs.chmodSync(ctoc, 0o555);
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
   let res;
   try {
-    res = await check(root, '--run-tests', 'src/pages/home.html');
+    res = await check(root, '--run-tests', 'src/styles/home.css');
   } finally {
     fs.chmodSync(ctoc, 0o755);
   }
-  assertPass(res, ['src/pages/home.html']);
+  assertPass(res, ['src/styles/home.css']);
   // Permissions bind only a non-administrator account on a system that enforces them.
   const enforced = process.platform !== 'win32' && typeof process.getuid === 'function' && process.getuid() !== 0;
   if (enforced) assert.equal(fs.existsSync(path.join(ctoc, 'logs')), false);
@@ -1488,24 +1471,24 @@ test('finding 1: no repository hook and no file-system monitor runs during eithe
   git(root, ['config', 'core.fsmonitor', fwd(monitor)]);
   // Both are live in this repository: a plain status runs the monitor, a plain add the hook.
   git(root, ['status', '--porcelain']);
-  git(root, ['add', 'src/pages/home.html']);
+  git(root, ['add', 'src/styles/home.css']);
   assert.ok(fs.existsSync(hookMarker), 'the hook runs for an ordinary git call');
   assert.ok(fs.existsSync(monitorMarker), 'the monitor runs for an ordinary git call');
   fs.rmSync(hookMarker);
   fs.rmSync(monitorMarker);
 
-  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
-  const first = await check(root, 'src/pages/home.html');
-  const second = await check(root, '--run-tests', 'src/pages/home.html');
-  assertChecking(first, ['src/pages/home.html']);
-  assertPass(second, ['src/pages/home.html']);
+  fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
+  const first = await check(root, 'src/styles/home.css');
+  const second = await check(root, '--run-tests', 'src/styles/home.css');
+  assertChecking(first, ['src/styles/home.css']);
+  assertPass(second, ['src/styles/home.css']);
   assert.equal(fs.existsSync(hookMarker), false, 'no repository hook ran during the check');
   assert.equal(fs.existsSync(monitorMarker), false, 'no file-system monitor ran during the check');
 });
 
 test('finding 2a: the first failing test is read from blank lines in linear time', async (t) => {
   const root = testedProject();
-  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+  fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
   // The reader of a failing run's output is reached through the test call only, so the call
   // is made in this process with the quality agent answering a failing run, and what is
   // counted is the processor time this process spends from the moment the run's output is
@@ -1517,7 +1500,7 @@ test('finding 2a: the first failing test is read from blank lines in linear time
       return { passed: false, passCount: 0, failed: 1, skipped: 0, flaky: 0, output };
     });
     try {
-      return await check(root, '--run-tests', 'src/pages/home.html');
+      return await check(root, '--run-tests', 'src/styles/home.css');
     } finally {
       t.mock.restoreAll();
     }
@@ -1563,25 +1546,11 @@ test('finding 2c: a colour change in a one-line stylesheet is judged in linear t
   }
 });
 
-test('finding 2, same class: a page with many script blocks is judged in linear time', async (t) => {
-  const page = (n) => `${'<script>x</script>\n'.repeat(100 * n)}<p>Save</p>\n`;
-  const root = makeRepo({ 'src/pages/big.html': page(2) });
-  fs.writeFileSync(path.join(root, 'src', 'pages', 'big.html'), page(2).replace('<p>Save</p>', '<p>Store</p>'));
-  assertChecking(await check(root, 'src/pages/big.html'), ['src/pages/big.html']);
-  const at = (n) => {
-    const change = changeOf('src/pages/big.html', page(n), page(n).replace('<p>Save</p>', '<p>Store</p>'));
-    return () => assert.equal(ruleRefusal(change), null);
-  };
-  const { n, small, big, ratio } = await growth(at, 16, 800);
-  t.diagnostic(`${100 * n} script blocks: ${small.toFixed(1)} ms, ${400 * n}: ${big.toFixed(1)} ms, ${ratio.toFixed(1)} times as long`);
-  assert.ok(ratio < 8, `${100 * n} script blocks took ${small.toFixed(1)} ms and ${400 * n} took ${big.toFixed(1)} ms`);
-});
-
 test('finding 6: a tracked test command with shell structure runs no test and says so', async () => {
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': PASSING_TEST,
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': PASSING_TEST,
     '.ctoc/quality-config.yaml': 'languages:\n  javascript:\n    test: npm run build && npm test\n' }, { testScript: SCRIPT });
-  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
-  await refusedUntouched(root, ['--run-tests', 'src/pages/home.html'], NO_TEST);
+  fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
+  await refusedUntouched(root, ['--run-tests', 'src/styles/home.css'], NO_TEST);
 });
 
 test('finding 8: a named file with control characters is quoted cleaned in every sentence', async () => {
@@ -1591,23 +1560,23 @@ test('finding 8: a named file with control characters is quoted cleaned in every
 });
 
 test('finding 9: a judged file named like an option reaches the test run after --', async () => {
-  const root = makeRepo({ '--x.html': '<p>Old wording.</p>\n', 'tests/any.test.js': nodeTest('runs', '  assert.ok(true);') }, { testScript: SCRIPT });
-  fs.writeFileSync(path.join(root, '--x.html'), '<p>New wording.</p>\n');
-  const first = await check(root, '--', '--x.html');
-  assertChecking(first, ['--x.html']);
-  assert.equal(first.next, "hotfix check --run-tests -- '--x.html'");
+  const root = makeRepo({ '--x.css': 'a { color: red; }\n', 'tests/any.test.js': nodeTest('runs', '  assert.ok(true);') }, { testScript: SCRIPT });
+  fs.writeFileSync(path.join(root, '--x.css'), 'a { color: blue; }\n');
+  const first = await check(root, '--', '--x.css');
+  assertChecking(first, ['--x.css']);
+  assert.equal(first.next, "hotfix check --run-tests -- '--x.css'");
   const words = shellWords(first.next);
   assert.deepEqual(words.slice(0, 2), ['hotfix', 'check']);
   const second = await check(root, ...words.slice(2));
-  assertPass(second, ['--x.html']);
-  fs.writeFileSync(path.join(root, 'notes.html'), '<p>Other.</p>\n');
-  git(root, ['add', 'notes.html']);
+  assertPass(second, ['--x.css']);
+  fs.writeFileSync(path.join(root, 'notes.css'), 'b { color: red; }\n');
+  git(root, ['add', 'notes.css']);
   git(root, ['commit', '-q', '-m', 'notes']);
-  fs.writeFileSync(path.join(root, 'notes.html'), '<p>Other, changed.</p>\n');
-  const mixed = await check(root, '--', 'notes.html', '--x.html');
-  assert.equal(mixed.next, "hotfix check --run-tests -- '--x.html' 'notes.html'", 'a mixed set carries --');
-  assertPass(await check(root, ...shellWords(mixed.next).slice(2)), ['--x.html', 'notes.html']);
-  assert.equal((await check(root, '--run-tests', '--x.html')).text, `Unknown hotfix command: --x.html. ${USAGE}`,
+  fs.writeFileSync(path.join(root, 'notes.css'), 'b { color: blue; }\n');
+  const mixed = await check(root, '--', 'notes.css', '--x.css');
+  assert.equal(mixed.next, "hotfix check --run-tests -- '--x.css' 'notes.css'", 'a mixed set carries --');
+  assertPass(await check(root, ...shellWords(mixed.next).slice(2)), ['--x.css', 'notes.css']);
+  assert.equal((await check(root, '--run-tests', '--x.css')).text, `Unknown hotfix command: --x.css. ${USAGE}`,
     'without --, a name that looks like an option is still the usage text');
 });
 
@@ -1630,9 +1599,9 @@ test('finding 10: removal never follows a copy the tests swapped for a link to a
     const outside = tmpDir('hotfix-outside-');
     writeFiles(outside, { 'node_modules': OUTSIDE, '.venv': OUTSIDE, 'packages/a/node_modules': OUTSIDE });
     const root = linkedProject("  assert.equal(require('greet'), 'hello');\n");
-    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
     const where = swapCopyFor(outside);
-    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    const res = await check(root, '--run-tests', 'src/styles/home.css');
     t.mock.restoreAll();
     assert.deepEqual(treeBytes(outside), { 'node_modules': sha(OUTSIDE), '.venv': sha(OUTSIDE),
       'packages/a/node_modules': sha(OUTSIDE) }, 'nothing outside the copy was deleted');
@@ -1643,13 +1612,13 @@ test('finding 10: removal never follows a copy the tests swapped for a link to a
   });
   await t.test('(b) with no link: git refuses to remove the swapped copy as its worktree', async () => {
     const outside = tmpDir('hotfix-outside-');
-    writeFiles(outside, { 'keep.txt': OUTSIDE, 'src/pages/home.html': OUTSIDE });
+    writeFiles(outside, { 'keep.txt': OUTSIDE, 'src/styles/home.css': OUTSIDE });
     const root = testedProject();
-    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
     const where = swapCopyFor(outside);
-    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    const res = await check(root, '--run-tests', 'src/styles/home.css');
     t.mock.restoreAll();
-    assert.deepEqual(treeBytes(outside), { 'keep.txt': sha(OUTSIDE), 'src/pages/home.html': sha(OUTSIDE) },
+    assert.deepEqual(treeBytes(outside), { 'keep.txt': sha(OUTSIDE), 'src/styles/home.css': sha(OUTSIDE) },
       'nothing outside the copy was deleted');
     assert.equal(res.verdict, 'hotfix', JSON.stringify(res));
     // git itself refuses to remove a worktree that is no longer the one it registered.
@@ -1660,16 +1629,16 @@ test('finding 10: removal never follows a copy the tests swapped for a link to a
   await t.test('(c) a link whose folder the tests removed counts as removed', async () => {
     const root = linkedProject("  assert.equal(require('greet'), 'hello');\n");
     const owned = treeBytes(path.join(root, 'packages', 'a', 'node_modules'));
-    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
     const where = { tree: null };
     t.mock.method(qualityAgent, 'runFullTests', async () => {
       where.tree = process.cwd();
       fs.rmSync(path.join(where.tree, 'packages'), { recursive: true, force: true });
       return { passed: true, passCount: 1, failed: 0, skipped: 0, flaky: 0 };
     });
-    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    const res = await check(root, '--run-tests', 'src/styles/home.css');
     t.mock.restoreAll();
-    assertPass(res, ['src/pages/home.html']);
+    assertPass(res, ['src/styles/home.css']);
     assert.equal(fs.existsSync(copyParent(where.tree)), false, 'the copy is gone');
     assert.deepEqual(treeBytes(path.join(root, 'packages', 'a', 'node_modules')), owned, 'the owner\'s folder is intact');
   });
@@ -1680,8 +1649,8 @@ test('finding 11: a kill from outside removes the copy, then the signal ends the
   const listeners = () => signals.map((s) => process.listenerCount(s));
   const before = listeners();
   const plain = testedProject();
-  fs.writeFileSync(path.join(plain, 'src', 'pages', 'home.html'), HOME_STORE);
-  assertPass(await check(plain, '--run-tests', 'src/pages/home.html'), ['src/pages/home.html']);
+  fs.writeFileSync(path.join(plain, 'src', 'styles', 'home.css'), HOME_STORE);
+  assertPass(await check(plain, '--run-tests', 'src/styles/home.css'), ['src/styles/home.css']);
   assert.deepEqual(listeners(), before, 'the handlers are removed after the check');
   // A signal from outside reaches a process on Windows only as a forced end, which no
   // handler sees; there the in-process half above is the whole contract.
@@ -1692,11 +1661,11 @@ test('finding 11: a kill from outside removes the copy, then the signal ends the
     + "fs.writeFileSync(path.join(process.env.CTOC_HOTFIX_PROBE, 'started.txt'), process.cwd());\n"
     + 'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500);\n'
     + "process.stdout.write('\\u2139 pass 1\\n\\u2139 fail 0\\n');\n";
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'slow.js': slow }, { testScript: 'node slow.js' });
-  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'slow.js': slow }, { testScript: 'node slow.js' });
+  fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
   const runner = path.join(tmpDir('hotfix-runner-'), 'run.js');
   fs.writeFileSync(runner, `const { route } = require(${JSON.stringify(path.join(__dirname, '..', 'src', 'lib', 'menu-screens'))});\n`
-    + "route(['hotfix', 'check', '--run-tests', 'src/pages/home.html'], process.argv[2]).then((r) => process.stdout.write(JSON.stringify(r)));\n");
+    + "route(['hotfix', 'check', '--run-tests', 'src/styles/home.css'], process.argv[2]).then((r) => process.stdout.write(JSON.stringify(r)));\n");
   const env = { ...process.env, TMPDIR: childTmp, TEMP: childTmp, TMP: childTmp, CTOC_HOTFIX_PROBE: probe };
   delete env.NODE_TEST_CONTEXT;
   const child = require('child_process').spawn(NODE, [runner, root], { env, stdio: 'ignore' });
@@ -1715,23 +1684,23 @@ test('finding 11: a kill from outside removes the copy, then the signal ends the
 
 test('round 2, finding 1: a staged edit hidden behind an index bit is refused, or committed exactly as judged', async (t) => {
   const SCRIPTS = HOME_STORE.replace('</body>', `${'<script>steal()</script>\n'.repeat(30)}</body>`);
-  const marked = 'I could not read the change (src/pages/home.html is marked in git\'s index as unchanged or skipped)';
+  const marked = 'I could not read the change (src/styles/home.css is marked in git\'s index as unchanged or skipped)';
   const shapes = [
-    ['assume-unchanged', ['update-index', '--assume-unchanged', 'src/pages/home.html'], null, true],
+    ['assume-unchanged', ['update-index', '--assume-unchanged', 'src/styles/home.css'], null, true],
     ['core.ignoreStat=true', null, ['config', 'core.ignoreStat', 'true'], true],
-    ['skip-worktree', ['update-index', '--skip-worktree', 'src/pages/home.html'], null, true]
+    ['skip-worktree', ['update-index', '--skip-worktree', 'src/styles/home.css'], null, true]
   ];
   for (const [label, mark, config, mustRefuse] of shapes) {
     await t.test(label, async () => {
       const root = testedProject();
-      const home = path.join(root, 'src', 'pages', 'home.html');
+      const home = path.join(root, 'src', 'styles', 'home.css');
       if (config) git(root, config);
       fs.writeFileSync(home, HOME_STORE);
-      git(root, ['add', 'src/pages/home.html']);
+      git(root, ['add', 'src/styles/home.css']);
       if (mark) git(root, mark);
       fs.writeFileSync(home, SCRIPTS);
-      const first = await check(root, 'src/pages/home.html');
-      const last = first.verdict === 'checking' ? await check(root, '--run-tests', 'src/pages/home.html') : first;
+      const first = await check(root, 'src/styles/home.css');
+      const last = first.verdict === 'checking' ? await check(root, '--run-tests', 'src/styles/home.css') : first;
       t.diagnostic(`${label}: ${last.verdict} ${last.text}`);
       if (mustRefuse) assert.equal(last.text, refusal(marked), JSON.stringify(last));
       if (last.verdict === 'refused') return;
@@ -1749,9 +1718,9 @@ test('round 2, finding 3: a project inside a sensitive, test, governing, build o
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   // [the project folder, the file, its old and new content, the clause]
   const shapes = [
-    ['services/payment', 'index.html', '<p>Old wording.</p>\n', '<p>New wording.</p>\n', 'index.html sits in an area named payment, and such areas are never a hotfix'],
-    ['tests/e2e', 'index.html', '<p>Old wording.</p>\n', '<p>New wording.</p>\n', 'it changes a test (index.html)'],
-    ['agents/x', 'index.html', '<p>Old wording.</p>\n', '<p>New wording.</p>\n', un('index.html')],
+    ['services/payment', 'index.css', 'a { color: red; }\n', 'a { color: blue; }\n', 'index.css sits in an area named payment, and such areas are never a hotfix'],
+    ['tests/e2e', 'index.css', 'a { color: red; }\n', 'a { color: blue; }\n', 'it changes a test (index.css)'],
+    ['agents/x', 'index.css', 'a { color: red; }\n', 'a { color: blue; }\n', un('index.css')],
     ['.circleci/web', 'config.yml', 'name: old\n', 'name: new\n', 'it changes how the project is built or shipped in config.yml'],
     ['db/migrations/app', 'seed.yaml', 'name: old\n', 'name: new\n', 'it changes stored data in seed.yaml']
   ];
@@ -1769,19 +1738,19 @@ test('round 2, finding 3: a project inside a sensitive, test, governing, build o
 
 test('round 2, finding 9: a pass names each judged file with its staged id, which a rewriting commit hook no longer matches', async () => {
   const root = testedProject();
-  const home = path.join(root, 'src', 'pages', 'home.html');
+  const home = path.join(root, 'src', 'styles', 'home.css');
   fs.writeFileSync(home, HOME_STORE);
-  const res = await check(root, '--run-tests', 'src/pages/home.html');
-  assertPass(res, ['src/pages/home.html']);
-  const blob = git(root, ['hash-object', 'src/pages/home.html']).trim();
-  assert.deepEqual(res.commit.judged, [{ path: 'src/pages/home.html', blob }]);
+  const res = await check(root, '--run-tests', 'src/styles/home.css');
+  assertPass(res, ['src/styles/home.css']);
+  const blob = git(root, ['hash-object', 'src/styles/home.css']).trim();
+  assert.deepEqual(res.commit.judged, [{ path: 'src/styles/home.css', blob }]);
   // A repository pre-commit hook that rewrites the judged file and stages another: the
   // commit then holds bytes nobody judged, and the judged ids are what can show it.
   fs.writeFileSync(path.join(root, '.git', 'hooks', 'pre-commit'),
-    "#!/bin/sh\necho '<script>steal()</script>' >> src/pages/home.html\ngit add src/pages/home.html\necho extra > extra.txt\ngit add extra.txt\n",
+    "#!/bin/sh\necho '<script>steal()</script>' >> src/styles/home.css\ngit add src/styles/home.css\necho extra > extra.txt\ngit add extra.txt\n",
     { mode: 0o755 });
   runCommit(root, res.commit);
-  const committed = spawnSync('git', ['rev-parse', 'HEAD:src/pages/home.html'], { cwd: root, encoding: 'utf8' }).stdout.trim();
+  const committed = spawnSync('git', ['rev-parse', 'HEAD:src/styles/home.css'], { cwd: root, encoding: 'utf8' }).stdout.trim();
   const names = git(root, ['show', '--name-only', '--format=', 'HEAD']).trim().split('\n');
   assert.ok(committed !== blob || names.length > 1, `the hook changed the commit: ${committed} ${names.join(' ')}`);
 });
@@ -1799,16 +1768,10 @@ test('round 4: components and code elements in HTML, custom properties; Vue, JSX
     // Only HTML host elements carry wording, and nothing anywhere inside a component.
     // The fifth round (2026-10-09): element names are matched in any letter case, as HTML reads
     // them, so `<DIV>` is the host element `div` and its text is wording (it was refused).
-    ['src/pages/upper.html', '<DIV>Save</DIV>\n', '<DIV>Store</DIV>\n', null],
-    ['src/pages/inside.html', '<MyAction><b>charge</b></MyAction>\n', '<MyAction><b>refund</b></MyAction>\n', inexact('src/pages/inside.html')],
-    ['src/pages/after.html', '<my-widget>x</my-widget>\n<p>Save</p>\n', '<my-widget>x</my-widget>\n<p>Store</p>\n', null],
     // Code elements: an end tag of another element does not leave one.
     // The fifth round (2026-10-09): an end tag that does not close the element on top while a
     // code element is open cannot be followed; since the sixth round that is HTML outside the
     // strict subset, with the functional plan's sentence for it.
-    ['src/pages/pre.html', '<pre></code>pip install requests</pre>\n', '<pre></code>pip install reqests</pre>\n', inexact('src/pages/pre.html')],
-    ['src/pages/after-code.html', '<p><code>x</code> Save</p>\n', '<p><code>x</code> Store</p>\n', null],
-    ['src/pages/after-code-tag.html', '<p><code>x</code><b>Save</b></p>\n', '<p><code>x</code><b>Store</b></p>\n', null],
     // Custom properties: a change to a value that is no colour; colours in real colour properties.
     ['src/styles/font.css', ':root { --font: "Old"; }\n', ':root { --font: "New"; }\n', setting('src/styles/font.css')],
     ['src/styles/width.css', 'a { width: #fff; }\n', 'a { width: #000; }\n', un('src/styles/width.css')],
@@ -1864,25 +1827,15 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const shapes = [
     // An attribute name where none can start: an unclosed `<div` swallowing the next tag.
-    ['src/pages/div.html', '<div class="a"\n<p>Save</p>\n', '<div class="a"\n<p>Store</p>\n', inexact('src/pages/div.html')],
     // An unclosed quote, comment, raw-text element and tag after the change.
-    ['src/pages/quote.html', '<p>Save</p>\n<a title="x>Go</a>\n', '<p>Store</p>\n<a title="x>Go</a>\n', inexact('src/pages/quote.html')],
-    ['src/pages/note.html', '<p>Save</p>\n<!-- note\n', '<p>Store</p>\n<!-- note\n', inexact('src/pages/note.html')],
-    ['src/pages/script.html', '<p>Save</p>\n<script>\nrun();\n', '<p>Store</p>\n<script>\nrun();\n', inexact('src/pages/script.html')],
-    ['src/pages/tag.html', '<p>Save</p>\n<a href="/x"\n', '<p>Store</p>\n<a href="/x"\n', inexact('src/pages/tag.html')],
-    ['src/pages/cdata-open.html', '<p>Save</p>\n<svg><![CDATA[ x\n', '<p>Store</p>\n<svg><![CDATA[ x\n', inexact('src/pages/cdata-open.html')],
     // Stylesheets: an unclosed comment, block and string; a closing brace with nothing open.
     ['src/styles/note.css', 'a { color: red; }\n/* note\n', 'a { color: blue; }\n/* note\n', open('src/styles/note.css')],
     ['src/styles/block.css', 'a { color: red; }\nb {\n', 'a { color: blue; }\nb {\n', open('src/styles/block.css')],
     ['src/styles/string.css', 'a { color: red; }\nb { content: "x }\n', 'a { color: blue; }\nb { content: "x }\n', lost('src/styles/string.css')],
     ['src/styles/extra.css', 'a { color: red; }\n}\n', 'a { color: blue; }\n}\n', lost('src/styles/extra.css')],
     // One side well-formed and the other not.
-    ['src/pages/one-side.html', '<p>Save</p>\n<!-- c -->\n', '<p>Store</p>\n<!-- c --\n', inexact('src/pages/one-side.html')],
     // Well-formed files still qualify.
-    ['src/pages/closed.html', '<p>Save</p>\n<!-- note -->\n<script>run();</script>\n', '<p>Store</p>\n<!-- note -->\n<script>run();</script>\n', null],
     // A file emptied is the content of a removal, never wording (found by the cut-short property case).
-    ['src/pages/emptied.html', '<p>Old words.</p>\n', '', un('src/pages/emptied.html')],
-    ['src/pages/filled.html', '', '<p>New words.</p>\n', un('src/pages/filled.html')],
     ['src/styles/emptied.css', 'a { color: red; }\n', '', un('src/styles/emptied.css')],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
@@ -1916,14 +1869,14 @@ test('round 4: every scanner fails closed on an unfinished or unreadable constru
 });
 
 test('round 4: CTOC\'s enforcement list applies only in CTOC\'s own repository', async () => {
-  const notes = { 'src/hooks/notes.html': HOME };
+  const notes = { 'src/hooks/notes.css': HOME };
   const ctoc = makeRepo({ ...notes, 'package.json': '{ "name": "ctoc" }\n', 'CLAUDE.md': '# CTOC Project Instructions\n', '.ctoc/keep.json': '{}\n' });
-  fs.writeFileSync(path.join(ctoc, 'src', 'hooks', 'notes.html'), HOME_STORE);
-  assert.equal((await check(ctoc, 'src/hooks/notes.html')).text,
-    refusal('src/hooks/notes.html sits in an area named enforcement, and such areas are never a hotfix'));
+  fs.writeFileSync(path.join(ctoc, 'src', 'hooks', 'notes.css'), HOME_STORE);
+  assert.equal((await check(ctoc, 'src/hooks/notes.css')).text,
+    refusal('src/hooks/notes.css sits in an area named enforcement, and such areas are never a hotfix'));
   const react = makeRepo({ ...notes, 'package.json': '{ "name": "web" }\n', 'CLAUDE.md': '# Web\n', '.ctoc/keep.json': '{}\n' });
-  fs.writeFileSync(path.join(react, 'src', 'hooks', 'notes.html'), HOME_STORE);
-  assertChecking(await check(react, 'src/hooks/notes.html'), ['src/hooks/notes.html']);
+  fs.writeFileSync(path.join(react, 'src', 'hooks', 'notes.css'), HOME_STORE);
+  assertChecking(await check(react, 'src/hooks/notes.css'), ['src/hooks/notes.css']);
 });
 
 // Renamed at review (2026-10-09): the rows on template literals, Vue and JSX templates and
@@ -1932,14 +1885,8 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const shapes = [
     // A script block's escape states: `</script>` inside `<!--<script>` does not end it.
-    ['src/pages/escaped.html', '<script><!--<script></script><b>Save</b></script>\n<p>Hi</p>\n', '<script><!--<script></script><b>Store</b></script>\n<p>Hi</p>\n', un('src/pages/escaped.html')],
-    ['src/pages/escaped-after.html', '<script><!--<script></script>--></script>\n<p>Save</p>\n', '<script><!--<script></script>--></script>\n<p>Store</p>\n', null],
-    ['src/pages/unclosed.html', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Save</b>\n', '<p>Hi</p>\n<script>\nlet a = 1;\n<b>Store</b>\n', inexact('src/pages/unclosed.html')],
     // A title is wording (the code review, 2026-10-09: it was wrongly refused).
-    ['src/pages/title.html', '<title>Save</title>\n', '<title>Store</title>\n', null],
-    ['src/pages/tpl.html', '<template><p>Save</p></template>\n', '<template><p>Store</p></template>\n', un('src/pages/tpl.html')],
     // A CDATA section inside `<svg>`: outside the strict subset.
-    ['src/pages/cdata.html', '<svg><![CDATA[ a > <b>Save</b> ]]></svg>\n', '<svg><![CDATA[ a > <b>Store</b> ]]></svg>\n', inexact('src/pages/cdata.html')],
     // Stylesheets: a colour function in its space form, a string, a colour beside a `url(…)`.
     // A pass until the tenth round: a colour function is read in its comma form only.
     ['src/styles/space.css', 'a { color: rgb(1 2 3 / 50%); }\n', 'a { color: rgb(1 2 4 / 50%); }\n', un('src/styles/space.css')],
@@ -1950,8 +1897,6 @@ test('round 3: the whole-file scanners read script escape states, titles, commen
     // the functional plan (amended 2026-10-09) refuses as a change the check cannot read exactly.
     ['src/styles/quoted.css', 'a { background: url("one.png") red; }\n', 'a { background: url("one.png") blue; }\n', inexact('src/styles/quoted.css')],
     // GitHub's assistant folders stay governing under `.github/`; every other file there is the build.
-    ['.github/prompts/card.html', '<p>Save</p>\n', '<p>Store</p>\n', un('.github/prompts/card.html')],
-    ['.github/pages/card.html', '<p>Save</p>\n', '<p>Store</p>\n', 'it changes how the project is built or shipped in .github/pages/card.html'],
     // The owner's decision of 2026-10-09: the check keeps only the formats it reads exactly, so
     // these cases of a removed format (Vue, Svelte, JSX, reStructuredText, Sass, Less, gettext)
     // stay, and each now asserts the "not recognised" refusal.
@@ -2003,8 +1948,6 @@ test('round 5: host elements, the element stack, stylesheet names, custom proper
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const area = (f, word) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
-  const sql = ['SELECT name FROM users', 'SELECT pass FROM admins'];
-  const pip = ['pip install requests', 'pip install reqests'];
   /** One row from a template holding `@`, replaced by the old and the new text. */
   const row = (fix, p, template, [o, n], expected) => [fix, p, template.replace('@', o), template.replace('@', n), expected];
   const shapes = [
@@ -2012,30 +1955,15 @@ test('round 5: host elements, the element stack, stylesheet names, custom proper
     // `<svg>` and `<math>` are opaque pieces and their names are no host elements), matched in
     // any letter case; an element with an `is` attribute, a custom element and an unknown name
     // hold their text.
-    row(1, 'src/pages/is.html', '<button is="run-sql">@</button>\n', sql, inexact('src/pages/is.html')),
-    row(1, 'src/pages/is-upper.html', '<P IS="x">@</P>\n', ['Save', 'Store'], inexact('src/pages/is-upper.html')),
-    row(1, 'src/pages/runsql.html', '<runsql>@</runsql>\n', sql, inexact('src/pages/runsql.html')),
-    row(1, 'src/pages/mixed.html', '<DIV>@</div>\n', ['Save', 'Store'], null),
     // Passes until the sixth round: `<svg>` and `<math>` are opaque pieces now, so text
     // inside them no longer qualifies (the session's decision of 2026-10-09, item 3).
-    row(1, 'src/pages/svg-text.html', '<svg><text>@</text><foreignObject><p>x</p></foreignObject></svg>\n', ['Save', 'Store'], inexact('src/pages/svg-text.html')),
-    row(1, 'src/pages/math.html', '<math><mtext>@</mtext></math>\n', ['Save', 'Store'], inexact('src/pages/math.html')),
     // 2. A stack of open elements: an end tag that does not close the top of the stack while
     // an element that holds text is open cannot be followed.
-    row(2, 'src/pages/stack.html', '<run-sql><div></run-sql>@</div></run-sql>\n', sql, inexact('src/pages/stack.html')),
-    row(2, 'src/pages/implied.html', '<ul><li>One<li>@</ul>\n<p>a<br>b</p>\n', ['Save', 'Store'], null),
     // A pass until the review of 2026-10-09: an end tag that closes nothing is outside the
     // strict subset (the reviewer's general rule; a browser makes an empty element for `</p>`).
-    row(2, 'src/pages/stray.html', '<p>@</p></b></p>\n', ['Save', 'Store'], inexact('src/pages/stray.html')),
-    row(2, 'src/pages/held-implied.html', '<my-card><p>one<p>two</my-card>\n<p>@</p>\n', ['Save', 'Store'], inexact('src/pages/held-implied.html')),
-    row(2, 'src/pages/self-closed.html', '<my-widget/>\n<p>@</p>\n', ['Save', 'Store'], inexact('src/pages/self-closed.html')),
     // A pass until the sixth round: a brace inside a tag is outside the strict HTML subset
     // (the session's decision of 2026-10-09, item 1; a browser knows no braces).
-    row(2, 'src/pages/braced.html', '<p data-x={a} data-y={`b`}>@</p>\n', ['Save', 'Store'], inexact('src/pages/braced.html')),
-    row(2, 'src/pages/after-held.html', '<my-card><p>one</p></my-card>\n<p>@</p>\n', ['Save', 'Store'], null),
     // 7. `listing` and `tt` are code elements.
-    row(7, 'src/pages/listing.html', '<listing>@</listing>\n', pip, un('src/pages/listing.html')),
-    row(7, 'src/pages/tt.html', '<p>Run <tt>@</tt></p>\n', pip, un('src/pages/tt.html')),
     // 8. A stylesheet's own name: a sensitive word still counts, its plural does not.
     row(8, 'src/styles/login.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/login.css', 'login')),
     row(8, 'src/styles/payment.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/payment.css', 'payment')),
@@ -2084,72 +2012,24 @@ test('round 5: host elements, the element stack, stylesheet names, custom proper
 // camel-case paths, and the functional plan's sentence for a change the check cannot read
 // exactly. Each row marked `red` answered otherwise on `5326daae`; the others are guards.
 // [item, path, base content, new content, the clause, or null for `checking`]
-test('round 6: the strict HTML subset, folded paths, the cannot-read-exactly sentence', async () => {
+test('round 6: folded paths, colours that are no whole value, the cannot-read-exactly sentence', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const area = (f, word) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
-  const sql = ['SELECT name FROM users', 'SELECT pass FROM admins'];
-  const pip = ['pip install requests', 'pip install reqests'];
-  const save = ['Save', 'Store'];
-  const run = ['run()', 'drop()'];
   /** One row from a template holding `@`, replaced by the old and the new text. */
   const row = (item, p, template, [o, n], expected) => [item, p, template.replace('@', o), template.replace('@', n), expected];
   const shapes = [
     // 1. A brace inside a tag is outside the subset; in text it is a plain character.
-    row(1, 'src/pages/brace-tag.html', '<button { is="run-sql" }>@</button>\n', sql, exact('src/pages/brace-tag.html')),
-    row(1, 'src/pages/brace-el.html', '{<run-sql>}<span>@</span></run-sql>\n', sql, exact('src/pages/brace-el.html')),
-    row(1, 'src/pages/brace-script.html', '{<script>/*}<b></b>*/ @ /*<b></b>*/</script>\n', run, un('src/pages/brace-script.html')),
-    row(1, 'src/pages/brace-quoted.html', '<p title="{a}">@</p>\n', save, exact('src/pages/brace-quoted.html')),
-    row(1, 'src/pages/brace-text.html', '<p>{a}</p>\n<p>@</p>\n', save, null),
-    row(1, 'src/pages/brace-same.html', '<p>{a} @</p>\n', save, un('src/pages/brace-same.html')),
     // 2. Anything starting `<!` but `<!DOCTYPE html>` and a standard comment; `<?`; `</` before
     // no letter; the same inside a script block; a closing tag ends only before HTML white space.
-    row(2, 'src/pages/comment-abrupt.html', '<!--><run-sql>--><span>@</span></run-sql>\n', sql, exact('src/pages/comment-abrupt.html')),
-    row(2, 'src/pages/comment-abrupt-dash.html', '<!---><run-sql>--><span>@</span></run-sql>\n', sql, exact('src/pages/comment-abrupt-dash.html')),
-    row(2, 'src/pages/comment-bang.html', '<!-- a --!><run-sql> --><span>@</span></run-sql>\n', sql, exact('src/pages/comment-bang.html')),
-    row(2, 'src/pages/comment-nested.html', '<!-- a <!-- b --><p>@</p>\n', save, exact('src/pages/comment-nested.html')),
-    row(2, 'src/pages/cdata.html', '<![CDATA[><run-sql>]]><span>@</span></run-sql>\n', sql, exact('src/pages/cdata.html')),
-    row(2, 'src/pages/php.html', '<?php echo 1 ?><p>@</p>\n', save, exact('src/pages/php.html')),
-    row(2, 'src/pages/bogus.html', '<!x><p>@</p>\n', save, exact('src/pages/bogus.html')),
-    row(2, 'src/pages/bogus-end.html', '</ x><p>@</p>\n', save, exact('src/pages/bogus-end.html')),
-    row(2, 'src/pages/doctype-legacy.html', '<!DOCTYPE html PUBLIC "x">\n<p>@</p>\n', save, exact('src/pages/doctype-legacy.html')),
-    row(2, 'src/pages/script-abrupt.html', '<script><!--> x</script>\n<p>@</p>\n', save, exact('src/pages/script-abrupt.html')),
-    row(2, 'src/pages/script-nested.html', '<script><!-- a <!-- b --></script>\n<p>@</p>\n', save, exact('src/pages/script-nested.html')),
-    row(2, 'src/pages/script-bang.html', '<script><!-- a --!> b --></script>\n<p>@</p>\n', save, exact('src/pages/script-bang.html')),
-    row(2, 'src/pages/script-space.html', '<script>x</script ><b></b>@<b></b></script>\n', run, un('src/pages/script-space.html')),
-    row(2, 'src/pages/style-space.html', '<style>x</style ><b></b>@<b></b></style>\n', save, un('src/pages/style-space.html')),
-    row(2, 'src/pages/doctype.html', '<!DocType HTML>\n<!-- a - b -- c -->\n<!---->\n<p>@</p>\n', save, null),
-    row(2, 'src/pages/script-comment.html', '<script><!--\nx();\n//--></script>\n<p>@</p>\n', save, null),
     // 3. `<svg>` and `<math>` are opaque from their start tag to their matching end tag; the
     // host elements are HTML's only; inside foreign content nothing HTML is followed.
-    row(3, 'src/pages/svg-pre.html', '<svg><style><pre></style><span>@</span></pre></svg>\n', pip, exact('src/pages/svg-pre.html')),
-    row(3, 'src/pages/unknown.html', '<unknown>@</unknown>\n', save, exact('src/pages/unknown.html')),
-    row(3, 'src/pages/set.html', '<set>@</set>\n', save, exact('src/pages/set.html')),
-    row(3, 'src/pages/text.html', '<text>@</text>\n', save, exact('src/pages/text.html')),
-    row(3, 'src/pages/svg-open.html', '<svg><g>\n<p>@</p>\n', save, exact('src/pages/svg-open.html')),
-    row(3, 'src/pages/svg-title-tag.html', '<svg><title><b></title></svg>\n<p>@</p>\n', save, exact('src/pages/svg-title-tag.html')),
-    row(3, 'src/pages/svg-foreign-object.html', '<svg><foreignObject><p>x</p></foreignObject></svg>\n<p>@</p>\n', save, exact('src/pages/svg-foreign-object.html')),
-    row(3, 'src/pages/svg-unquoted.html', '<svg><g x=1/></svg>\n<p>@</p>\n', save, exact('src/pages/svg-unquoted.html')),
-    row(3, 'src/pages/svg-after.html', '<svg viewBox="0 0 1 1"><title>Close</title><g><path d="M0 0"/></g></svg>\n<math><mi>x</mi></math>\n<svg/>\n<p>@</p>\n', save, null),
-    row(3, 'src/pages/svg-label.html', '<p>Save</p>\n<svg><title>@</title></svg>\n', ['Close', 'Shut'], exact('src/pages/svg-label.html')),
     // Inside `<select>` only options are followed: an older parser ignores every other tag there.
-    row(3, 'src/pages/select-style.html', '<select><style><script>/*</style>*/ @ /*<b></b>*/</script></select>\n', run, exact('src/pages/select-style.html')),
-    row(3, 'src/pages/select-end.html', '<div><select></div><style><script>/*</style>*/ @ /*<b></b>*/</script>\n', run, exact('src/pages/select-end.html')),
-    row(3, 'src/pages/select-ok.html', '<select><optgroup label="a"><option value="m">@</option></optgroup><hr></select>\n', ['Middle', 'Medium'], null),
     // An element never closed is outside the subset (the functional plan's scenario); an end
     // tag that closes several elements is everyday HTML.
-    row(4, 'src/pages/open-div.html', '<div>\n<p>@</p>\n', save, exact('src/pages/open-div.html')),
-    row(4, 'src/pages/implied-list.html', '<ul><li>One<li>@</ul>\n', save, null),
-    row(4, 'src/pages/card.html', '<my-card>@</my-card>\n', save, exact('src/pages/card.html')),
     // 9 and 10. The path is folded (Unicode NFKC, lower case) and split at every character
     // that is no letter; camel-case sub-words count as words too.
-    row(9, 'ＡＵＴＨ/index.html', '<p>@</p>\n', save, area('ＡＵＴＨ/index.html', 'auth')),
-    row(9, 'src/état/index.html', '<p>@</p>\n', save, null),
-    row(10, 'src/pages/AuthPanel.html', '<p>@</p>\n', save, area('src/pages/AuthPanel.html', 'auth')),
-    row(10, 'src/pages/paymentForm.html', '<p>@</p>\n', save, area('src/pages/paymentForm.html', 'payment')),
-    row(10, 'src/pages/userTokens.html', '<p>@</p>\n', save, area('src/pages/userTokens.html', 'token')),
-    row(10, 'src/pages/Author.html', '<p>@</p>\n', save, null),
     // A pass until the tenth round: a sensitive word counts anywhere inside a part of the path.
     row(10, 'src/styles/brandTokens.css', 'a { color: @; }\n', ['red', 'blue'], area('src/styles/brandTokens.css', 'token')),
     // The functional plan's fifth case: a colour that is not the whole value of a colour
@@ -2177,96 +2057,13 @@ test('round 6: the strict HTML subset, folded paths, the cannot-read-exactly sen
   }
   assert.deepEqual(wrong, []);
   // The sentence a person reads is one plain sentence, and the log keeps today's cause words.
-  fs.writeFileSync(path.join(root, 'src/pages/card.html'), '<my-card>Store</my-card>\n');
-  assert.equal((await check(root, 'src/pages/card.html')).text,
-    'I did not treat this as a hotfix because it changes src/pages/card.html in a way the check cannot read exactly, '
+  fs.writeFileSync(path.join(root, 'src/styles/border.css'), '.save { border: 1px solid #0b5ed7; }\n');
+  assert.equal((await check(root, 'src/styles/border.css')).text,
+    'I did not treat this as a hotfix because it changes src/styles/border.css in a way the check cannot read exactly, '
     + 'and only what it can read exactly qualifies; it goes through a normal plan, and your edits stay in place, not committed.');
-  fs.writeFileSync(path.join(root, 'src/pages/open-div.html'), '<div>\n<p>Store</p>\n');
-  await check(root, 'src/pages/open-div.html');
   fs.writeFileSync(path.join(root, 'src/styles/two-tokens.css'), ':root { --brand-color: red url(x); }\n');
   await check(root, 'src/styles/two-tokens.css');
-  assert.deepEqual(logLines(root).slice(-3).map((l) => l.cause), ['unrecognised', 'unreadable', 'setting']);
-});
-
-// The seventh round (2026-10-09, the decision at review): the reader is held to real parsers
-// by the differential test (tests/hotfix-check-differential.test.js); these rows pin the
-// classes it found and the three false refusals it let go. Each row marked `red` answered
-// otherwise on `e43ea9ae`; the others are guards.
-// [item, path, base content, new content, the clause, or null for `checking`]
-test('round 7: names, frames, options, noscript, end tags, text over lines and beside comments', async () => {
-  const un = (f) => `I do not recognise ${f} as wording or a colour`;
-  const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
-  const save = ['Save', 'Store'];
-  const pip = ['pip install requests', 'pip install reqests'];
-  const row = (item, p, template, [o, n], expected) => [item, p, template.replace('@', o), template.replace('@', n), expected];
-  const shapes = [
-    // 1. Names are lower-cased in ASCII only: `lin` with the Kelvin sign is no `link` (red).
-    row(1, 'src/pages/kelvin.html', '<linK>@</linK>\n', save, exact('src/pages/kelvin.html')),
-    row(1, 'src/pages/upper-link.html', '<LINK rel="x"><p>@</p>\n', save, null),
-    // 2. `<frameset>` and `<frame>` refuse the file: a browser may drop the body for them (red).
-    row(2, 'src/pages/frames.html', '<div></div><frameset></frameset>\n<p>@</p>\n', save, exact('src/pages/frames.html')),
-    // 3. Inside a `<select>` text is wording only in an `<option>` with a `value` (red); an
-    // `<option>` on top of the stack is closed by the next one and by the end of its list.
-    row(3, 'src/pages/select-text.html', '<select>@</select>\n', ['Choose', 'Pick'], un('src/pages/select-text.html')),
-    row(3, 'src/pages/option-text.html', '<select><option>@</select>\n', ['Small', 'Little'], un('src/pages/option-text.html')),
-    row(3, 'src/pages/option-valued.html', '<select><option value="a">@<option value="b">Two<hr><optgroup label="x"><option value="c">Three</select>\n', ['One', 'First'], null),
-    row(3, 'src/pages/datalist.html', '<datalist><option value="a">@<option value="b">Two</datalist>\n', ['One', 'First'], null),
-    // 4. The content of `<noscript>` must itself be markup of the subset, every element
-    // closed: a browser without scripting reads it as markup (red).
-    row(4, 'src/pages/noscript-open.html', '<noscript><code></noscript><p>@</p></code>\n', pip, exact('src/pages/noscript-open.html')),
-    row(4, 'src/pages/noscript-comment.html', '<noscript><!-- </noscript> --></noscript><p>@</p>\n', save, exact('src/pages/noscript-comment.html')),
-    row(4, 'src/pages/noscript-ok.html', '<noscript><img src="/pixel.png" alt=""></noscript>\n<p>@</p>\n', save, null),
-    // 5. An end tag closes the element on top of the stack, or the elements that may leave
-    // their end tag out before it; every other end tag refuses the file (red), and so does a
-    // start tag for which a browser would close an element that is not on top (red).
-    row(5, 'src/pages/misnested.html', '<b><p>One</b>@</p>\n', save, exact('src/pages/misnested.html')),
-    row(5, 'src/pages/stray-end.html', '<p>@</p></div>\n', save, exact('src/pages/stray-end.html')),
-    row(5, 'src/pages/through.html', '<p><span>One<div>@</div></span></p>\n', save, exact('src/pages/through.html')),
-    row(5, 'src/pages/second-link.html', '<a href="/a"><span>One<a href="/b">@</a></span></a>\n', save, exact('src/pages/second-link.html')),
-    row(5, 'src/pages/list-through.html', '<ul><li><span>One<li>@</span></ul>\n', save, exact('src/pages/list-through.html')),
-    row(5, 'src/pages/form-in-form.html', '<form><div><form>One</form>@</div></form>\n', save, exact('src/pages/form-in-form.html')),
-    row(5, 'src/pages/cell-alone.html', '<div><td>@</td></div>\n', save, exact('src/pages/cell-alone.html')),
-    row(5, 'src/pages/table-in-table.html', '<table><tr><td>One</td></tr><table><tr><td>@</td></tr></table></table>\n', save, exact('src/pages/table-in-table.html')),
-    row(5, 'src/pages/column-text.html', '<table><colgroup>x</colgroup><tr><td>@</td></tr></table>\n', save, exact('src/pages/column-text.html')),
-    row(5, 'src/pages/ruby-through.html', '<ruby>a<p>b<rt>@</ruby>\n', save, exact('src/pages/ruby-through.html')),
-    row(5, 'src/pages/after-body.html', '<html><body><p>One</p></body>@</html>\n', save, exact('src/pages/after-body.html')),
-    row(5, 'src/pages/body-is.html', '<p>@</p>\n<body is="x"></body>\n', save, exact('src/pages/body-is.html')),
-    // The end tags that may be left out, each as the HTML parser reads it (guards).
-    row(5, 'src/pages/ends-list.html', '<ul><li><p>One<li>@</ul>\n<ol><li>a</li><li>b</ol>\n', save, null),
-    row(5, 'src/pages/ends-paragraph.html', '<div><p>One<p>@</div>\n<blockquote><p>q</blockquote>\n', save, null),
-    row(5, 'src/pages/ends-definitions.html', '<dl><dt>One<dd>@<dt>a<dd>b</dl>\n', save, null),
-    row(5, 'src/pages/ends-ruby.html', '<ruby>a<rp>(<rt>@<rp>)</ruby>\n', save, null),
-    row(5, 'src/pages/ends-table.html', '<table><caption>c<colgroup><col><thead><tr><th>@<tbody><tr><td>a<td>b<tr><td>c<tfoot><tr><td>d</table>\n', save, null),
-    row(5, 'src/pages/ends-document.html', '<!DOCTYPE html>\n<html><head><title>T</title><body><h1>One<h2>@</h2><p>last</html>\n', save, null),
-    row(5, 'src/pages/closes-own.html', '<p><a href="/a">One<a href="/b">@</a></p>\n<button>x<button>y</button>\n', save, null),
-    // A table in a paragraph: under `<!DOCTYPE html>` it closes the paragraph, without one a
-    // browser nests it (quirks mode), so the paragraph's `is` attribute holds its text.
-    row(5, 'src/pages/standards-table.html', '<!DOCTYPE html>\n<p is="x">One<table><tr><td>@</td></tr></table>\n', save, null),
-    row(5, 'src/pages/quirks-table.html', '<p is="x">One<table><tr><td>@</td></tr></table></p>\n', save, exact('src/pages/quirks-table.html')),
-    // 6. The three false refusals let go: text over several lines (red), a plain character
-    // reference in the changed sentence (red), text beside a comment (red).
-    row(6, 'src/pages/two-lines.html', '<p>\n  @ your work\n  now\n</p>\n', save, null),
-    row(6, 'src/pages/reference.html', '<p>Terms &amp; @ &mdash; read them&hellip;</p>\n', ['rules', 'conditions'], null),
-    row(6, 'src/pages/beside-comment.html', '<p>Save<!-- note --> @</p>\n', ['now', 'today'], null),
-    // A reference that may spell a digit, a currency sign or an `@`, or lacks its semicolon, still refuses.
-    row(6, 'src/pages/reference-at.html', '<p>Mail us &commat; @</p>\n', ['home', 'work'], un('src/pages/reference-at.html')),
-    row(6, 'src/pages/reference-open.html', '<p>Terms &amp @</p>\n', ['rules', 'conditions'], un('src/pages/reference-open.html')),
-    // Text that comes or goes whole is no reworded text.
-    row(6, 'src/pages/emptied.html', '<table>@<tr><td>a</td></tr></table>\n', ['x', ' '], un('src/pages/emptied.html'))
-  ];
-  const base = {};
-  for (const [, p, b] of shapes) base[p] = b;
-  const root = makeRepo(base);
-  const wrong = [];
-  for (const [item, p, b, n, expected] of shapes) {
-    fs.writeFileSync(path.join(root, ...p.split('/')), n);
-    const res = await check(root, p);
-    fs.writeFileSync(path.join(root, ...p.split('/')), b);
-    const want = expected === null ? STATUS_LINE : refusal(expected);
-    if (res.text !== want) wrong.push(`item ${item} ${p}: ${res.verdict === 'checking' ? 'checking' : res.text}`);
-    else if (expected === null) assertChecking(res, [p]);
-  }
-  assert.deepEqual(wrong, []);
+  assert.deepEqual(logLines(root).slice(-2).map((l) => l.cause), ['unrecognised', 'setting']);
 });
 
 // The ninth round (2026-10-09, decisions at review): the size rule runs once the kind of every
@@ -2275,27 +2072,25 @@ test('round 7: names, frames, options, noscript, end tags, text over lines and b
 // Markdown rows of the ninth round: a raw start tag anywhere, colons, parentheses, list items.)
 // [item, path, base content, new content, the clause]
 test('round 9: the size rule runs before the content rules, and after the kind of each file', async () => {
-  const exact = (f) => `it changes ${f} in a way the check cannot read exactly, and only what it can read exactly qualifies`;
   const size = (n, m) => `it changes ${n} lines in ${m} ${m === 1 ? 'file' : 'files'} and a hotfix is at most 20 lines in at most 3 files`;
   const reworded = (n, wrap = (l) => l) => [Array.from({ length: n }, (_, i) => wrap(`Old line ${String.fromCharCode(97 + i)}`)).join('\n'),
     Array.from({ length: n }, (_, i) => wrap(`New line ${String.fromCharCode(97 + i)}`)).join('\n')];
   const [oldEleven, newEleven] = reworded(11);
-  const [oldPages, newPages] = reworded(11, (l) => `<p>${l}</p>`);
   const [oldColours, newColours] = [Array.from({ length: 11 }, (_, i) => `.a${i} { color: red; }`).join('\n'),
     Array.from({ length: 11 }, (_, i) => `.a${i} { color: blue; }`).join('\n')];
   const shapes = [
     // A change over the limit that a reader would also refuse gets the size clause (red);
     // under the limit it gets the reader's.
-    ['size', 'src/pages/r9-grown.html', '<p>A line.</p>\n', `<p>A line.</p>\n${'<p>One more line.</p>\n'.repeat(21)}`, size(21, 1)],
-    ['size', 'src/pages/r9-open.html', `<div>\n${oldPages}\n`, `<div>\n${newPages}\n`, size(22, 1)],
+    ['size', 'src/styles/r9-grown.css', 'a { color: red; }\n', `a { color: red; }\n${'b { color: red; }\n'.repeat(21)}`, size(21, 1)],
     ['size', 'src/styles/r9-extra.css', `${oldColours}\n}\n`, `${newColours}\n}\n`, size(22, 1)],
-    ['size', 'src/pages/r9-small-open.html', '<div>\n<p>The old words.</p>\n', '<div>\n<p>The new words.</p>\n', exact('src/pages/r9-small-open.html')],
+    ['size', 'src/styles/r9-small-extra.css', 'a { color: red; }\n}\n', 'a { color: blue; }\n}\n', 'I could not read the change (src/styles/r9-small-extra.css holds something I cannot follow)'],
     // The kind of a file is still named ahead of its size (guards).
     ['size', 'src/r9/cart.js', `${oldEleven}\n`, `${newEleven}\n`, 'it changes program logic in src/r9/cart.js, and only wording and colours qualify'],
     ['size', 'src/r9/Page.vue', `${oldEleven}\n`, `${newEleven}\n`, gone('src/r9/Page.vue')],
     ['size', 'docs/r9.md', `${oldEleven}\n`, `${newEleven}\n`, gone('docs/r9.md')],
     ['size', 'locales/r9/en.yml', `${oldEleven.replace(/^/gm, 'k: ')}\n`, `${newEleven.replace(/^/gm, 'k: ')}\n`, SETTING('locales/r9/en.yml')],
-    ['size', 'agents/r9.html', `${oldPages}\n`, `${newPages}\n`, gone('agents/r9.html')]
+    ['size', 'src/pages/r9.html', `${oldEleven}\n`, `${newEleven}\n`, gone('src/pages/r9.html')],
+    ['size', 'agents/r9.css', `${oldColours}\n`, `${newColours}\n`, gone('agents/r9.css')]
   ];
   const base = {};
   for (const [, p, b] of shapes) {
@@ -2325,7 +2120,6 @@ test('round 9: names that are dependencies, the build or settings; the wording r
   const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
   const build = (f) => `it changes how the project is built or shipped in ${f}`;
   const deps = (f) => `it changes the dependencies in ${f}`;
-  const risk = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
   const json = (o) => `${JSON.stringify(o, null, 2)}\n`;
   const shapes = [
     // 1. A dependency, build or settings name, in any letter case, wherever the file lies.
@@ -2361,14 +2155,10 @@ test('round 9: names that are dependencies, the build or settings; the wording r
     ['tag', 'translations/Strings.json', json({ home: 'Start' }), json({ home: 'Begin' }), setting('translations/Strings.json')],
     ['tag', 'messages/labels_en-US.yml', 'home: Start\n', 'home: Begin\n', setting('messages/labels_en-US.yml')],
     // The same rule in HTML text.
-    ['wording', 'src/pages/r9-host.html', '<p>See account.example.com now</p>\n', '<p>See account.example.net now</p>\n', risk('src/pages/r9-host.html')],
-    ['wording', 'src/pages/r9-scheme.html', '<p>Write to us</p>\n', '<p>Write mailto:us</p>\n', risk('src/pages/r9-scheme.html')],
-    ['wording', 'src/pages/r9-numeral.html', '<p>Step two</p>\n', '<p>Step \u2461</p>\n', risk('src/pages/r9-numeral.html')],
     // 6. A byte-order mark on one side only, or another number of carriage returns (red for
     // the stylesheet; an HTML page was let through with every line ending changed).
     ['mark', 'src/styles/r9-mark.css', 'a { color: red; }\n', '\ufeffa { color: blue; }\n', un('src/styles/r9-mark.css')],
     ['mark', 'src/styles/r9-returns.css', 'a { color: red; }\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n', un('src/styles/r9-returns.css')],
-    ['mark', 'src/pages/r9-returns.html', '<p>Save</p>\n<p>More</p>\n', '<p>Store</p>\n<p>More</p>\r\n', un('src/pages/r9-returns.html')]
   ];
   const base = {};
   for (const [, p, b] of shapes) {
@@ -2495,40 +2285,36 @@ test('round 9: stylesheets — brackets, statements outside the subset, escapes,
 test('round 9: paths and names — governing folders, sensitive words in every spelling, byte-order marks and line endings', async () => {
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const area = (word) => (f) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
-  const PAGE = [HOME, HOME_STORE];
   const COLOUR = ['a { color: red; }\n', 'a { color: blue; }\n'];
   // [what the row shows, path, [before, after], the clause, or null for the first call's `checking`]
   const rows = [
     // 1. The folders that govern the work, in any letter case and at any depth (red: `checking`).
-    ['governing folder', 'prompts/intro.html', PAGE, un],
-    ['governing folder', 'docs/Prompts/tone.html', PAGE, un],
+    ['governing folder', 'prompts/intro.css', COLOUR, un],
+    ['governing folder', 'docs/Prompts/tone.css', COLOUR, un],
     ['governing folder', 'output-styles/terse.css', COLOUR, un],
-    ['governing folder', 'site/output-styles/page.html', PAGE, un],
-    ['governing folder', 'site/skills/page.html', PAGE, un],
+    ['governing folder', 'site/output-styles/site.css', COLOUR, un],
+    ['governing folder', 'site/skills/site.css', COLOUR, un],
     ['governing folder', '.claude/theme/page.css', COLOUR, un],
-    // 2. A file an instruction file of the last commit names governs the work (B21: a plain
-    // search for its base name; the reader of link syntax is gone with the Markdown reader).
-    ['named', 'docs/linked.md', ['Some words here.\n', 'Some other words here.\n'], un],
-    ['named', 'site/linked one.html', PAGE, un],
-    ['named', 'src/styles/linked.css', COLOUR, un],
-    // The search is for the base name anywhere: `one.html` ends the name above, so it is named too.
-    ['named', 'site/one.html', PAGE, un],
-    ['named', 'site/unnamed.html', PAGE, null],
+    // 2. A file an instruction file links to or names is judged like any other (the reader of
+    // links went with the Markdown reader, and the search for a name with the re-check of
+    // 2026-10-10); a Markdown file is refused by its extension.
+    ['linked', 'docs/linked.md', ['Some words here.\n', 'Some other words here.\n'], un],
+    ['linked', 'src/styles/linked.css', COLOUR, null],
     // 3. A sensitive word behind capitals, a mark or a character nobody sees (red: `checking`).
-    ['sensitive word', 'src/APIKey/page.html', PAGE, area('key')],
-    ['sensitive word', 'src/SSOLogin/page.html', PAGE, area('login')],
-    ['sensitive word', 'src/JWTToken/page.html', PAGE, area('token')],
-    ['sensitive word', 'src/UIAdmin/page.html', PAGE, area('admin')],
-    ['sensitive word', 'src/HTMLAuth/page.html', PAGE, area('auth')],
-    ['sensitive word', 'src/pay\u200bment/page.html', PAGE, area('payment')],
-    ['sensitive word', 'src/p\u00e1yment/page.html', PAGE, area('payment')],
+    ['sensitive word', 'src/APIKey/site.css', COLOUR, area('key')],
+    ['sensitive word', 'src/SSOLogin/site.css', COLOUR, area('login')],
+    ['sensitive word', 'src/JWTToken/site.css', COLOUR, area('token')],
+    ['sensitive word', 'src/UIAdmin/site.css', COLOUR, area('admin')],
+    ['sensitive word', 'src/HTMLAuth/site.css', COLOUR, area('auth')],
+    ['sensitive word', 'src/pay\u200bment/site.css', COLOUR, area('payment')],
+    ['sensitive word', 'src/p\u00e1yment/site.css', COLOUR, area('payment')],
     ['sensitive word', 'src/styles/payments.css', COLOUR, area('payment')],
     ['sensitive word', 'src/styles/keys.css', COLOUR, area('key')],
     // Words that hold one refuse since the tenth round (both passed until then); a part that is
     // exactly `author`, and the one plural a stylesheet's name may carry, pass (guards).
-    ['sensitive word', 'src/HTMLAuthor/page.html', PAGE, area('auth')],
-    ['sensitive word', 'src/APIKeyboard/page.html', PAGE, area('key')],
-    ['sensitive word', 'src/author/page.html', PAGE, null],
+    ['sensitive word', 'src/HTMLAuthor/site.css', COLOUR, area('auth')],
+    ['sensitive word', 'src/APIKeyboard/site.css', COLOUR, area('key')],
+    ['sensitive word', 'src/author/site.css', COLOUR, null],
     ['sensitive word', 'src/styles/design-tokens.css', COLOUR, null],
     // 4. A byte-order mark on one side only, or another count of carriage returns, in a
     // stylesheet (red: `checking`).
@@ -2536,7 +2322,7 @@ test('round 9: paths and names — governing folders, sensitive words in every s
     ['mark and line ending', 'src/styles/ending.css', ['a { color: red; }\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n'], un],
     ['mark and line ending', 'src/styles/both.css', ['\ufeffa { color: red; }\r\n', '\ufeffa { color: blue; }\r\n'], null]
   ];
-  const base = { 'CLAUDE.md': '# Instructions\n\nRead [the guide](docs/linked.md) and [the page](<site/linked one.html>).\n@src/styles/linked.css\n',
+  const base = { 'CLAUDE.md': '# Instructions\n\nRead [the guide](docs/linked.md) and [the page](src/styles/linked.css).\n@src/styles/linked.css\n',
     'AGENTS.md': 'Follow [the colours](src/styles/linked.css).\n' };
   for (const [, p, [before]] of rows) base[p] = before;
   const root = makeRepo(base);
@@ -2557,8 +2343,9 @@ test('round 9: a long path is read in time proportional to its size', async (t) 
   // A folder name of capitals, small letters, marks and characters nobody sees: every piece is one sub-word.
   const piece = `aB${String.fromCharCode(0x301, 0x200b)}`;
   const longPath = (n) => {
-    const change = changeOf(`src/${piece.repeat(256 * n)}/page.html`, HOME, HOME_STORE);
-    return () => assert.equal(ruleRefusal(change), null);
+    const change = changeOf(`src/${piece.repeat(256 * n)}/site.css`, HOME, HOME_STORE);
+    // Read to its end in every form, then refused for the characters nobody sees (since the re-check of 2026-10-10).
+    return () => assert.equal(ruleRefusal(change).cause, 'unrecognised');
   };
   const name = await growth(longPath, 16, 1600);
   t.diagnostic(`a path of ${name.n} KiB: ${name.small.toFixed(1)} ms, ${4 * name.n} KiB: ${name.big.toFixed(1)} ms, ${name.ratio.toFixed(1)} times as long`);
@@ -2566,12 +2353,12 @@ test('round 9: a long path is read in time proportional to its size', async (t) 
 });
 
 test('round 9: an added or deleted path is refused before anything is staged, so no untracked file reaches the object store', async () => {
-  const root = makeRepo({ 'src/pages/home.html': HOME, 'docs/old.md': 'Old.\nWords.\n' });
+  const root = makeRepo({ 'src/styles/home.css': HOME, 'docs/old.md': 'Old.\nWords.\n' });
   const objects = () => git(root, ['count-objects', '-v']);
   const last = () => withoutTime(logLines(root)).pop();
   // A 40 MiB file nobody has added (655,360 lines), beside a wording change.
   fs.writeFileSync(path.join(root, 'big.txt'), `${'x'.repeat(63)}\n`.repeat(40 * 16384));
-  fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+  fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
   let before = objects();
   assert.equal((await check(root)).text, refusal('it adds, removes or renames big.txt'));
   assert.equal(objects(), before, 'the unnamed first call wrote nothing to the object store');
@@ -2605,16 +2392,16 @@ test('round 9: an added or deleted path is refused before anything is staged, so
 
 test('round 9: the copy is removed whatever the tests leave in it, and a removal that fails keeps both ends of its reason', async (t) => {
   await t.test('a test that leaves folders nobody may write to, or read', async () => {
-    const locking = nodeTest('has a button', "  assert.ok(read('src/pages/home.html').includes('<button>'));", { prelude: [
+    const locking = nodeTest('has a rule', "  assert.ok(read('src/styles/home.css').includes('.save'));", { prelude: [
       "fs.mkdirSync(path.join(process.cwd(), 'locked', 'inner'), { recursive: true });",
       "fs.writeFileSync(path.join(process.cwd(), 'locked', 'inner', 'kept.txt'), 'x');",
       "fs.chmodSync(path.join(process.cwd(), 'locked', 'inner'), 0o000);",
       "fs.chmodSync(path.join(process.cwd(), 'locked'), 0o555);"
     ].join('\n') });
-    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': locking }, { testScript: SCRIPT });
+    const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': locking }, { testScript: SCRIPT });
     const before = worktrees(root);
-    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
-    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
+    const res = await check(root, '--run-tests', 'src/styles/home.css');
     const left = leftovers();
     // Whatever the answer, this test removes what the check left, so no later test inherits it.
     const open = (dir) => {
@@ -2627,23 +2414,23 @@ test('round 9: the copy is removed whatever the tests leave in it, and a removal
     }
     git(root, ['worktree', 'prune']);
     assert.deepEqual(left, [], `the copy is gone: ${JSON.stringify(res.detail)}`);
-    assertPass(res, ['src/pages/home.html']);
+    assertPass(res, ['src/styles/home.css']);
     assert.equal(worktrees(root), before);
   });
   await t.test('a folder the check cannot open is left to the removal, which names it', async () => {
-    const locking = nodeTest('has a button', "  assert.ok(read('src/pages/home.html').includes('<button>'));", { prelude: [
+    const locking = nodeTest('has a rule', "  assert.ok(read('src/styles/home.css').includes('.save'));", { prelude: [
       "fs.mkdirSync(path.join(process.cwd(), 'locked'));",
       "fs.writeFileSync(path.join(process.cwd(), 'locked', 'kept.txt'), 'x');",
       "fs.chmodSync(path.join(process.cwd(), 'locked'), 0o555);"
     ].join('\n') });
-    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': locking }, { testScript: SCRIPT });
-    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': locking }, { testScript: SCRIPT });
+    fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
     const realChmod = fs.chmodSync;
     t.mock.method(fs, 'chmodSync', (p, mode) => {
       if (String(p).includes('ctoc-hotfix-')) throw Object.assign(new Error('EPERM: operation not permitted'), { code: 'EPERM' });
       return realChmod(p, mode);
     });
-    const res = await check(root, '--run-tests', 'src/pages/home.html');
+    const res = await check(root, '--run-tests', 'src/styles/home.css');
     t.mock.restoreAll();
     const left = leftovers();
     for (const name of left) {
@@ -2661,14 +2448,14 @@ test('round 9: the copy is removed whatever the tests leave in it, and a removal
   await t.test('a removal that still fails names the start and the end of its reason', async () => {
     const root = testedProject();
     const probe = probeDir();
-    fs.writeFileSync(path.join(root, 'src', 'pages', 'home.html'), HOME_STORE);
+    fs.writeFileSync(path.join(root, 'src', 'styles', 'home.css'), HOME_STORE);
     const reason = `EACCES: permission denied, rmdir '${'/a-folder-with-a-long-name'.repeat(12)}/the-last-folder'`;
     const realRm = fs.rmSync;
     t.mock.method(fs, 'rmSync', (p, options) => {
       if (path.basename(String(p)).startsWith('ctoc-hotfix-')) throw Object.assign(new Error(reason), { code: 'EACCES' });
       return realRm(p, options);
     });
-    const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/pages/home.html'));
+    const res = await withEnv({ CTOC_HOTFIX_PROBE: probe }, () => check(root, '--run-tests', 'src/styles/home.css'));
     t.mock.restoreAll();
     const parent = copyParent(probeRead(probe));
     assert.equal(res.verdict, 'hotfix');
@@ -2690,9 +2477,6 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
       ['CSS', 'src/styles/old.css', 'a { color: red; }\nb { margin: 0; \n', 'a { color: blue; }\nb { margin: 0; }\n', open],
       ['CSS', 'src/styles/comment.css', 'a { color: red; }\n/* open\n', 'a { color: blue; }\n/* open\n', open],
       ['CSS', 'src/styles/string.css', 'a { color: red; }\nb { content: "x\n; }\n', 'a { color: blue; }\nb { content: "x\n; }\n', lost],
-      ['HTML', 'src/pages/both.html', '<p>Save</p>\n<div class="x\n', '<p>Store</p>\n<div class="x\n', inexact],
-      ['HTML', 'src/pages/new.html', '<p>Save</p>\n<p>More</p>\n', '<p>Store</p>\n<p>More</p\n', inexact],
-      ['HTML', 'src/pages/comment.html', '<p>Save</p>\n<!-- open\n', '<p>Store</p>\n<!-- open\n', inexact]
     ];
     const base = {};
     for (const [, p, before] of rows) base[p] = before;
@@ -2710,10 +2494,10 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
     assert.deepEqual(wrong, []);
   });
 
-  /** A change that passes every rule, built by hand: one wording change in a page. */
-  const passing = (rel = 'site/page.html') => ({
+  /** A change that passes every rule, built by hand: one colour in a stylesheet. */
+  const passing = (rel = 'site/page.css') => ({
     files: [{ display: rel, topRel: rel, status: 'M', oldMode: '100644', newMode: '100644', oldSha: null, oldText: HOME, newText: HOME_STORE,
-      hunks: [{ oldStart: 4, newStart: 4, removed: ['<button>Save</button>'], added: ['<button>Store</button>'] }] }],
+      hunks: [{ oldStart: 2, newStart: 2, removed: ['  background-color: #0a58ca;'], added: ['  background-color: #0b5ed7;'] }] }],
     lineCount: 2
   });
   const boom = () => { throw new Error('injected fault'); };
@@ -2727,8 +2511,7 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
       'rule 4, texts that differ without a changed line': (c) => Object.defineProperty(c.files[0], 'hunks', { get: boom }),
       'rule 4, the kind': (c) => Object.defineProperty(c.files[0], 'oldText', { get: boom }),
       'rule 3, the size': (c) => Object.defineProperty(c, 'lineCount', { get: boom }),
-      'rule 4, the content': (c) => Object.defineProperty(c.files[0], 'kind', { get: boom, set() {} }),
-      'rule 6, risk markers': (c) => Object.defineProperty(c.files[0], 'runs', { get: boom, set() {} })
+      'rule 4, the content': (c) => Object.defineProperty(c.files[0], 'kind', { get: boom, set() {} })
     };
     for (const [rule, poison] of Object.entries(inject)) {
       const change = passing();
@@ -2743,18 +2526,6 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
     });
     try {
       assert.throws(() => ruleRefusal(passing()), /injected fault/, 'rule 5, the sensitive area');
-    } finally {
-      t.mock.restoreAll();
-    }
-    // A name that is one kind as written and another in a folded form is no kind the check
-    // vouches for. No real name does that (the extension of a qualifying name is plain
-    // letters), so the second form's extension is replaced here: a page read as a stylesheet.
-    const extname = path.posix.extname;
-    let asked = 0;
-    t.mock.method(path.posix, 'extname', (name) => (name === 'page.html' && ++asked === 5 ? '.css' : extname(name)));
-    try {
-      assert.equal(ruleRefusal(passing()).clause, 'I do not recognise site/page.html as wording or a colour');
-      assert.equal(asked >= 5, true, 'the kind was asked of the second form of the path');
     } finally {
       t.mock.restoreAll();
     }
@@ -2775,20 +2546,15 @@ test('round 9: every guard fails closed — a file its reader cannot parse is re
   });
 
   await t.test('through the menu: a fault in the reading, in a rule or in the test run is "the check stopped"', async () => {
-    const root = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': PASSING_TEST }, { testScript: SCRIPT });
-    const page = ['src/pages/home.html', HOME_STORE];
-    const real = { extname: path.posix.extname, normalize: String.prototype.normalize, test: RegExp.prototype.test };
+    const root = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': PASSING_TEST }, { testScript: SCRIPT });
+    const page = ['src/styles/home.css', HOME_STORE];
+    const real = { extname: path.posix.extname, normalize: String.prototype.normalize };
     // [where the fault is injected, the judged file, the arguments before it, how to inject]
     const faults = [
       ['rule 1, the copy of the index', page, [], () => t.mock.method(safeFs, 'cpSync', boom)],
-      ['rule 7, the name of the judged file', page, [], () => t.mock.method(path.posix, 'extname', (p) => (p === 'home.html' ? boom() : real.extname(p)))],
       ['rule 5, the folding of the path', page, [], () => t.mock.method(String.prototype, 'normalize', function fold(form) {
         if (form === 'NFKD') boom();
         return real.normalize.call(this, form);
-      })],
-      ['rule 6, the risk pattern', page, [], () => t.mock.method(RegExp.prototype, 'test', function probe(text) {
-        if (this.source.includes('www')) boom();
-        return real.test.call(this, text);
       })],
       ['rule 8, the test run', page, ['--run-tests'], () => t.mock.method(qualityAgent, 'runFullTests', async () => boom())]
     ];
@@ -2820,41 +2586,31 @@ test('round 9: a transform only adds reasons to refuse, and the check reads what
   const un = (f) => `I do not recognise ${f} as wording or a colour`;
   const lost = (f) => `I could not read the change (${f} holds something I cannot follow)`;
   const area = (word) => (f) => `${f} sits in an area named ${word}, and such areas are never a hotfix`;
-  const marker = (f) => `the wording in ${f} contains a number, a price, a web address or an e-mail address`;
   const testEdited = (f) => `it changes a test (${f})`;
-  const PAGE = [HOME, HOME_STORE];
-  const page = (a, b) => [HOME.replace('Save', a), HOME.replace('Save', b)];
+  const COLOUR = ['a { color: red; }\n', 'a { color: blue; }\n'];
   // [the transform, path, [before, after], the clause, or null for the first call's `checking`]
   const rows = [
     // Marks and unseen characters are dropped from a path: two words then read as one, so the
     // path is asked as written too (red on the round's own commit 795325ab: `checking`).
-    ['path: marks and format characters dropped', 'src/authZWSPlogin/page.html', PAGE, area('auth')],
-    ['path: marks and format characters dropped', 'src/authACUTElogin/page.html', PAGE, area('auth')],
-    ['path: compatibility letters', 'src/authKGSIGN/page.html', PAGE, area('auth')],
-    ['path: compatibility letters', 'src/FWAUTH/page.html', PAGE, area('auth')],
+    ['path: marks and format characters dropped', 'src/authZWSPlogin/site.css', COLOUR, area('auth')],
+    ['path: marks and format characters dropped', 'src/authACUTElogin/site.css', COLOUR, area('auth')],
+    ['path: compatibility letters', 'src/authKGSIGN/site.css', COLOUR, area('auth')],
+    ['path: compatibility letters', 'src/FWAUTH/site.css', COLOUR, area('auth')],
     // A governing folder and a test folder behind a character nobody sees.
-    ['path: a governing folder folded', 'promptsZWSP/intro.html', PAGE, un],
-    ['path: a test folder folded', 'teZWSPsts/page.html', PAGE, testEdited],
+    ['path: a governing folder folded', 'promptsZWSP/site.css', COLOUR, un],
+    ['path: a test folder folded', 'teZWSPsts/site.css', COLOUR, testEdited],
     // A name that qualifies only once folded does not qualify: the raw name must qualify too.
-    ['path: a qualifying name must qualify as written', 'site/page.htZWSPml', PAGE, un],
-    ['path: a qualifying name must qualify as written', 'site/page.cZWSPss', ['a { color: red; }\n', 'a { color: blue; }\n'], un],
-    // An accent in a name changes nothing (guards).
-    ['path: an accent', 'docs/cafEACUTE/page.html', PAGE, null],
-    // A character reference is read as written and as the character it spells.
-    ['markup: a reference decoded', 'src/pages/shy.html', page('Save', 'Sto&shy;re'), marker],
-    ['markup: a reference decoded', 'src/pages/amp.html', page('Save', 'Save &amp; close'), null],
+    ['path: a qualifying name must qualify as written', 'site/page.cZWSPss', COLOUR, un],
+    // An accent in a name changes nothing (guard).
+    ['path: an accent', 'docs/cafEACUTE/site.css', COLOUR, null],
     // A colour's name in the letters a browser compares: the Kelvin sign is no `k`.
     ['stylesheet: letter case', 'src/styles/kelvin.css', ['a { color: red }\n', 'a { color: blacKELVIN }\n'], un],
     ['stylesheet: letter case', 'src/styles/upper.css', ['a { color: red }\n', 'a { COLOR: BLACK }\n'], un],
     ['stylesheet: letter case', 'src/styles/upper-value.css', ['a { COLOR: red }\n', 'a { COLOR: BLACK }\n'], null],
     // Line endings: the same on every line, not only as many.
     ['line endings moved', 'src/styles/moved.css', ['a { color: red; }\r\nb { margin: 0; }\n', 'a { color: blue; }\nb { margin: 0; }\r\n'], un],
-    ['line endings moved', 'src/pages/moved.html', ['<p>Save</p>\r\n<p>More</p>\n', '<p>Store</p>\n<p>More</p>\r\n'], un],
     ['line endings moved', 'src/styles/kept.css', ['a { color: red; }\r\nb { margin: 0; }\n', 'a { color: blue; }\r\nb { margin: 0; }\n'], null],
     // A character set other than UTF-8, which is how the check read the bytes.
-    ['character set', 'src/pages/sjis.html', page('<meta charset="shift_jis">Save', '<meta charset="shift_jis">Store'), (f) => inexact(f)],
-    ['character set', 'src/pages/equiv.html', page('<meta http-equiv="Content-Type" content="text/html; charset=iso-2022-jp">Save',
-      '<meta http-equiv="Content-Type" content="text/html; charset=iso-2022-jp">Store'), (f) => inexact(f)],
     ['character set', 'src/styles/sjis.css', ['@charset "shift_jis";\na { color: red; }\n', '@charset "shift_jis";\na { color: blue; }\n'], lost],
     ['character set', 'src/styles/utf.css', ['@charset "UTF-8";\na { color: red; }\n', '@charset "UTF-8";\na { color: blue; }\n'], null]
   ];
@@ -2952,47 +2708,19 @@ test('round 10: through the real menu process, an imported instruction file, a c
 // The tenth round, fixes in what stays (the session coordinator's brief of 2026-10-10, part B).
 // Each case was written, run and seen failing before its fix; the plan's record ("Fix round
 // 10") holds what each answered before.
-const pageWith = (text) => HOME.replace('Save', text);
 const reasonOf = (refused) => (refused === null ? 'passed' : refused.clause);
-const NOT_WORDING = 'I do not recognise src/pages/home.html as wording or a colour';
-const RISK = 'the wording in src/pages/home.html contains a number, a price, a web address or an e-mail address';
-
-test('round 10, B1 to B3: a character nobody sees, letters of two scripts in one word, and a price', () => {
-  const judgeText = (before, after) => reasonOf(ruleRefusal(changeOf('src/pages/home.html', pageWith(before), pageWith(after))));
-  // B1. A character nobody sees: default-ignorable code points (the Hangul filler, the combining
-  // grapheme joiner, a variation selector), a lone surrogate, a private-use and an unassigned
-  // code point, the line and paragraph separators, the blank Braille pattern, two non-characters.
-  const unseen = { 'the Hangul filler': '\u3164', 'the combining grapheme joiner': '\u034f', 'a variation selector': '\u{e0101}', 'a lone surrogate': '\ud800',
-    'a private-use character': '\ue000', 'an unassigned code point': '\u0378', 'the line separator': '\u2028', 'the paragraph separator': '\u2029',
-    'the blank Braille pattern': '\u2800', 'the non-character U+FFFE': '\ufffe', 'the non-character U+FFFF': '\uffff', 'a zero-width space': '\u200b' };
-  for (const [name, character] of Object.entries(unseen)) {
-    assert.equal(judgeText('Save', `Sa${character}ve`), NOT_WORDING, `${name} in the new text`);
-    assert.equal(judgeText(`Sa${character}ve`, 'Save'), NOT_WORDING, `${name} in the old text`);
-  }
-  // B2. A run of letters that mixes Latin with Cyrillic or Greek.
-  assert.equal(judgeText('Pay', 'P\u0430y'), NOT_WORDING, 'a Cyrillic letter in a Latin word');
-  assert.equal(judgeText('Pay', '\u03a1ay'), NOT_WORDING, 'a Greek letter in a Latin word');
-  assert.equal(judgeText('Pay', 'Pa\u0301\u0443'), NOT_WORDING, 'a mark between them does not part the word');
-  // One script per word passes, in any script, and so do two words of two scripts.
-  for (const text of ['\u041f\u0440\u0438\u0432\u0435\u0442', '\u039a\u03b1\u03bb\u03b7\u03bc\u03ad\u03c1\u03b1', 'Save \u041f\u0440\u0438\u0432\u0435\u0442', 'caf\u00e9 na\u00efve', 'Save-\u043c\u0438\u0440']) {
-    assert.equal(judgeText('Save', text), 'passed', text);
-  }
-  // B3. `$` is decided once, by the number-and-price rule, as `€` is.
-  assert.equal(judgeText('Only five', 'Only $5'), RISK);
-  assert.equal(judgeText('Only five', 'Only \u20ac5'), RISK);
-  assert.equal(judgeText('Only five', 'Only $five'), RISK);
-});
+const NOT_WORDING = 'I do not recognise src/styles/home.css as wording or a colour';
 
 test('round 10, B4: guards closed by construction', async (t) => {
-  const page = () => changeOf('src/pages/home.html', HOME, HOME_STORE);
+  const page = () => changeOf('src/styles/home.css', HOME, HOME_STORE);
   await t.test('a kind no reader is written for stops the check, never another reader', () => {
-    for (const kind of ['catalogue', 'documentation', 'toString', undefined]) {
+    for (const kind of ['catalogue', 'documentation', 'markup', 'toString', undefined]) {
       const change = page();
       Object.defineProperty(change.files[0], 'kind', { get: () => kind, set() {} });
       assert.throws(() => ruleRefusal(change), /no reader for the kind/, String(kind));
     }
   });
-  await t.test('a page with no changed text is no pass of nothing', () => {
+  await t.test('a stylesheet with no changed colour is no pass of nothing', () => {
     // git gives no such change; a caller that hands over changed lines beside equal texts gets a refusal.
     const change = page();
     change.files[0].newText = HOME;
@@ -3001,7 +2729,7 @@ test('round 10, B4: guards closed by construction', async (t) => {
   await t.test('CTOC\'s protected paths are asked in every form of the path, and without regard to letter case', async () => {
     const files = { 'package.json': '{ "name": "ctoc" }\n', 'CLAUDE.md': '# CTOC Project Instructions\n', '.ctoc/keep.json': '{}\n' };
     const area = (f) => refusal(`${f} sits in an area named enforcement, and such areas are never a hotfix`);
-    for (const rel of ['src/hooks/notes.html', 'src/Hooks/notes.html', 'SRC/HOOKS/notes.html', 'src/hoo\u200bks/notes.html', 'src/\uff48ooks/notes.html']) {
+    for (const rel of ['src/hooks/notes.css', 'src/Hooks/notes.css', 'SRC/HOOKS/notes.css', 'src/hoo\u200bks/notes.css', 'src/\uff48ooks/notes.css']) {
       const root = makeRepo({ ...files, [rel]: HOME });
       fs.writeFileSync(path.join(root, ...rel.split('/')), HOME_STORE);
       assert.equal((await check(root, rel)).text, area(rel), JSON.stringify(rel));
@@ -3012,7 +2740,7 @@ test('round 10, B4: guards closed by construction', async (t) => {
     const site = process.platform === 'win32' ? ['.venv', 'Lib', 'site-packages'] : ['.venv', 'lib', 'python3.12', 'site-packages'];
     const root = workspaceProject('greet', 'greet', { '.gitignore': 'node_modules/\n.venv/\n' });
     writeFiles(root, { '.venv/pyvenv.cfg': 'home = /usr/bin\n', [`${site.join('/')}/_x.pth`]: '# nothing\n' });
-    fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+    fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
     const real = { readdir: safeFs.readdirSync, read: safeFs.readFileSync, lstat: safeFs.lstatSync };
     const inWorkingFolder = (p) => String(p).startsWith(root);
     const faults = [
@@ -3024,7 +2752,7 @@ test('round 10, B4: guards closed by construction', async (t) => {
       inject();
       let res;
       try {
-        res = await check(root, '--run-tests', 'src/pages/home.html');
+        res = await check(root, '--run-tests', 'src/styles/home.css');
       } finally {
         t.mock.restoreAll();
       }
@@ -3032,7 +2760,7 @@ test('round 10, B4: guards closed by construction', async (t) => {
       assert.match(res.detail, /EACCES/, what);
     }
     // With nothing injected the same change passes: what does not exist is no fault.
-    assertPass(await check(root, '--run-tests', 'src/pages/home.html'), ['src/pages/home.html']);
+    assertPass(await check(root, '--run-tests', 'src/styles/home.css'), ['src/styles/home.css']);
   });
 });
 
@@ -3073,7 +2801,7 @@ test('round 10, B5 to B7: a control character in a stylesheet, the exact grammar
   assert.equal(css('a { x: 1px url({); color: red }\n', 'a { x: 1px URL({); color: blue }\n'), NOT_COLOUR, 'and is compared exactly');
 });
 
-test('round 10, B9 and B10: a sensitive word anywhere inside a part of the path, a part that holds `prompt`, and a page in a dot-folder', () => {
+test('round 10, B9 and B10: a sensitive word anywhere inside a part of the path, a part that holds `prompt`, and a stylesheet in a dot-folder', () => {
   const page = (rel) => reasonOf(ruleRefusal(changeOf(rel, HOME, HOME_STORE)));
   const sheet = (rel) => reasonOf(ruleRefusal(changeOf(rel, 'a { color: red; }\n', 'a { color: blue; }\n')));
   const area = (rel, word) => `${rel} sits in an area named ${word}, and such areas are never a hotfix`;
@@ -3083,26 +2811,25 @@ test('round 10, B9 and B10: a sensitive word anywhere inside a part of the path,
     ['authentication', 'auth'], ['authorization', 'auth'], ['deployment', 'deploy'], ['security', 'security'], ['coauthor', 'auth'], ['authority', 'auth'],
     ['HTMLAuthor', 'auth'], ['APIKeyboard', 'key'], ['ci', 'ci'], ['ci-tools', 'ci'], ['CI_scripts', 'ci']];
   for (const [part, word] of held) {
-    assert.equal(page(`src/${part}/page.html`), area(`src/${part}/page.html`, word), part);
-    assert.equal(page(`src/pages/${part}.html`), area(`src/pages/${part}.html`, word), `${part} as a file name`);
+    assert.equal(page(`src/${part}/site.css`), area(`src/${part}/site.css`, word), part);
+    assert.equal(page(`src/styles/${part}.css`), area(`src/styles/${part}.css`, word), `${part} as a file name`);
   }
   assert.equal(sheet('src/styles/accessTokens.css'), area('src/styles/accessTokens.css', 'token'));
   assert.equal(sheet('src/styles/brandTokens.css'), area('src/styles/brandTokens.css', 'token'));
   assert.equal(sheet('src/tokens/base.css'), area('src/tokens/base.css', 'token'), 'a folder named tokens');
-  assert.equal(page('src/pages/tokens.html'), area('src/pages/tokens.html', 'token'), 'a page named tokens');
   // What stays: a part that is exactly `author` or `authors`; `ci` inside a longer part; a
   // stylesheet's own name part that is exactly `tokens`.
-  for (const part of ['author', 'Authors', 'circle', 'pencil', 'special', 'home']) assert.equal(page(`src/${part}/page.html`), 'passed', part);
+  for (const part of ['author', 'Authors', 'circle', 'pencil', 'special', 'home']) assert.equal(page(`src/${part}/site.css`), 'passed', part);
   for (const rel of ['src/styles/tokens.css', 'src/styles/design-tokens.css', 'src/styles/Tokens.dark.css']) assert.equal(sheet(rel), 'passed', rel);
   // B10. A part of the path that holds `prompt` governs the work.
-  for (const rel of ['src/llm/system_prompt.html', 'src/llm/SystemPrompt.html', 'src/prompting/page.html', 'src/my-prompts-old/page.html']) assert.equal(page(rel), un(rel), rel);
+  for (const rel of ['src/llm/system_prompt.css', 'src/llm/SystemPrompt.css', 'src/prompting/site.css', 'src/my-prompts-old/site.css']) assert.equal(page(rel), un(rel), rel);
   assert.equal(sheet('src/styles/Prompt.css'), un('src/styles/Prompt.css'));
-  assert.equal(page('src/prom/pt.html'), 'passed', 'the word stands in one part');
+  assert.equal(page('src/prom/pt.css'), 'passed', 'the word stands in one part');
   // A dot-folder may be some tool's own: a page or a stylesheet below one never qualifies.
-  for (const rel of ['.storybook/preview-head.html', 'docs/.vitepress/theme/index.html', '.foo/page.html']) assert.equal(page(rel), un(rel), rel);
+  for (const rel of ['.storybook/preview-head.css', 'docs/.vitepress/theme/index.css', '.foo/site.css']) assert.equal(page(rel), un(rel), rel);
   assert.equal(sheet('.vitepress/theme/custom.css'), un('.vitepress/theme/custom.css'));
-  assert.equal(page('docs/a.b/page.html'), 'passed', 'a dot inside a folder name is no dot-folder');
-  assert.equal(page('.github/pages/index.html'), 'it changes how the project is built or shipped in .github/pages/index.html', 'a build folder is named as one');
+  assert.equal(page('docs/a.b/site.css'), 'passed', 'a dot inside a folder name is no dot-folder');
+  assert.equal(page('.github/pages/index.css'), 'it changes how the project is built or shipped in .github/pages/index.css', 'a build folder is named as one');
 });
 
 // Found after the B9 commit (3ce7ae0a) by comparing it with the round's base commit: reading
@@ -3125,90 +2852,71 @@ test('round 10, B9: whatever the earlier matcher refused is still refused (a wor
   const capital = (word) => word[0].toUpperCase() + word.slice(1);
   for (const word of words) {
     for (const part of [word, `${word}s`, `${word}es`, word.toUpperCase(), `my${capital(word)}`, `${word}Panel`, `API${capital(word)}`, `x-${word}_y`]) {
-      const answer = page(`src/${part}/page.html`);
+      const answer = page(`src/${part}/site.css`);
       assert.match(answer, / sits in an area named \p{L}+, and such areas are never a hotfix$/u, `${part}: ${answer}`);
     }
   }
   // What passed then passes now, where the tenth round did not decide otherwise.
-  for (const part of ['circle', 'Author', 'ui', 'special', 'site']) assert.equal(page(`src/${part}/page.html`), 'passed', part);
+  for (const part of ['circle', 'Author', 'ui', 'special', 'site']) assert.equal(page(`src/${part}/site.css`), 'passed', part);
 });
 
 test('round 10, B12 and B14: a skipped test confirms nothing, and the test run is asked to end its whole process tree', async (t) => {
   // The fixture's two skipped tests. The option's name is put together here because this
   // repository's own fence (tests/skip-visibility.test.js) refuses a test file that declares one.
   const OPTION = ['sk', 'ip'].join('');
-  const SKIPPING = nodeTest('has a button', "  assert.ok(read('src/pages/home.html').includes('<button>'));")
+  const SKIPPING = nodeTest('has a rule', "  assert.ok(read('src/styles/home.css').includes('.save'));")
     + `test('is not written yet', { ${OPTION}: 'later' }, () => {});\ntest('nor this one', { ${OPTION}: 'later' }, () => {});\n`;
-  const real = makeRepo({ 'src/pages/home.html': HOME, 'tests/home.test.js': SKIPPING }, { testScript: SCRIPT });
-  fs.writeFileSync(path.join(real, 'src/pages/home.html'), HOME_STORE);
-  await refusedUntouched(real, ['--run-tests', 'src/pages/home.html'], '2 tests were skipped, so nothing confirms the change');
+  const real = makeRepo({ 'src/styles/home.css': HOME, 'tests/home.test.js': SKIPPING }, { testScript: SCRIPT });
+  fs.writeFileSync(path.join(real, 'src/styles/home.css'), HOME_STORE);
+  await refusedUntouched(real, ['--run-tests', 'src/styles/home.css'], '2 tests were skipped, so nothing confirms the change');
   assert.equal(logLines(real).pop().cause, 'no-test-ran');
 
   const root = testedProject();
-  fs.writeFileSync(path.join(root, 'src/pages/home.html'), HOME_STORE);
+  fs.writeFileSync(path.join(root, 'src/styles/home.css'), HOME_STORE);
   const asked = [];
   const answer = (result) => t.mock.method(qualityAgent, 'runFullTests', async (tools, options) => { asked.push(options); return result; });
   answer({ passed: true, passCount: 3, failed: 0, skipped: 1, flaky: 0 });
-  const one = await check(root, '--run-tests', 'src/pages/home.html');
+  const one = await check(root, '--run-tests', 'src/styles/home.css');
   t.mock.restoreAll();
   assert.equal(one.text, refusal('1 test was skipped, so nothing confirms the change'));
   // A failing run is named as one, whatever it skipped; a run that skipped nothing passes.
   answer({ passed: false, passCount: 3, failed: 1, skipped: 1, flaky: 0, output: 'not ok 1 - shows Save\n' });
-  const failing = await check(root, '--run-tests', 'src/pages/home.html');
+  const failing = await check(root, '--run-tests', 'src/styles/home.css');
   t.mock.restoreAll();
   assert.equal(failing.text, refusal('the existing tests fail (shows Save)'));
   answer({ passed: true, passCount: 3, failed: 0, skipped: 0, flaky: 0 });
-  assertPass(await check(root, '--run-tests', 'src/pages/home.html'), ['src/pages/home.html']);
+  assertPass(await check(root, '--run-tests', 'src/styles/home.css'), ['src/styles/home.css']);
   t.mock.restoreAll();
   assert.deepEqual(asked, [{ wholeTree: true }, { wholeTree: true }, { wholeTree: true }], 'B14: the whole process tree ends at the time limit');
 });
 
-// B21 (the session coordinator, 2026-10-10, after the automated review of 63f0b47a): a page or
-// stylesheet an instruction file NAMES governs the work. A plain search: the file's base name
-// occurs anywhere in the last commit's text of a file that is governing by its name, compared
-// in lower case, with backslashes removed and percent-escapes decoded in the instruction text.
-// No link or import syntax is read. KNOWN LIMIT: a folder an instruction file names does not
-// make the files below it governing.
-test('round 10, B21: through the real menu process, a page or stylesheet that an instruction file names is refused, and one it does not name passes', () => {
-  const root = tmpDir();
-  git(root, ['init', '-q']);
-  const env = { ...process.env, TMPDIR: PRIVATE_TMP, TEMP: PRIVATE_TMP, TMP: PRIVATE_TMP };
-  delete env.CLAUDE_PROJECT_DIR;
-  delete env.NODE_TEST_CONTEXT;
-  assert.equal(spawnSync(NODE, [START], { cwd: root, encoding: 'utf8', env, timeout: 60000 }).status, 0);
-  const named = ['docs/rules.html', 'docs/linked.html', 'docs/anchor.html', 'docs/my_rules.html', 'docs/my rules.html', 'docs/plain.html', 'docs/cased.html',
-    'web/sheet.css', 'web/deep.html', 'docs/x%ffy.html'];
-  const free = ['docs/free.html', 'docs/folder/inside.html', 'web/free.css'];
-  const files = {
-    'CLAUDE.md': ['# Instructions', '', '@docs/rules.html', 'Read [the rules](docs/linked.html) and <a href="docs/anchor.html">this</a>.',
-      'Escaped: docs/my\\_rules.html and docs/my%20rules.html. Keep plain.html as it is, and DOCS/CASED.HTML too.', 'The folder docs/folder/ holds more.', 'Bytes that spell nothing stay as written: docs/x%FFy.html.', ''].join('\n'),
-    'web/sub/AGENTS.md': 'Colours live in sheet.css.\n',
-    'web/rules/style.mdc': 'See deep.html.\n',
-    'docs/notes.md': 'This file governs nothing: free.html and free.css are only mentioned here.\n'
-  };
-  for (const rel of [...named, ...free]) files[rel] = rel.endsWith('.css') ? 'a { color: red; }\n' : HOME;
-  writeFiles(root, files);
-  git(root, ['add', '-A']);
-  git(root, ['commit', '-q', '-m', 'base']);
-  const ask = (rel) => {
-    fs.writeFileSync(path.join(root, ...rel.split('/')), rel.endsWith('.css') ? 'a { color: blue; }\n' : HOME_STORE);
-    const run = spawnSync(NODE, [START, 'hotfix', 'check', rel], { cwd: root, encoding: 'utf8', env, timeout: 60000 });
-    assert.equal(run.status, 0, run.stderr);
-    return JSON.parse(run.stdout);
-  };
-  for (const rel of named) assert.equal(ask(rel).text, refusal(gone(rel)), rel);
-  for (const rel of free) assertChecking(ask(rel), [rel]);
-  // The text is the last commit's: a name taken out of the working folder's copy still counts, one added there does not.
-  fs.writeFileSync(path.join(root, 'CLAUDE.md'), '# Instructions\n\nNow free.html is named.\n');
-  assert.equal(ask('docs/rules.html').text, refusal(gone('docs/rules.html')));
-  assertChecking(ask('docs/free.html'), ['docs/free.html']);
-});
-
-test('round 10, B21: a change read from a repository is never judged without the text of its instruction files', () => {
-  const change = () => changeOf('site/page.html', HOME, HOME_STORE);
-  assert.equal(ruleRefusal(change()), null, 'a change built by hand, with no repository, names none');
-  assert.throws(() => ruleRefusal({ ...change(), top: os.tmpdir() }), /no text of the instruction files/);
-  assert.throws(() => ruleRefusal({ ...change(), top: os.tmpdir(), instructions: ['page.html'] }), /no text of the instruction files/);
-  assert.equal(ruleRefusal({ ...change(), top: os.tmpdir(), instructions: 'nothing here' }), null);
-  assert.equal(reasonOf(ruleRefusal({ ...change(), top: os.tmpdir(), instructions: 'see page.html' })), 'I do not recognise site/page.html as wording or a colour');
+// After the re-check of 2026-10-10 (the session coordinator): the rule "a page that an
+// instruction file names" failed a second time, so by the two-fix-rounds rule that area comes
+// out, and with it the one kind that needs it: pages. The only thing that can pass is one
+// colour value in a standard colour property of a `.css` stylesheet.
+test('after the re-check: every extension the module ever recognised but `.css` is refused, whatever the file holds', () => {
+  const texts = { page: ['<p>Save the file</p>\n', '<p>Store the file</p>\n'], prose: ['Save the file.\n', 'Store the file.\n'],
+    colour: ['a { color: red; }\n', 'a { color: blue; }\n'] };
+  const setting = (f) => `it changes a setting in ${f}, and settings changes are a common cause of outages`;
+  // [extension, a path that qualified once, the content, the clause]
+  const rows = [
+    ['.html', 'src/pages/home.html', 'page', gone], ['.html', 'site/INDEX.HTML', 'page', gone], ['.htm', 'site/about.htm', 'page', gone],
+    ['.md', 'README.md', 'prose', gone], ['.txt', 'CHANGES.txt', 'prose', gone],
+    ['.json', 'locales/en.json', 'prose', setting], ['.yaml', 'i18n/fr.yaml', 'prose', setting], ['.yml', 'config/locales/en.yml', 'prose', setting],
+    ['.properties', 'i18n/messages_fr.properties', 'prose', setting],
+    ['.vue', 'src/components/Name.vue', 'page', gone], ['.svelte', 'src/components/Name.svelte', 'page', gone], ['.jsx', 'src/components/Name.jsx', 'page', gone],
+    ['.tsx', 'src/components/Name.tsx', 'page', gone], ['.mdx', 'docs/page.mdx', 'prose', gone], ['.rst', 'docs/guide.rst', 'prose', gone],
+    ['.scss', 'src/styles/theme.scss', 'colour', gone], ['.sass', 'src/styles/theme.sass', 'colour', gone], ['.less', 'src/styles/theme.less', 'colour', gone],
+    ['.po', 'translations/de.po', 'prose', gone], ['.svg', 'docs/diagram.svg', 'page', gone]
+  ];
+  const wrong = [];
+  for (const [, rel, kind, clause] of rows) {
+    const refused = ruleRefusal(changeOf(rel, texts[kind][0], texts[kind][1]));
+    if (refused === null || refused.clause !== clause(rel)) wrong.push(`${rel}: ${refused === null ? 'passed' : refused.clause}`);
+  }
+  assert.deepEqual(wrong, []);
+  assert.equal(ruleRefusal(changeOf('src/styles/site.css', texts.colour[0], texts.colour[1])), null, 'a colour in a stylesheet passes');
+  // A path that holds a character nobody sees is refused (the Hangul filler is a letter to Unicode).
+  const unseen = `src/ad${String.fromCharCode(0x3164)}min/site.css`;
+  assert.notEqual(ruleRefusal(changeOf(unseen, texts.colour[0], texts.colour[1])), null, 'a path with a Hangul filler');
 });
