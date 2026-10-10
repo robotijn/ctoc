@@ -1198,3 +1198,93 @@ describe('runFullTests and runSpecificTests — undetermined runs, standard erro
     assert.throws(() => qualityAgent.runCommandArgv('ctoc-no-such-runner', [], { silent: true }), (err) => err.code === 'ENOENT');
   });
 });
+
+// The hotfix check's tenth round (2026-10-10): what the reviewers of its ninth round found in
+// the test run. Each case was written and seen failing before its fix.
+describe('the test run: one run per command, a failure counted on a summary line, and the whole process tree ended at the time limit', () => {
+  const COUNTERS = `${String.fromCharCode(0x2139)} pass 5\n${String.fromCharCode(0x2139)} fail 0\n`;
+
+  it('B11: a test command two detected languages share runs once, and its count is the count of one run', async () => {
+    await withExecSpies(() => COUNTERS, async (qa, fileCalls) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' }, typescript: { test: 'node x' } }));
+      assert.equal(fileCalls.length, 1, JSON.stringify(fileCalls.map((c) => [c.bin, c.args])));
+      assert.deepEqual([res.passed, res.passCount], [true, 5]);
+      return {};
+    });
+    await withExecSpies(() => COUNTERS, async (qa, fileCalls) => {
+      const script = { test: 'node --test', testFromScript: true };
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: script, typescript: { ...script } }));
+      assert.equal(fileCalls.length, 1, 'npm test once');
+      assert.equal(res.passCount, 5);
+      return {};
+    });
+    // Two commands that differ each run; a script's `node x` and a configured `node x` are two.
+    await withExecSpies(() => COUNTERS, async (qa, fileCalls) => {
+      const { res } = await captureLog(() => qa.runFullTests({ javascript: { test: 'node x' }, python: { test: 'pytest' }, typescript: { test: 'node x', testFromScript: true } }));
+      assert.equal(fileCalls.length, 3);
+      assert.equal(res.passCount, 15);
+      return {};
+    });
+    await withExecSpies(() => COUNTERS, async (qa, fileCalls) => {
+      const jest = { test: 'jest', testFramework: 'jest' };
+      const res = qa.runSpecificTests({ javascript: jest, typescript: { ...jest } }, ['a.test.js']);
+      assert.equal(fileCalls.length, 1, 'the selected tests once');
+      assert.equal(res.passCount, 5);
+      return {};
+    });
+  });
+
+  it('B11: a lint command two detected languages share runs once', async () => {
+    await withExecSpies(() => '', async (qa, fileCalls) => {
+      const { res } = await captureLog(() => qa.runLint({ javascript: { lint: 'eslint .' }, typescript: { lint: 'eslint .' }, python: { lint: 'ruff check' } }));
+      assert.deepEqual(fileCalls.map((c) => [c.bin, ...c.args].join(' ')), ['eslint .', 'ruff check']);
+      assert.deepEqual([res.passed, res.ran], [true, 2]);
+      return {};
+    });
+  });
+
+  it('B13: "N failed" on a summary line is a failure, also when the runner exits with 0', async () => {
+    const failing = ['1 failed, 3 passed', '=== 1 failed, 3 passed in 0.12s ===', '3 passed, 2 failed', '  2 failed', '1 failed in 0.1s', '1 skipped, 1 failed, 3 passed'];
+    for (const summary of failing) {
+      await withExecSpies(() => `collected 4 items\n${summary}\n`, async (qa) => {
+        const { res } = await captureLog(() => qa.runFullTests({ python: { test: 'pytest' } }));
+        assert.equal(res.passed, false, summary);
+        assert.ok(res.failed >= 1, summary);
+        return {};
+      });
+    }
+    // No summary line: a test's name or its own output that holds the words, and a count of none.
+    const clean = ['ok 1 - 3 failed attempts are retried\n4 passed', '2 failed logins recorded\n4 passed', '4 passed, 0 failed', 'the 1 failed request is retried\n4 passed'];
+    for (const output of clean) {
+      await withExecSpies(() => `${output}\n`, async (qa) => {
+        const { res } = await captureLog(() => qa.runFullTests({ python: { test: 'pytest' } }));
+        assert.equal(res.passed, true, output);
+        return {};
+      });
+    }
+  });
+
+  it('B14: at the time limit the whole process tree of the test command ends', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'qa-tree-'));
+    const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
+    let pid = 0;
+    try {
+      fs.writeFileSync(path.join(dir, 'slow.js'), "require('fs').writeFileSync('slow.pid', String(process.pid));\nsetTimeout(() => {}, 60000);\n");
+      fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'slow', version: '1.0.0', private: true, scripts: { test: 'node slow.js && echo done' } }));
+      const started = Date.now();
+      const { res } = await withCwd(dir, () => captureLog(() => qualityAgent.runFullTests(
+        { javascript: { test: 'node slow.js && echo done', testFromScript: true } }, { timeout: 3000, wholeTree: true })));
+      assert.ok(Date.now() - started < 30000, 'the run came back at its time limit');
+      assert.deepEqual([res.passed, res.undetermined], [false, true], JSON.stringify(res));
+      assert.match(res.output, /timed out/);
+      pid = Number(fs.readFileSync(path.join(dir, 'slow.pid'), 'utf8'));
+      assert.ok(pid > 0, 'the test script started');
+      // The signal that ends the tree is sent before the run returns; the processes need a moment to go.
+      for (let waited = 0; alive(pid) && waited < 5000; waited += 50) await new Promise((resolve) => setTimeout(resolve, 50));
+      assert.equal(alive(pid), false, `the test script (process ${pid}) is left behind`);
+    } finally {
+      if (pid > 0 && alive(pid)) process.kill(pid, 'SIGKILL');
+      fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+    }
+  });
+});

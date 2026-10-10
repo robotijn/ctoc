@@ -158,23 +158,36 @@ function runCommand(cmd, options = {}) {
  * `signal`, `stdout`, `stderr` and `code`, the shape execFileSync threw, so callers that
  * rely on the throw are unchanged.
  *
+ * THE WHOLE PROCESS TREE (`wholeTree`, the hotfix check's tenth round). The time limit ends
+ * only the program started here (npm, or the configured runner); the test processes that
+ * program started kept running, kept files open and could write after the answer. With
+ * `wholeTree` the program is started as the leader of a process group of its own on macOS
+ * and Linux, and when the run is stopped at its time limit or for its output's size, the
+ * whole group is ended ({@link endProcessTree}). Off by default: a process group of its own
+ * is a session of its own, so an interrupt typed at the terminal no longer reaches the
+ * tests, which an interactive `/ctoc:push` relies on.
+ *
  * @param {string} bin - the executable (an argv[0], never a shell string)
  * @param {string[]} args - argument vector; each element is passed literally
- * @param {{silent?: boolean, allowFail?: boolean, timeout?: number}} [options]
+ * @param {{silent?: boolean, allowFail?: boolean, timeout?: number, wholeTree?: boolean}} [options]
  * @returns {{success: boolean, output: string, stdout: string, stderr: string, error?: string, timedOut?: boolean, outputTooLarge?: boolean, notStarted?: boolean}}
  *   `output` is standard output and standard error together; `stdout` and `stderr` are
  *   kept apart so the counters are read from standard output first ({@link counterText}).
  */
 function runCommandArgv(bin, args, options = {}) {
-  const { silent = false, allowFail = false, timeout = 300000 } = options;
+  const { silent = false, allowFail = false, timeout = 300000, wholeTree = false } = options;
   const r = spawnSync(bin, args, {
     encoding: 'utf8',
     stdio: silent ? 'pipe' : 'inherit',
     shell: false, // the whole point: no shell parses the operands
     maxBuffer: 10 * 1024 * 1024, // 10MB
     timeout,
-    windowsHide: true
+    windowsHide: true,
+    ...(wholeTree && process.platform !== 'win32' ? { detached: true } : {})
   });
+  // Stopped from here (the time limit, or more output than the buffer holds): only the
+  // program itself was ended, so what it started is ended now.
+  if (wholeTree && r.error && typeof r.pid === 'number' && r.pid > 0) endProcessTree(r.pid);
   const text = (v) => (typeof v === 'string' ? v.trim() : '');
   const stdout = text(r.stdout);
   const stderr = text(r.stderr);
@@ -194,6 +207,27 @@ function runCommandArgv(bin, args, options = {}) {
   }
   if (allowFail) return result;
   throw Object.assign(new Error(error), { status: r.status, signal: r.signal, stdout: r.stdout, stderr: r.stderr, code });
+}
+
+/**
+ * End every process a stopped program left behind. macOS and Linux: the program led a
+ * process group of its own ({@link runCommandArgv}, `wholeTree`), and the group is killed;
+ * a group that is already empty is no fault. Windows: `taskkill /T /F` on the program's id.
+ * NOT VERIFIED ON WINDOWS (the build machine has none): the program itself is already ended
+ * when this runs, and whether taskkill still finds its children then is for the first
+ * Windows use to show.
+ * @param {number} pid the program's process id
+ */
+function endProcessTree(pid) {
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true, timeout: 10000 });
+    return;
+  }
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch (err) {
+    if (/** @type {NodeJS.ErrnoException} */ (err).code !== 'ESRCH') throw err;
+  }
 }
 
 /** The exact test script `npm init` writes: it runs no test and always fails. */
@@ -578,7 +612,33 @@ function parseFailCount(out) {
   if (jest) return parseInt(jest[1], 10);
   const mocha = lastCap(text, /^[ \t]*(\d+)\s+failing\b/gim);
   if (mocha) return parseInt(mocha[1], 10);
-  return null;
+  return summaryFailCount(text);
+}
+
+/**
+ * The failing count of a SUMMARY LINE in the form pytest and others print: `1 failed, 3
+ * passed`, `=== 1 failed, 3 passed in 0.12s ===` (the hotfix check's tenth round: a run that
+ * printed this and exited with 0 was a pass). A summary line is short and holds nothing but
+ * counters, `N word`, separated by commas, between optional `=` signs and before an optional
+ * `in <time>`; so `2 failed logins recorded` and a test named `3 failed attempts` are none.
+ * The last such line wins. Each line is read once, part by part: linear in the output.
+ * @param {string} text - runner output without colour
+ * @returns {number|null} the count, or null when no summary line names one
+ */
+function summaryFailCount(text) {
+  let found = null;
+  for (const raw of text.split('\n')) {
+    if (raw.length > 200 || !raw.includes('failed')) continue;
+    const line = raw.replace(/=/g, ' ').trim();
+    const timed = line.search(/ in /);
+    const counters = (timed < 0 ? line : line.slice(0, timed)).split(',').map((part) => part.trim());
+    if (!counters.every((part) => /^\d+ +[a-z]+$/i.test(part))) continue;
+    for (const part of counters) {
+      const failed = /^(\d+) +failed$/i.exec(part);
+      if (failed) found = parseInt(failed[1], 10);
+    }
+  }
+  return found;
 }
 
 /**
@@ -759,9 +819,31 @@ function notVerifiedTypecheck(reason) {
 }
 
 /**
+ * The detected languages whose command of one kind runs: each DISTINCT command once (the
+ * hotfix check's tenth round). A project with `package.json` and `tsconfig.json` is detected
+ * as javascript and as typescript, both with the same `npm test` and the same lint command;
+ * the suite then ran twice and its tests were counted twice. A command that comes from the
+ * package script, a configured one of the same text, and one run through another framework
+ * are three commands.
+ * @param {Object<string, Object>} tools - detected tools per language
+ * @param {'test'|'lint'} kind
+ * @returns {Array<[string, Object]>} `[language, its tools]`, the first language of each command
+ */
+function distinctCommands(tools, kind) {
+  const seen = new Set();
+  return Object.entries(tools).filter(([, langTools]) => {
+    if (!langTools[kind]) return false;
+    const command = kind === 'test' ? JSON.stringify([langTools.test, Boolean(langTools.testFromScript), langTools.testFramework || null]) : String(langTools.lint);
+    if (seen.has(command)) return false;
+    seen.add(command);
+    return true;
+  });
+}
+
+/**
  * Run lint check.
  *
- * `ran` counts the tools that actually carried a lint command. When it is ZERO the check
+ * `ran` counts the distinct lint commands that ran ({@link distinctCommands}). When it is ZERO the check
  * could not run and returns a not-verified result (passed:false) — a detection failure
  * must fail toward honest, never toward green. `ran >= 1` with no command failure is the
  * only path to `passed:true`; a run failure returns `passed:false` with `ran` reflecting
@@ -771,8 +853,7 @@ async function runLint(tools) {
   console.log('\n  Running lint...');
 
   let ran = 0;
-  for (const [lang, langTools] of Object.entries(tools)) {
-    if (!langTools.lint) continue;
+  for (const [lang, langTools] of distinctCommands(tools, 'lint')) {
     ran++;
 
     // NO SHELL: langTools.lint is a CONFIGURED string (agent-writable .ctoc config); run
@@ -852,9 +933,7 @@ function runSpecificTests(tools, testFiles) {
   let totalFailed = 0;
   let totalSkipped = 0;
 
-  for (const [lang, langTools] of Object.entries(tools)) {
-    if (!langTools.test) continue;
-
+  for (const [lang, langTools] of distinctCommands(tools, 'test')) {
     // COMMAND-INJECTION FIX: testFiles come from .ctoc/state/coverage-map.json
     // (entry.tests — arbitrary, unsanitized strings) or a filename heuristic. They
     // MUST NEVER be interpolated into a shell command string. Every per-framework
@@ -940,8 +1019,14 @@ function runSpecificTests(tools, testFiles) {
  * Run all tests (full suite fallback). A run that printed more than 10 MiB, timed out,
  * could not start, or whose package.json test script is npm's placeholder answers the
  * `undetermined` result ({@link undeterminedRunResult}), never a failure and never a pass.
+ * Each distinct test command runs once ({@link distinctCommands}), so `passCount` is the
+ * count of one run of each.
+ * @param {Object} tools - detected tools per language
+ * @param {{timeout?: number, wholeTree?: boolean}} [options] the time limit of each command
+ *   (300000 ms by default), and whether the whole process tree is ended at it
+ *   ({@link runCommandArgv}); the hotfix check asks for it
  */
-async function runFullTests(tools) {
+async function runFullTests(tools, options = {}) {
   // Finding A: a detector-undetermined test command is NOT a silent pass.
   const undetermined = undeterminedTestLanguages(tools);
   if (undetermined.length) return undeterminedTestsResult(undetermined);
@@ -950,15 +1035,14 @@ async function runFullTests(tools) {
   let totalFailed = 0;
   let totalSkipped = 0;
 
-  for (const [lang, langTools] of Object.entries(tools)) {
-    if (!langTools.test) continue;
-
+  const limits = { ...(options.timeout !== undefined ? { timeout: options.timeout } : {}), ...(options.wholeTree ? { wholeTree: true } : {}) };
+  for (const [lang, langTools] of distinctCommands(tools, 'test')) {
     console.log(`   Running full ${lang} test suite...`);
     // A PACKAGE-SCRIPT-derived command (testFromScript) is launched via `npm test` (argv,
     // no shell), so a benign `"test": "jest && tsc"` runs internally through npm; an EXTERNAL
     // .ctoc-config command runs as an argv vector and a shell-operator command is REFUSED as
     // a FAILED check, never handed to a shell (00203 F1 repair — see runProjectTestCommand).
-    const result = runProjectTestCommand(langTools, { allowFail: true, silent: true, label: `${lang} test` });
+    const result = runProjectTestCommand(langTools, { allowFail: true, silent: true, label: `${lang} test`, ...limits });
 
     if (!result.success && cannotCertify(result)) return undeterminedRunResult(lang, result, totalPassed, totalSkipped);
     if (!result.success && result.refused) return refusedTestsResult(result, totalPassed, totalFailed, totalSkipped);
