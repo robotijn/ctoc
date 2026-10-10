@@ -493,10 +493,11 @@ const NEVER_PASSES = {
 const MUST_PASS = { css: ['a colour replaced'] };
 /**
  * The share of the generated edits the check must pass: 90% of the share measured on the
- * default seed and size after the last change to the reader (the re-check of 2026-10-10), so
- * that a rule which starts to refuse a tenth more than it did fails here.
+ * default seed and size after the last change to the reader (the re-check of 2026-10-10:
+ * 1,622 of 27,083 edits, 5.99%), so that a rule which starts to refuse a tenth more than it
+ * did fails here.
  */
-const PASS_FLOOR = { css: 0.0569 };
+const PASS_FLOOR = { css: 0.0539 };
 
 function run(kind, count) {
   const started = Date.now();
@@ -569,10 +570,9 @@ function assertRun(t, kind, count) {
   if (stats.cases >= 10000) assert.deepEqual(missing, [], `the check passed no edit in a document with: ${missing.join(', ')}`);
 }
 
-// Measured on 2026-10-10, seed 20261009, default size: 27,083 edits, 1,714 passed (6.3%). (The
-// ninth round's reader passed 12.3%: custom properties named for a colour and the colour
-// functions written with spaces passed then.) Beyond this test, 120,000 edits the ninth round's
-// reader passed were read by Chromium 156's own CSS parser (the plan's Execution Record).
+// Measured on 2026-10-10, seed 20261009, default size, after the re-check: 27,083 edits, 1,622
+// passed (6.0%). (The ninth round's reader passed 12.3%: custom properties named for a colour,
+// the colour functions written with spaces and the two shadows passed then.)
 test('CSS: every stylesheet edit the check passes changes exactly one colour for postcss', (t) => {
   assertRun(t, 'css', CSS_CASES);
 });
