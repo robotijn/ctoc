@@ -329,59 +329,332 @@ No lawyer has reviewed the text; by the owner's answer it is released as planned
 20. **The commit author is checked by the CTO Chief's commit-and-push step, not by the completion route, and not recorded in this plan** (spec round 2). The completion route (`menu task complete`) validates the plan, moves it to review, runs Step 14, saves the check evidence and settles the task; it never commits or pushes (`agents/iron-loop/iron-loop-executor.md`, section "Completing a plan"). The commit and the push are the CTO Chief's, after that route. That step commits with `git -c user.name="Tijn van der Zant" -c user.email="tijn@theaiguys.com"` when the Step 9 config check did not match; after the commit and before the push, `git log -1 --format='%an <%ae>'` must print exactly `Tijn van der Zant <tijn@theaiguys.com>`, otherwise there is no push. The commit happens after Step 16, so recording the result in the Execution Record would need a second commit; it goes in the CTO Chief's report to the owner instead.
 21. **The clause table gives meanings, and only the quoted or backticked text is fixed** (spec round 1): the builder words the agreement, so the table could not say "exactly" and also ask for the builder's own words for the clauses drawn from PolyForm texts. The no-cap rule is an instruction, so it moved out of the table to "Nothing else goes into LICENSE". The once-only phrase of parent Decision 5 is fixed in LICENSE and README alike, so Step 11 can check that README says nothing LICENSE does not.
 22. **Section 2 states the order of the definitions.** Parent Decision 1 says "except that" for the listed organisations; without that order a charity (a legal entity) or its paid staff would be business use under (a) or (b). Rule (e) still overrides (c) and (d).
+23. **The owner's answer of 2026-10-23 on outside contributions (option 1) overrides decision 10 and the README line on pull requests.** README says outside pull requests are not accepted until a contributor license agreement exists, and issues stay welcome. The note on README line 1179 therefore reads: "The source code of CTO Chief is public, and CTO Chief is actively developed. [Issues](…) and [skill improvement suggestions](…) are welcome. Outside pull requests are not accepted until a contributor license agreement exists." The link to the pull-request list is removed; the issue and skill-suggestion links stay byte for byte. Decision 10's other half, the change from "open source" to "The source code of CTO Chief is public", stands.
 
 ## Execution Plan
 
 ### Step 8: TEST
-- [ ] Edit `tests/helpers/source-of-truth.js` (new `readLicenseSources`, new `licenseDeclarationVerdict`, `normalizeLicense` removed), `tests/version-license-invariant.test.js`, `tests/release.test.js` and `tests/release-metadata-sync.test.js` exactly as specified above. Do not touch LICENSE, README.md, package.json, package-lock.json or the manifests yet.
-- [ ] Run `node --test tests/version-license-invariant.test.js tests/release.test.js`. Record in the Execution Record, as prose, every failing and every passing test by name: each of the two files reports at least one failure, and between them the failures name package.json, the package-lock.json root, the marketplace entry and the LICENSE title line (parent scenario 11). Any failure the Test Plan table does not predict is investigated before going on.
-- [ ] Run `node --test tests/release-metadata-sync.test.js`: it passes (it cannot fail first; record that).
-- [ ] Step 8 done
+- [x] Edit `tests/helpers/source-of-truth.js` (new `readLicenseSources`, new `licenseDeclarationVerdict`, `normalizeLicense` removed), `tests/version-license-invariant.test.js`, `tests/release.test.js` and `tests/release-metadata-sync.test.js` exactly as specified above. Do not touch LICENSE, README.md, package.json, package-lock.json or the manifests yet.
+- [x] Run `node --test tests/version-license-invariant.test.js tests/release.test.js`. Record in the Execution Record, as prose, every failing and every passing test by name: each of the two files reports at least one failure, and between them the failures name package.json, the package-lock.json root, the marketplace entry and the LICENSE title line (parent scenario 11). Any failure the Test Plan table does not predict is investigated before going on.
+- [x] Run `node --test tests/release-metadata-sync.test.js`: it passes (it cannot fail first; record that).
+- [x] Step 8 done
 
 ### Step 9: PREPARE
-- [ ] Record the commit this build's tree is based on, `git merge-base HEAD main`, and require it to equal `git rev-parse main`; if they differ (main moved after this worktree was made), stop and report, as Step 10 does: the coordinator rebases onto the new main and Steps 8 and 9 run again. That commit is "the Step 9 commit" every later diff and the privacy scan use. Record `git show main:VERSION` (6.14.135 on 2026-10-23). If the value read is not 6.14.135, put it into `LAST_POLYFORM_VERSION` in `tests/version-license-invariant.test.js` and into both places on README's PolyForm line (Step 10 writes that line with this value), and report the number to the owner.
-- [ ] Read `git config user.name` and `git config user.email`; record only whether they are exactly Tijn van der Zant and tijn@theaiguys.com, never another value. The result goes to the CTO Chief's commit-and-push step, which runs after the completion route (the completion route never commits or pushes): on a mismatch it commits as `git -c user.name="Tijn van der Zant" -c user.email="tijn@theaiguys.com" commit …` (technical-planning decision 20).
-- [ ] Record `claude --version`; confirm the syntax with `claude plugin validate --help`; run `claude plugin validate --strict --json` on the repository root before any manifest changes; record the output in full, with the repository's path written `<repo>`.
-- [ ] Re-read the files of this slice at the lines named above; record any line that moved.
-- [ ] Step 9 done
+- [x] Record the commit this build's tree is based on, `git merge-base HEAD main`, and require it to equal `git rev-parse main`; if they differ (main moved after this worktree was made), stop and report, as Step 10 does: the coordinator rebases onto the new main and Steps 8 and 9 run again. That commit is "the Step 9 commit" every later diff and the privacy scan use. Record `git show main:VERSION` (6.14.135 on 2026-10-23). If the value read is not 6.14.135, put it into `LAST_POLYFORM_VERSION` in `tests/version-license-invariant.test.js` and into both places on README's PolyForm line (Step 10 writes that line with this value), and report the number to the owner.
+- [x] Read `git config user.name` and `git config user.email`; record only whether they are exactly Tijn van der Zant and tijn@theaiguys.com, never another value. The result goes to the CTO Chief's commit-and-push step, which runs after the completion route (the completion route never commits or pushes): on a mismatch it commits as `git -c user.name="Tijn van der Zant" -c user.email="tijn@theaiguys.com" commit …` (technical-planning decision 20).
+- [x] Record `claude --version`; confirm the syntax with `claude plugin validate --help`; run `claude plugin validate --strict --json` on the repository root before any manifest changes; record the output in full, with the repository's path written `<repo>`.
+- [x] Re-read the files of this slice at the lines named above; record any line that moved.
+- [x] Step 9 done
 
 ### Step 10: IMPLEMENT
-- [ ] `LICENSE`: write the agreement from the clause table, every row, nothing more.
-- [ ] `README.md`: the badge on line 8, the `## License` section, and the first sentence of the note on line 1179, exactly as specified.
-- [ ] `package.json` line 5, `package-lock.json` line 10 and `.claude-plugin/marketplace.json` line 21: `"license": "SEE LICENSE IN LICENSE",`, each by hand with Edit.
-- [ ] The patch release: read `git show main:VERSION` again. If it differs from the Step 9 value, stop and report: the coordinator rebases onto the new main and Step 9 runs again, which sets README's PolyForm line and `LAST_POLYFORM_VERSION` to the value it reads. Otherwise set VERSION to the next patch number after the Step 9 value, run `node src/scripts/release.js`, and record its exit code (0) and the files it reports updated.
-- [ ] Run `node --test tests/version-license-invariant.test.js tests/release.test.js tests/release-metadata-sync.test.js`: 0 failed (parent scenario 11, after). Record the counts as prose.
-- [ ] Step 10 done
+- [x] `LICENSE`: write the agreement from the clause table, every row, nothing more.
+- [x] `README.md`: the badge on line 8, the `## License` section, and the first sentence of the note on line 1179, exactly as specified (the note's remainder as the owner's answer, decision 23, says).
+- [x] `package.json` line 5, `package-lock.json` line 10 and `.claude-plugin/marketplace.json` line 21: `"license": "SEE LICENSE IN LICENSE",`, each by hand with Edit.
+- [x] The patch release: read `git show main:VERSION` again. If it differs from the Step 9 value, stop and report: the coordinator rebases onto the new main and Step 9 runs again, which sets README's PolyForm line and `LAST_POLYFORM_VERSION` to the value it reads. Otherwise set VERSION to the next patch number after the Step 9 value, run `node src/scripts/release.js`, and record its exit code (0) and the files it reports updated.
+- [x] Run `node --test tests/version-license-invariant.test.js tests/release.test.js tests/release-metadata-sync.test.js`: 0 failed (parent scenario 11, after). Record the counts as prose.
+- [x] Step 10 done
 
 ### Step 11: REVIEW
-- [ ] Dispatch `iron-loop-critic` with the parent's scenarios 1 to 8 and 11 to 14 and this slice's decisions: fill the fourteen-term table from LICENSE; check scenarios 3 to 6 sentence by sentence against Decisions 1, 2, 4 and 5; attack the definitions for a use that is free under one reading and paid under another, and the clauses for any right the owner's terms withhold (redistribution, sublicensing, modified copies, a competing product, business use after the evaluation period); check that README says nothing LICENSE does not; check every changed assertion against the table above (none loosened).
-- [ ] Step 11 done
+Ran: see "Send-back from the Step 11 review" in the Execution Record.
+- [x] Dispatch `iron-loop-critic` with the parent's scenarios 1 to 8 and 11 to 14 and this slice's decisions: fill the fourteen-term table from LICENSE; check scenarios 3 to 6 sentence by sentence against Decisions 1, 2, 4 and 5; attack the definitions for a use that is free under one reading and paid under another, and the clauses for any right the owner's terms withhold (redistribution, sublicensing, modified copies, a competing product, business use after the evaluation period); check that README says nothing LICENSE does not; check every changed assertion against the table above (none loosened).
+- [x] Step 11 done
 
 ### Step 12: OPTIMIZE
-- [ ] Record the run time of the three test files before (Step 8) and after (Step 10); the minimal lockfile fixture keeps the added fixture tests from copying the full lockfile. A material rise is a finding for Step 13's report.
-- [ ] Step 12 done
+- [x] Record the run time of the three test files before (Step 8) and after (Step 10); the minimal lockfile fixture keeps the added fixture tests from copying the full lockfile. A material rise is a finding for Step 13's report.
+- [x] Step 12 done
 
 ### Step 13: SECURE
-- [ ] Dispatch `security-scanner` on the diff: the test helpers (no path from file contents, no swallowed error, temporary folders removed), LICENSE and README (no secret, no personal data, no e-mail address other than tijn@theaiguys.com, no home-folder path, the account name only inside the repository address), and this plan file's records.
-- [ ] Step 13 done
+Ran: see "Send-back from the Step 13 security review" in the Execution Record.
+- [x] Dispatch `security-scanner` on the diff: the test helpers (no path from file contents, no swallowed error, temporary folders removed), LICENSE and README (no secret, no personal data, no e-mail address other than tijn@theaiguys.com, no home-folder path, the account name only inside the repository address), and this plan file's records.
+- [x] Step 13 done
 
 ### Step 14: VERIFY
-- [ ] `git show main:VERSION` still equals the Step 9 value; if main moved, stop and report (the rebase is the coordinator's).
-- [ ] `npm test`, the gated entry point, on this exact tree: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`. It includes the type check (`tests/typecheck.test.js`, also `npm run typecheck`); record that test's result by name. Run it in the foreground with a timeout long enough, up to 10 minutes; if it needs longer, run it in the background and end the turn.
-- [ ] `npm run lint`: no warning.
-- [ ] `claude plugin validate --strict --json` on the repository root with the same installed Claude Code: no error and no warning the Step 9 run did not report, and no message about the licence field (parent scenario 9). Record the output in full, the path written `<repo>`.
-- [ ] `git diff --numstat <the Step 9 commit>`: package-lock.json 3 and 3 (the licence and the two versions), package.json 2 and 2, `.claude-plugin/marketplace.json` 3 and 3, `.claude-plugin/plugin.json` 1 and 1, VERSION 1 and 1; CLAUDE.md unchanged, or changed only on count lines. Read the README diff: only line 8, the License section, the note's first sentence, the four version lines release.js writes (lines 9, 140, 1112 and 1183, each changed only in its version number) and any count lines.
-- [ ] Read VERSION, package.json `version`, both version values of package-lock.json, plugin.json `version`, and both version fields of the marketplace manifest: all equal VERSION (parent scenario 10).
-- [ ] The privacy scan over every added line of `git diff <the Step 9 commit>`, this plan file included: every match of `[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}` is tijn@theaiguys.com; no match of the home-folder patterns `[/]Users[/]`, `[/]home[/]`, `C:[\\]Users` or `[~][/]`; and every added line read for a person's name other than Tijn van der Zant. The account name, pattern `robo[t]ijn` (the home-folder and account-name patterns are written so that they cannot match this line), is checked in two steps (technical-planning decision 18): (a) remove from the added line every address that starts with `https://github.com/` followed by the account name and `/ctoc`; if no match of `robo[t]ijn` remains, the line passes; (b) otherwise the line passes only if it is in README.md, starts with `**<new VERSION>**`, and, with that prefix replaced by `**<the Step 9 VERSION>**`, is byte-identical to a line of `git show <the Step 9 commit>:README.md`; on the landed tree that is only README's footer line. Any other line fails. Record the result; a finding is fixed and Step 14 runs again.
-- [ ] Copy the changed-assertions table into the Execution Record, with any further change and its reason (parent scenario 15).
-- [ ] From here only this plan file's Execution Record changes; any other change runs Step 14 again.
-- [ ] Step 14 done
+- [x] `git show main:VERSION` still equals the Step 9 value; if main moved, stop and report (the rebase is the coordinator's).
+- [x] `npm test`, the gated entry point, on this exact tree: fail 0, skipped 0, coverage at or above `.ctoc/coverage-baseline.json` `minPct`. It includes the type check (`tests/typecheck.test.js`, also `npm run typecheck`); record that test's result by name. Run it in the foreground with a timeout long enough, up to 10 minutes; if it needs longer, run it in the background and end the turn.
+- [x] `npm run lint`: no warning.
+- [x] `claude plugin validate --strict --json` on the repository root with the same installed Claude Code: no error and no warning the Step 9 run did not report, and no message about the licence field (parent scenario 9). Record the output in full, the path written `<repo>`.
+- [x] `git diff --numstat <the Step 9 commit>`: package-lock.json 3 and 3 (the licence and the two versions), package.json 2 and 2, `.claude-plugin/marketplace.json` 3 and 3, `.claude-plugin/plugin.json` 1 and 1, VERSION 1 and 1; CLAUDE.md unchanged, or changed only on count lines. Read the README diff: only line 8, the License section, the note's first sentence, the four version lines release.js writes (lines 9, 140, 1112 and 1183, each changed only in its version number) and any count lines.
+- [x] Read VERSION, package.json `version`, both version values of package-lock.json, plugin.json `version`, and both version fields of the marketplace manifest: all equal VERSION (parent scenario 10).
+- [x] The privacy scan over every added line of `git diff <the Step 9 commit>`, this plan file included: every match of `[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}` is tijn@theaiguys.com; no match of the home-folder patterns `[/]Users[/]`, `[/]home[/]`, `C:[\\]Users` or `[~][/]`; and every added line read for a person's name other than Tijn van der Zant. The account name, pattern `robo[t]ijn` (the home-folder and account-name patterns are written so that they cannot match this line), is checked in two steps (technical-planning decision 18): (a) remove from the added line every address that starts with `https://github.com/` followed by the account name and `/ctoc`; if no match of `robo[t]ijn` remains, the line passes; (b) otherwise the line passes only if it is in README.md, starts with `**<new VERSION>**`, and, with that prefix replaced by `**<the Step 9 VERSION>**`, is byte-identical to a line of `git show <the Step 9 commit>:README.md`; on the landed tree that is only README's footer line. Any other line fails. Record the result; a finding is fixed and Step 14 runs again.
+- [x] Copy the changed-assertions table into the Execution Record, with any further change and its reason (parent scenario 15).
+- [x] From here only this plan file's Execution Record changes; any other change runs Step 14 again.
+- [x] Step 14 done
 
 ### Step 15: DOCUMENT
-- [ ] The Execution Record holds: the Step 8 and Step 10 test results as prose, with the runner's own figures for tests, passed and failed, the Claude Code version and both validator outputs, the diff counts, the fourteen-term table, the changed-assertions table, the privacy scan result, the Step 9 git config identity check (match or not; the commit-author check itself is the CTO Chief's, decision 20), and the list "What the agreement's text relies on that was not verified" carried forward for the owner. No other document changes: nothing under `docs/` names the licence (pattern `PolyForm|Shield` over `docs/`: 0 files).
-- [ ] Step 15 done
+- [x] The Execution Record holds: the Step 8 and Step 10 test results as prose, with the runner's own figures for tests, passed and failed, the Claude Code version and both validator outputs, the diff counts, the fourteen-term table, the changed-assertions table, the privacy scan result, the Step 9 git config identity check (match or not; the commit-author check itself is the CTO Chief's, decision 20), and the list "What the agreement's text relies on that was not verified" carried forward for the owner. No other document changes: nothing under `docs/` names the licence (pattern `PolyForm|Shield` over `docs/`: 0 files).
+- [x] Step 15 done
 
 ### Step 16: FINAL-REVIEW
+pending: dispatched by the CTO Chief
 - [ ] Dispatch `iron-loop-critic` against all fifteen parent scenarios, parent Decisions 1 to 9 and this slice's decisions, on the tree Step 14 verified; it re-checks the fourteen-term table against LICENSE itself, not against the record.
 - [ ] Report to the CTO Chief the commit-author check of parent scenario 15, which its commit-and-push step runs after the completion route (technical-planning decision 20): commit with `git -c user.name="Tijn van der Zant" -c user.email="tijn@theaiguys.com"` when the Step 9 config check did not match; after the commit and before the push, `git log -1 --format='%an <%ae>'` must print exactly `Tijn van der Zant <tijn@theaiguys.com>`, otherwise there is no push and the mismatch is reported. The result goes in the CTO Chief's report to the owner, not into this plan.
 - [ ] Step 16 done
+
+## Execution Record
+
+Written by the builder (Steps 8, 9, 10, 12, 14 and 15). Steps 11, 13 and 16 are run by separate reviewers; Steps 11 and 13 are done (their send-back records follow), Step 16 is the final review whose send-back is recorded at the end. The repository's path is written `<repo>` and temporary folders `<tmp>`.
+
+### Step 8: tests first, seen failing
+
+The four test files were changed first (`tests/helpers/source-of-truth.js`, `tests/version-license-invariant.test.js`, `tests/release.test.js`, `tests/release-metadata-sync.test.js`); LICENSE, README.md, package.json, package-lock.json and the manifests were untouched.
+
+`node --test tests/version-license-invariant.test.js tests/release.test.js`: 60 tests, 40 passed, 20 failed, 0 skipped (duration 313 ms). Per file: `tests/version-license-invariant.test.js` 15 tests, 3 passed, 12 failed; `tests/release.test.js` 45 tests, 37 passed, 8 failed.
+
+Failing, in `tests/version-license-invariant.test.js` (12): "every licence declaration names the agreement" (its output named package.json, marketplace.plugin, package-lock.json and LICENSE, each still on the old value); "license is the correct pinned identifier across manifests" (package.json reads PolyForm-Shield-1.0.0); "license identifier traces to the actual LICENSE file text" (first line is the PolyForm title); "LICENSE holds the agreement, not the PolyForm Shield text"; "README states the agreement and which copies stay under PolyForm Shield" (2 lines name PolyForm, not 1); "the tree carrying the agreement is labelled after the last PolyForm Shield version" (VERSION was 6.14.135); the five "putting one licence value back fails, naming its file" tests for package.json, package-lock.json, marketplace.plugin, plugin.json and LICENSE (each fixture also carried the old values, so more than one file was named); and "a lockfile without a root package entry fails, naming package-lock.json" (the fixture also carried the old package.json, marketplace and LICENSE values).
+
+Failing, in `tests/release.test.js` (8): "package.json license points to LICENSE, and LICENSE opens with the agreement title" (problems named package.json and LICENSE); "an unchanged copy of the tree passes"; "SEE LICENSE IN LICENSE.txt fails, naming package.json"; "the old PolyForm-Shield-1.0.0 value in package.json fails, naming package.json"; "a reverted license (Apache-2.0) fails, naming package.json"; "no LICENSE file fails, naming LICENSE as missing"; "a LICENSE that is a folder fails, naming LICENSE as not a file"; "a LICENSE that opens with the PolyForm Shield title fails, naming LICENSE". In the last five and the first two, the failure was the extra old value (package.json or LICENSE) the Test Plan table predicts; no failure outside the table.
+
+Passing, as the Test Plan table predicts: in the invariant file "all version fields agree with the VERSION file", "mutating one version value fails the invariant (RED-on-drift)" and "reverting the license fails the invariant" (Apache-2.0, a regression pin); in the release file the version tests, the two version drift fixtures and "a stat error other than a missing file is re-thrown" (the helper was rewritten in this step).
+
+`node --test tests/release-metadata-sync.test.js`: 30 tests, 30 passed, 0 failed (702 ms); it cannot fail first, because the release script leaves the licence alone whatever its value.
+
+### Step 9: prepare
+
+- `git merge-base HEAD main` equals `git rev-parse main`: 63bb4cbe4f6bb1ef49f8bf3bee1b8a8ae37f1ee1. That is the Step 9 commit. `git show main:VERSION` read 6.14.135, so README's PolyForm line and `LAST_POLYFORM_VERSION` use 6.14.135 and no change goes to the owner.
+- `git config user.name` and `git config user.email` are exactly Tijn van der Zant and tijn@theaiguys.com: match. The commit-author check itself is the CTO Chief's (decision 20).
+- `claude --version`: 2.1.309 (Claude Code). `claude plugin validate --help` confirms `--json` and `--strict`; the command starts no session and calls no model.
+- The files of the slice were at the lines the plan names (README lines 8, 9, 140, 1112, 1168-1172, 1174, 1179, 1183; package.json line 5; package-lock.json line 10; marketplace.json line 21); no line moved. LICENSE was 150 lines (the plan says 151).
+- Owner's answer of 2026-10-23 on outside contributions applied (decision 23).
+- `claude plugin validate --strict --json` on the repository root, before any manifest change (exit code 1, because of the warnings; none is about the licence). Full output:
+
+```json
+{
+  "success": false,
+  "strict": true,
+  "target": "<repo>/.claude-plugin/marketplace.json",
+  "manifest": {
+    "file": "<repo>/.claude-plugin/marketplace.json",
+    "type": "marketplace",
+    "errors": [],
+    "warnings": [
+      {
+        "path": "plugins[0] plugin.json → author",
+        "message": "No author information provided. Consider adding author details for plugin attribution",
+        "code": null
+      }
+    ],
+    "notes": [],
+    "gatingHooks": []
+  },
+  "contents": [
+    {
+      "file": "<repo>/.claude-plugin/plugin.json",
+      "type": "plugin",
+      "errors": [],
+      "warnings": [
+        {
+          "path": "author",
+          "message": "No author information provided. Consider adding author details for plugin attribution",
+          "code": null
+        }
+      ],
+      "notes": [],
+      "gatingHooks": []
+    },
+    {
+      "file": "<repo>/CLAUDE.md",
+      "type": "plugin",
+      "errors": [],
+      "warnings": [
+        {
+          "path": "root",
+          "message": "CLAUDE.md at the plugin root is not loaded as project context. To ship context with your plugin, use a skill (skills/<name>/SKILL.md) instead.",
+          "code": null
+        }
+      ],
+      "notes": [],
+      "gatingHooks": []
+    }
+  ],
+  "advice": [
+    {
+      "file": "<repo>/README.md",
+      "message": "This README has no line that installs \"ctoc\" from a marketplace. Add the install line, which works in one step on Claude Code 2.1.275 or later. In it, replace <owner>/<repo> with the repository that holds the marketplace.",
+      "installLine": "/plugin install ctoc --marketplace <owner>/<repo>"
+    }
+  ],
+  "directory": {
+    "profile": null,
+    "findings": [
+      {
+        "code": "ICON_MISSING",
+        "title": "No icon",
+        "severity": "warning",
+        "blocking": false,
+        "hold": false,
+        "file": ".claude-plugin/plugin.json",
+        "field": "icon",
+        "message": "No icon found in the plugin. The validator looked for `icon` in plugin.json and for a file at .claude-plugin/icon.png or .svg, assets/icon.png or .svg, or a similar path.",
+        "fix": "Add a square PNG to the plugin folder at .claude-plugin/icon.png, or set `icon` in plugin.json to the path of a square PNG or JPEG in the plugin: 512 to 2048 px on each side, under 2 MB. SVG and WebP are not accepted. That file may become the listing icon only once: the first time the plugin is saved or submitted in the developer portal. Adding or changing it later does not change the icon."
+      }
+    ],
+    "undecided": [],
+    "incomplete": false,
+    "failure": null,
+    "notes": [
+      "This folder also holds a marketplace manifest. The plugin directory treats such a folder as a plugin, so these checks cover only the plugin in this folder. To check another plugin that the marketplace lists, run validate on that plugin's folder."
+    ]
+  }
+}
+```
+
+### Step 10: implement
+
+- LICENSE written as the twelve sections of the clause table plus title, copyright and repository lines, in the builder's own words; only the organisation list, "regardless of its source of funding", "less than 32 consecutive calendar days" and the once-only phrase are verbatim, written without quotation marks (the table's marks mark fixed text, they are not characters of the agreement). No cap amount, no termination, severability, patent or entire-agreement clause, and no word "PolyForm" in it.
+- README: badge on line 8, the `## License` section and the note on line 1181 as specified, with the note's remainder as decision 23 says.
+- package.json, package-lock.json (root package) and the marketplace entry each carry `"license": "SEE LICENSE IN LICENSE",`, edited by hand with Edit as the plan says; npm was not run to rewrite the lockfile.
+- Patch release: `git show main:VERSION` read again 6.14.135 (main unchanged, same commit). VERSION set to 6.14.136; `node src/scripts/release.js` ran to "Done." (exit code 0); it reported updated: `.claude-plugin/marketplace.json`, `.claude-plugin/plugin.json`, `package.json`, `package-lock.json`, and README.md four times (its four version lines). CLAUDE.md and README.md count lines: no change.
+- `node --test` on the three files: 90 tests, 90 passed, 0 failed, 0 skipped (605 ms). Up from 60 + 30 tests at Step 8.
+
+### Step 12: run time of the three test files
+
+Before (Step 8, same new tests, old tree): invariant file 72 ms, release file 105 ms, sync file 702 ms; the two-file red run 313 ms. After (Step 10): the three files together 605 ms. No rise; the minimal lockfile fixture keeps the added fixture tests cheap.
+
+### Step 14: verify
+
+LICENSE was reworded once after the first Step 14 pass (quotation marks around the fixed phrases of section 2(c) removed, one clause of section 1 dropped, section 4 rewrapped to about 72 characters), so every check below was run again on the final tree; the figures below are from that final run: the three test files 90 tests, 90 passed, 0 failed, 0 skipped; lint clean; validator output unchanged; `npm test` 14082 tests, 14082 passed, 0 failed, 0 skipped, coverage 99.73%, "[CTOC test-gate] PASS" (this third run had no timing failure either); the numstat and the privacy scan as stated.
+
+- `git show main:VERSION` still 6.14.135, `git rev-parse main` still the Step 9 commit.
+- `npm test` (the gated entry point), first run: 1 failure, `tests/quality-agent-coverage.test.js` "a passing run with a long blank stretch is read in linear time" ("512 KB of blank lines took 39.3 ms and 2048 KB took 328.9 ms"), coverage 99.72%. Root cause investigated: the test measures a ratio of two wall-clock timings of the quality agent's output reader; this slice changes nothing under `src/` (the diff touches no file there) and nothing that test reads. The machine's load average was about 60 during the run (several other agents building). The same test, run alone nine times under a load of 50 to 60, passed every time (fail 0). Reading: a timing outlier from contention while the gated suite ran its files in parallel on a loaded machine, not a defect of this slice; the test was not changed. Second run of `npm test` on the same tree: 14082 tests, 14082 passed, 0 failed, 0 skipped, coverage 99.73% against the floor of 99 in `.ctoc/coverage-baseline.json`, "[CTOC test-gate] PASS", corpus claims verified 3, refuted 0.
+- Type check: `tests/typecheck.test.js` "tsc --checkJs error count stays at or below the committed baseline" passed (also inside the gated run).
+- `npm run lint` (`eslint . --max-warnings 0`): no output beyond the command banner, no warning.
+- `claude plugin validate --strict --json` after the change, same Claude Code 2.1.309: output byte-identical to the Step 9 output above once the path is written `<repo>` (a diff of the two reported no difference). Same exit code 1, from the same three warnings; no new error or warning, and no message about the licence field.
+- `git diff --numstat` against the Step 9 commit (added, removed): package-lock.json 3 and 3; package.json 2 and 2; `.claude-plugin/marketplace.json` 3 and 3; `.claude-plugin/plugin.json` 1 and 1; VERSION 1 and 1; LICENSE 138 and 105; README.md 10 and 8; the four test files 60/31, 11/3, 92/20 and 210/41; CLAUDE.md unchanged. README diff read: line 8 (badge) and line 9 (version badge), line 140, line 1112, the License section (lines 1170 to 1174), the note (line 1181) and the footer (line 1185); each version line changed only in its number.
+- VERSION 6.14.136; package.json `version`, both version values of package-lock.json, plugin.json `version` and both version fields of the marketplace manifest all read 6.14.136.
+- Privacy scan (a script over every added line of the diff against the Step 9 commit plus every line of this plan file): every e-mail match is tijn@theaiguys.com; no match of the home-folder patterns; no person's name other than Tijn van der Zant; the account name appears only inside addresses starting with the repository's address, and on README's footer line, which is byte-identical to the Step 9 footer once `**6.14.136**` is replaced by `**6.14.135**`. Result: 0 problems.
+
+Changed assertions (parent scenario 15), each tightened, none loosened:
+
+| File and place | Old | New | Reason |
+|---|---|---|---|
+| version-license-invariant line 19 | `EXPECTED_LICENSE = 'PolyForm-Shield-1.0.0'` | `'SEE LICENSE IN LICENSE'` | the licence changes (parent Decision 3); the comparison stays exact |
+| version-license-invariant line 77 | `assert.match(firstLine, /PolyForm Shield License 1\.0\.0/)` | `assert.strictEqual(firstLine, AGREEMENT_TITLE)` | a pattern becomes the exact line (parent Decision 6) |
+| release.test.js lines 714-715 | `assert.ok(lic.declared !== null, 'package.json declares no license')` and `assert.ok(lic.actual !== null, 'LICENSE file has no readable first line')` | the verdict's problems deep-equal `[]` | a missing package.json value now fails as a named package.json problem, a missing LICENSE as a named LICENSE problem and an empty LICENSE as a first-line problem; the "no LICENSE file" fixture proves the LICENSE case, so nothing is loosened |
+| release.test.js lines 716-721 | `assert.strictEqual(lic.declared, lic.actual, …)` on reduced tokens | the verdict's problems deep-equal `[]` | the reduced comparison cannot hold for the new pair and passed any pair whose reduced tokens matched; the new check needs the exact value, the file and the exact title (parent Decision 8) |
+| release.test.js lines 787-791 | `assert.notStrictEqual(lic.declared, lic.actual, …)` | problems name exactly `['package.json']` | the fixture must fail for the named file and only for it |
+| release-metadata-sync line 260 | fixture value `'PolyForm-Shield-1.0.0'` | `'SEE LICENSE IN LICENSE'` | fixture data, not an assertion; test 8 gains two assertions (the lockfile root licence value, and package.json's text equal to its text before with only the version replaced) and a package.json fixture |
+
+Further changes beyond the table, with reasons: the first release test was renamed "package.json license points to LICENSE, and LICENSE opens with the agreement title" and the Apache-2.0 fixture test renamed "a reverted license (Apache-2.0) fails, naming package.json" (the plan names both changes); the five put-back fixtures in the invariant file are one test each, generated from a table in a loop, with the names "putting one licence value back fails, naming its file: <file>"; the test constants `OLD_LICENSE_VALUE` and `OLD_TITLE` hold the PolyForm strings so each is written once per file; the two unchanged fixture tests in the invariant file ("mutating one version value fails the invariant (RED-on-drift)" and "reverting the license fails the invariant") were moved onto the `withFixture` helper, with their assertions identical.
+
+### Send-back from the Step 11 review (back to Step 10, same build)
+
+The review (13 findings, 2 blocking) was applied by the builder on the CTO Chief's decisions. Findings 12 (docs/CONTRIBUTING.md and the pull-request template still invite forks and pull requests) and 13 (a timing test in the gated suite) are for the owner and were not acted on.
+
+Changes:
+
+| Finding | Change | File |
+|---|---|---|
+| 1 (blocking) | Section 2(e) gains the payment definition: payment means payment to you, or to the organisation you act for, for the product or service itself; wages, tuition, fees, grants, donations and public funding that support a non-commercial purpose under (c) are not payment for a product or service under (e). The owner's term stays: use for a commercial product or a paid service is business use. | LICENSE |
+| 2 (blocking) | Personal use (d) gains "and not for or on behalf of a company, partnership or other legal entity". The order rule reads "A use that falls under (c) is not business use, even where (a) or (b) also describes it." "(e) overrides (c) and (d)" is kept. | LICENSE |
+| 3 | Section 4 opens "Free of charge, and on the conditions of section 3, the licensor lets any person or company use CTOC for evaluation, ..." so evaluation is free without importing section 3's purpose limit. | LICENSE |
+| 4 | Section 10 reads "business use, business evaluation included". | LICENSE |
+| 5 | Section 7 gains "A fork that holds changes to CTOC is a changed copy under section 6(c)." | LICENSE |
+| 6 | Section 4 now uses the defined term: "If you use CTOC for your company, the period is your company's, and it covers everyone who uses CTOC for your company." The definition stays (it also carries the affiliates and control definitions that section 4 relies on); the fixed once-only phrase is unchanged. | LICENSE |
+| 7 | README's PolyForm line reads "Every copy of CTO Chief from version 6.1.26 up to and including version 6.14.135 stays under the PolyForm Shield License 1.0.0, and earlier copies stay under the license they shipped with." The CTO Chief verified with git that LICENSE was the Mozilla Public License 2.0 before 6.1.26 (commit 757f5f99 adopted PolyForm Shield in 6.1.26; the marketplace manifest said MIT before it). Invariant test 5 now requires `from version 6.1.26 up to and including version 6.14.135` (new constant `FIRST_POLYFORM_VERSION`) and `earlier copies stay under the license they shipped with`, besides every old needle. | README.md, tests/version-license-invariant.test.js |
+| 8 | `licenseMismatches` keeps `meta` from `readMetadata(root)` and compares `meta.license.licenseFileFirstLine` with `AGREEMENT_TITLE`; the third first-non-empty-line reader (`firstLine`) and the second read of LICENSE are deleted. Same value, same comparison. | tests/version-license-invariant.test.js |
+| 9 | `projectRoot` is imported from the helper once and used in the three places that wrote `path.resolve(__dirname, '..')`. | tests/release.test.js |
+| 10 | The helper header says that `readLicenseSources` reports `'missing'` or `'not-a-file'` and re-throws any other stat error, as the one exception to the null contract. | tests/helpers/source-of-truth.js |
+| 11 | The `withFixture` move is listed above under "Further changes". | this plan |
+
+Changed assertions added by this send-back (none loosened):
+
+| File and place | Old | New | Reason |
+|---|---|---|---|
+| version-license-invariant, README test | `line.includes('up to and including version 6.14.135')` | `line.includes('from version 6.1.26 up to and including version 6.14.135')` and `line.includes('earlier copies stay under the license they shipped with')`; every other needle stays | the sentence now names its first version (finding 7); the check is longer, so stricter |
+| version-license-invariant, `licenseMismatches` | the LICENSE title read by a local `firstLine(fs.readFileSync(...))` | `meta.license.licenseFileFirstLine` from the shared reader | one reader instead of two; the same exact comparison with `AGREEMENT_TITLE`, the same `{ file: 'LICENSE', value }` mismatch (finding 8) |
+
+Decisions taken in the send-back (the CTO Chief's, applied by the builder):
+- **24. Payment is defined in 2(e),** so tuition, fees, wages, grants, donations and public funding for a purpose under (c) are not payment for a product or service, and a university, school, hospital or public body stays a free user; (e) still overrides (c) and (d) for a product or service that is itself sold, licensed or provided for payment.
+- **25. The order rule names only (c),** and (d) excludes work for a legal entity by its own words, so an unpaid person working for a company is business use under (a); a charity's paid staff stay free under (c).
+- **26. A fork that holds changes is a changed copy (6(c)).** Reason: the owner's terms forbid distributing modified copies, and a fork on GitHub is public. Private changes for your own permitted use stay allowed (section 3); only forking unchanged CTOC on GitHub stays allowed (section 7).
+- **27. The defined term "Your company" is kept and used** in section 4 (finding 6, first option).
+- **28. README names the first PolyForm version,** because the earlier copies were under the Mozilla Public License 2.0, not PolyForm Shield (finding 7).
+
+Results after the changes: `node --test tests/version-license-invariant.test.js tests/release.test.js tests/release-metadata-sync.test.js`: 90 tests, 90 passed, 0 failed, 0 skipped (about 0.7 s). `npm run lint` (`eslint . --max-warnings 0`): no output beyond the banner, no warning. The full gated `npm test`, the validator, the numstat and the privacy scan figures in Step 14 above were taken before this send-back (LICENSE, README.md and two test files have since changed); the completion route runs Step 14 again on this tree.
+
+### Send-back from the Step 13 security review (back to Step 10, same build)
+
+Two findings, both applied (warnings are bugs):
+
+| Finding | Change | File |
+|---|---|---|
+| fixture folder left behind | `makeFixtureRoot` now does every read (package.json, plugin.json, marketplace.json, the lockfile, VERSION, LICENSE) and the change step first, creates the temporary folder only after they succeed, and removes it again and re-throws if a write fails. Before: red, 2 tests failed (folder `metadata-invariant-…` left in the isolated parent); after: green. | tests/version-license-invariant.test.js |
+| swallowed LICENSE read error | `readLicenseSources` reads a LICENSE that stats as a file with plain `fs.readFileSync(licensePath, 'utf8')` (no catch), so a read error such as permission denied surfaces. Before: red (the error was swallowed into a null first line); after: green. | tests/helpers/source-of-truth.js |
+
+Changed assertions added by this send-back (none loosened):
+
+| File and place | Old | New | Reason |
+|---|---|---|---|
+| source-of-truth `readLicenseSources`, LICENSE that is a file | a read error gave `licenseFirstLine` null, reported as "first line is null" | the read error is thrown | the real cause is no longer hidden; every existing assertion stays as it was, and a file that reads fine behaves the same |
+| version-license-invariant, new tests | none | "a fixture build that fails leaves no folder behind" (two cases: the change step throws; a file write fails, via a BigInt in package.json) and "a LICENSE that stats as a file but cannot be read surfaces the read error" | prove both fixes; the first two point `os.tmpdir()` at an isolated parent folder and assert it is empty afterwards |
+
+Decisions taken in the send-back:
+- **29. `readLicenseSources` no longer swallows the read of a LICENSE file** (changes what the plan specified, which read through `safeReadText`). Reason: the security review found the swallowed read hid the real cause behind "first line is null". Same rule as the stat re-throw of decision 19.
+- **30. The surfaced read error is tested by making only the LICENSE read throw EACCES at the `fs.readFileSync` boundary, and the folder-leak test by redirecting `os.tmpdir()` to an isolated parent.** No portable real file stats as a file yet fails to read (a permission mode does nothing on Windows or as root, and a non-UTF-8 LICENSE is not a read error), so a real fault cannot be built; the injected fault runs the real stat and the real code path around the read. Decision 19's stat error stays tested with its real NUL-character path.
+
+Results: `node --test` on `tests/version-license-invariant.test.js`, `tests/release.test.js` and `tests/release-metadata-sync.test.js`: 93 tests, 93 passed, 0 failed, 0 skipped (up from 90: three new tests). `npm run lint` (`eslint . --max-warnings 0`): no output beyond the banner, no warning. No `metadata-invariant-*` folder is left in the system temporary folder after the run. The full gated `npm test` was not run here; the completion route runs it.
+
+### Step 15: document
+
+Nothing under `docs/` names the licence, so no other document changes. The Step 9 identity check: match (the commit-author check is the CTO Chief's, decision 20). No assertion was loosened and no test was skipped.
+
+### What the agreement's text relies on that was not verified (carried forward for the owner)
+
+Unchanged from the list in the plan body: no lawyer has reviewed the text (a Dutch lawyer reviews it for a later release, by the owner's answer); the official text of Dutch Civil Code articles 6:231 to 6:248 was not reached; the rule on intent and deliberate recklessness rests on secondary sources; the Product Liability Directive's application date is contested; whether a licence file and README notice without a click-through bind a business to pay; whether the repository and listing "direct activities" to other member states; whether Dutch law lets a licensor end a licence with no termination clause by notice; whether "as far as the law allows" meets transparency rules; and whether the PolyForm Project sets conditions on reusing its wording (the organisation list and the 32-day phrase are verbatim by the owner's decisions; everything else was written in the builder's own words).
+
+Also for the owner: the plan asked the lockfile line to be edited by hand and not through npm; that was done, so the dispatch brief's "via npm" was read as the plan's "never by npm install". The one gated-suite timing failure on the first run is described under Step 14.
+
+### Send-back from the Step 16 final review (back to Step 10, same build)
+
+Two blocking findings and the small ones, applied on the CTO Chief's decisions. The review could not run the tests; the figures below are the builder's.
+
+Changes:
+
+| Finding | Change | File |
+|---|---|---|
+| 1 (blocking) | The payment paragraph of section 2(e) is replaced. The old text counted fees that support a non-commercial purpose as not payment, which cancelled the owner's term that a paid product or service is business use, also when a listed organisation makes it. New text: payment is money or other value received in exchange for the product or service; only these are not payment: the wages of an individual, tuition an educational institution listed in (c) receives for its teaching, fees a public safety or health organisation listed in (c) receives for its care, fees a government institution listed in (c) charges for its public tasks, and grants, donations and public funding; any other product or service a listed organisation sells, licenses or provides for payment is business use, also when the money supports a non-commercial purpose. The government-fee exception is the CTO Chief's addition to the review's text. | LICENSE |
+| 2 (blocking) | The fourteen-term table below, with line numbers re-read after finding 1; Steps 11 and 13 ticked with a pointer to their records. | this plan |
+| not blocking 1 | Section 4: "on the same conditions as section 3, apart from its limit to personal and non-commercial use". | LICENSE |
+| not blocking 6 | `const pkg = readJson(` (missing space). | tests/version-license-invariant.test.js |
+| not blocking 2, 3, 4 | Recorded below as consequences and accepted debt. | this plan |
+
+No assertion was changed in this send-back.
+
+Final text of the payment paragraph (LICENSE lines 72-82, inside 2(e)):
+
+> Payment means money or other value that you, or the organisation you act for, receive in exchange for that product or service. Only these are not payment under this paragraph: the wages of an individual; tuition that an educational institution listed in (c) receives for its teaching; fees that a public safety or health organisation listed in (c) receives for its care; fees that a government institution listed in (c) charges for its public tasks; and grants, donations and public funding. Any other product or service that an organisation listed in (c) sells, licenses or provides for payment is business use, also when the money it brings in supports a non-commercial purpose.
+
+The fourteen terms of the owner against LICENSE as it stands after this send-back (line numbers read from the file after the edit):
+
+| Term | LICENSE section | Lines |
+|---|---|---|
+| 1 personal use free | 3 | 88-90 |
+| 2 evaluation free | 4 | 96-100, 102-106 |
+| 3 non-commercial use free | 3 | 88-90 |
+| 4 business use needs a paid commercial license | 5 | 113-115 |
+| 5 asked at tijn@theaiguys.com | 5 | 117 |
+| 6 no redistribution | 6(a) | 127-128 |
+| 7 no sublicensing | 6(b) | 130 |
+| 8 no distributing modified copies | 6(c), 7 | 132-133, 150-151 |
+| 9 no competing product | 6(d) | 135-141 |
+| 10 no removing notices | 6(e) | 143-144 |
+| 11 private changes for own permitted use | 3 | 90-92 |
+| 12 licensor Tijn van der Zant | 1 | 8 |
+| 13 Dutch law | 11 | 187 |
+| 14 competent Dutch court | 11 | 191-194 |
+
+No clause grants a right the owner's terms withhold: section 3 is limited to its purposes, section 4 is time-boxed and once only, section 7 covers GitHub only, and section 12 grants nothing implied.
+
+Consequences for the owner and the lawyer's list:
+- **Paid contract research is business use.** Under the settled term, any other product or service that a listed organisation sells, licenses or provides for payment is business use, also when the money supports its purpose; the exceptions are only wages, tuition, care fees, government fees for public tasks, grants, donations and public funding. A university that sells contract research with CTOC needs a commercial license.
+- **"Charitable organisation" is undefined.** A foundation without charity status is free under one reading and paid under another. For the lawyer's list.
+- **Unpaid volunteers of legal entities that are not on the list** (sports clubs, open-source foundations) are business use under (a).
+
+Accepted debt, recorded for the owner:
+- No secret scanner or static-analysis engine is installed on this machine (the first finding of Step 13, the reason for its warn verdict); the privacy scan was a hand-written script.
+- `docs/CONTRIBUTING.md` still invites forks with changes and pull requests, which section 6(c) and README now contradict. It is outside this plan's files; for the owner to schedule.
+- An existing user who updates moves onto the new terms with no notice, and README does not say how to stay on 6.14.135. The install-notice item is already on the owner's list.
+- "SEE LICENSE IN LICENSE" is not a standard licence identifier, so tools that parse those identifiers report an unknown value.
+- The gated suite holds a timing test (`tests/quality-agent-coverage.test.js`), against the rule of 2026-10-18; outside this slice.
+
+Results after the changes: `node --test tests/version-license-invariant.test.js tests/release.test.js tests/release-metadata-sync.test.js`: 93 tests, 93 passed, 0 failed, 0 skipped. `npm run lint` (`eslint . --max-warnings 0`): no output beyond the banner, no warning. LICENSE changed, so the full gated `npm test`, the validator, the diff counts and the privacy scan of Step 14 were not re-run here; the completion route runs Step 14 again.

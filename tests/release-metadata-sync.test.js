@@ -257,7 +257,7 @@ const realisticLock = () => ({
   lockfileVersion: 3,
   requires: true,
   packages: {
-    '': { name: 'ctoc', version: '6.14.123', license: 'PolyForm-Shield-1.0.0', devDependencies: { eslint: '^9.0.0' } },
+    '': { name: 'ctoc', version: '6.14.123', license: 'SEE LICENSE IN LICENSE', devDependencies: { eslint: '^9.0.0' } },
     'node_modules/eslint': { version: '9.1.0', dev: true }
   }
 });
@@ -271,10 +271,13 @@ function runRelease(root) {
 }
 
 describe('release.js — package-lock.json sync target', () => {
-  test('8. the lockfile follows VERSION; only its two version values change', () => {
-    const root = makeFixture({ version: '6.14.125', packageLock: realisticLock() });
+  test('8. the lockfile follows VERSION; only its two version values change, and neither licence is written', () => {
+    const packageJson = { name: 'ctoc', version: '6.14.123', license: 'SEE LICENSE IN LICENSE', private: true };
+    const root = makeFixture({ version: '6.14.125', packageJson, packageLock: realisticLock() });
     const lockPath = path.join(root, 'package-lock.json');
+    const pkgPath = path.join(root, 'package.json');
     const before = fs.readFileSync(lockPath, 'utf8');
+    const pkgBefore = fs.readFileSync(pkgPath, 'utf8');
 
     const result = runRelease(root);
 
@@ -283,10 +286,15 @@ describe('release.js — package-lock.json sync target', () => {
     const lock = JSON.parse(text);
     assert.strictEqual(lock.version, '6.14.125');
     assert.strictEqual(lock.packages[''].version, '6.14.125');
+    assert.strictEqual(lock.packages[''].license, 'SEE LICENSE IN LICENSE');
     assert.strictEqual(lock.packages['node_modules/eslint'].version, '9.1.0');
     assert.strictEqual(before.split('"version": "6.14.123"').length - 1, 2);
     assert.strictEqual(text, before.split('"version": "6.14.123"').join('"version": "6.14.125"'));
     assert.strictEqual(text, JSON.stringify(lock, null, 2) + '\n');
+    assert.strictEqual(
+      fs.readFileSync(pkgPath, 'utf8'),
+      pkgBefore.replace('"version": "6.14.123"', '"version": "6.14.125"')
+    );
   });
 
   test('9. a lockfile that cannot be parsed fails the release and is left untouched', () => {

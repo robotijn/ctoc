@@ -10,6 +10,9 @@
  * `package.json` / `plugin.json` / `marketplace.json` / `LICENSE`. That blind spot
  * is exactly how the shipped artifact drifted (version 6.9.49 vs VERSION 6.10.3,
  * license Apache-2.0 vs the actual PolyForm Shield 1.0.0) under a fully green suite.
+ * The license check now reads the exact value package.json declares ("SEE LICENSE
+ * IN LICENSE") and the top-level file it names, and compares the file's first line
+ * with the agreement's title; it reduces nothing to tokens.
  * This module reads the REAL on-disk sources and returns raw values + agreement
  * verdicts so the caller can assert; it contains no assertions of its own.
  *
@@ -22,7 +25,11 @@
  * reader `tests/helpers/metadata-invariant.js` (the throw-on-missing variant). This
  * module is the plan-specified reader with a DEFENSIVE-NULL contract: a missing or
  * unparseable source yields a `null` field (so an assertion fails loudly, naming the
- * file, rather than throwing opaquely). Both readers are pure reads over the same
+ * file, rather than throwing opaquely). The exception is `readLicenseSources`: it
+ * reports a missing or non-file LICENSE as 'missing' or 'not-a-file' and re-throws
+ * any other stat error and any read error on a LICENSE file, so a real I/O
+ * failure is never read as a missing file or an empty first line.
+ * Both readers are pure reads over the same
  * five files; this one is the reader s5's release.test assertions consume.
  *
  * Not named `*.test.js` and lives under tests/helpers/, so the
@@ -77,24 +84,6 @@ function firstNonEmptyLine(text) {
 }
 
 /**
- * Normalize a license string to a stable comparison token so that the SPDX-ish
- * identifier declared in package.json (e.g. "PolyForm-Shield-1.0.0") and the
- * human-readable first line of the LICENSE file (e.g. "PolyForm Shield License
- * 1.0.0") reduce to the same token — while genuinely different licenses (Apache
- * vs PolyForm) do NOT collide. Lower-cases, drops the standalone word "license",
- * and strips every non-alphanumeric character.
- * @param {string|null} raw Raw license string.
- * @returns {string|null} Stable token, or null if the input is null.
- */
-function normalizeLicense(raw) {
-  if (typeof raw !== 'string') return null;
-  return raw
-    .toLowerCase()
-    .replace(/\blicense\b/g, '')
-    .replace(/[^a-z0-9]/g, '');
-}
-
-/**
  * Read the version string reported by each real source file. A missing or
  * unparseable source (or a missing field / missing ctoc marketplace entry)
  * yields `null` for that field so `allVersionsAgree` fails loudly and names it.
@@ -129,29 +118,38 @@ function readVersionSources(root = projectRoot) {
 }
 
 /**
- * Read the license declared in package.json against the license the actual
- * LICENSE file states. Returns normalized comparison tokens (`declared`,
- * `actual`) alongside the raw strings (`declaredRaw`, `actualRaw`) for the
- * failure message. A missing source yields `null` for that field.
+ * Read the exact license value package.json declares and what the top-level
+ * LICENSE entry is: a regular file, missing, or something else (a folder, for
+ * example). A stat error other than "missing", and a read error on a LICENSE
+ * that is a file, are re-thrown, so a test fails loudly with the real error
+ * instead of reading a swallowed one.
  *
  * @param {string} [root=projectRoot] Repo root to read from.
  * @returns {{
- *   declared: string|null,
- *   actual: string|null,
  *   declaredRaw: string|null,
- *   actualRaw: string|null
- * }} Normalized tokens for equality plus raw strings for messaging.
+ *   licenseFile: 'file'|'missing'|'not-a-file',
+ *   licenseFirstLine: string|null
+ * }} The exact declared value (null if absent), the kind of LICENSE entry, and
+ *   the first non-empty line of LICENSE (null unless it is a file).
  */
 function readLicenseSources(root = projectRoot) {
   const pkg = safeReadJson(path.join(root, 'package.json'));
   const declaredRaw = pkg && typeof pkg.license === 'string' ? pkg.license : null;
-  const actualRaw = firstNonEmptyLine(safeReadText(path.join(root, 'LICENSE')));
+  const licensePath = path.join(root, 'LICENSE');
+
+  let licenseFile;
+  try {
+    licenseFile = fs.statSync(licensePath).isFile() ? 'file' : 'not-a-file';
+  } catch (err) {
+    if (err && err.code === 'ENOENT') licenseFile = 'missing';
+    else throw err;
+  }
 
   return {
-    declared: normalizeLicense(declaredRaw),
-    actual: normalizeLicense(actualRaw),
     declaredRaw,
-    actualRaw,
+    licenseFile,
+    licenseFirstLine:
+      licenseFile === 'file' ? firstNonEmptyLine(fs.readFileSync(licensePath, 'utf8')) : null,
   };
 }
 
@@ -172,10 +170,46 @@ function allVersionsAgree(sources) {
   return { ok: !anyNull && allEqual, values: sources };
 }
 
+/**
+ * Verdict on whether the license declaration holds: package.json declares
+ * exactly `expectedValue`, a file named LICENSE exists at the top level, and its
+ * first non-empty line is exactly `expectedTitle`. Every problem names the file
+ * at fault; `ok` is true only when there is no problem.
+ *
+ * @param {ReturnType<typeof readLicenseSources>} sources License sources.
+ * @param {{ expectedValue: string, expectedTitle: string }} expected Exact values.
+ * @returns {{ ok: boolean, problems: Array<{ file: 'package.json'|'LICENSE', message: string }> }}
+ *   Verdict plus the named problems.
+ */
+function licenseDeclarationVerdict(sources, { expectedValue, expectedTitle }) {
+  const problems = [];
+  if (sources.declaredRaw !== expectedValue) {
+    problems.push({
+      file: 'package.json',
+      message:
+        `package.json "license" is ${JSON.stringify(sources.declaredRaw)}; ` +
+        `expected ${JSON.stringify(expectedValue)}`,
+    });
+  }
+  if (sources.licenseFile === 'missing') {
+    problems.push({ file: 'LICENSE', message: 'LICENSE is missing at the top level of the repository' });
+  } else if (sources.licenseFile === 'not-a-file') {
+    problems.push({ file: 'LICENSE', message: 'LICENSE at the top level of the repository is not a file' });
+  } else if (sources.licenseFirstLine !== expectedTitle) {
+    problems.push({
+      file: 'LICENSE',
+      message:
+        `LICENSE first line is ${JSON.stringify(sources.licenseFirstLine)}; ` +
+        `expected ${JSON.stringify(expectedTitle)}`,
+    });
+  }
+  return { ok: problems.length === 0, problems };
+}
+
 module.exports = {
   projectRoot,
-  normalizeLicense,
   readVersionSources,
   readLicenseSources,
   allVersionsAgree,
+  licenseDeclarationVerdict,
 };

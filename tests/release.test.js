@@ -13,10 +13,19 @@ const path = require('path');
 const os = require('os');
 
 const {
+  projectRoot,
   readVersionSources,
   readLicenseSources,
   allVersionsAgree,
+  licenseDeclarationVerdict,
 } = require('./helpers/source-of-truth');
+
+// The license declaration the release must carry: package.json names the file,
+// and that file opens with the agreement's title (pinned here and, separately, in
+// tests/version-license-invariant.test.js, so one cannot drift without the other).
+const LICENSE_VALUE = 'SEE LICENSE IN LICENSE';
+const AGREEMENT_TITLE = 'CTO Chief (CTOC) End-User License Agreement';
+const OLD_TITLE = 'PolyForm Shield License 1.0.0';
 
 // =============================================================================
 // Test Setup - Shared temp directory
@@ -709,16 +718,13 @@ describe('release artifact is the single source of truth', () => {
     );
   });
 
-  test('package.json license equals the actual LICENSE file', () => {
-    const lic = readLicenseSources();
-    assert.ok(lic.declared !== null, 'package.json declares no license');
-    assert.ok(lic.actual !== null, 'LICENSE file has no readable first line');
-    assert.strictEqual(
-      lic.declared,
-      lic.actual,
-      `declared license (package.json: "${lic.declaredRaw}") does not match the ` +
-        `actual LICENSE file ("${lic.actualRaw}")`,
-    );
+  test('package.json license points to LICENSE, and LICENSE opens with the agreement title', () => {
+    const verdict = licenseDeclarationVerdict(readLicenseSources(), {
+      expectedValue: LICENSE_VALUE,
+      expectedTitle: AGREEMENT_TITLE,
+    });
+    assert.deepStrictEqual(verdict.problems, []);
+    assert.strictEqual(verdict.ok, true);
   });
 
   // Non-vacuity: point the reader at a drift fixture and prove the same
@@ -727,26 +733,35 @@ describe('release artifact is the single source of truth', () => {
   describe('goes red on drift (non-vacuity)', () => {
     let fixtureRoot;
 
-    function writeFixture({ pkgVersion, pkgLicense }) {
-      const realRoot = path.resolve(__dirname, '..');
+    // licenseText: undefined copies the real LICENSE, null writes no LICENSE,
+    // a string writes that text. extraFiles maps a top-level file name to its text.
+    function writeFixture({ pkgVersion, pkgLicense, licenseText, extraFiles = {} }) {
       fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'source-of-truth-drift-'));
       fs.mkdirSync(path.join(fixtureRoot, '.claude-plugin'), { recursive: true });
 
-      const pkg = JSON.parse(fs.readFileSync(path.join(realRoot, 'package.json'), 'utf8'));
+      const pkg = JSON.parse(fs.readFileSync(path.join(projectRoot, 'package.json'), 'utf8'));
       const plugin = JSON.parse(
-        fs.readFileSync(path.join(realRoot, '.claude-plugin', 'plugin.json'), 'utf8'),
+        fs.readFileSync(path.join(projectRoot, '.claude-plugin', 'plugin.json'), 'utf8'),
       );
       const marketplace = JSON.parse(
-        fs.readFileSync(path.join(realRoot, '.claude-plugin', 'marketplace.json'), 'utf8'),
+        fs.readFileSync(path.join(projectRoot, '.claude-plugin', 'marketplace.json'), 'utf8'),
       );
-      const versionText = fs.readFileSync(path.join(realRoot, 'VERSION'), 'utf8');
-      const licenseText = fs.readFileSync(path.join(realRoot, 'LICENSE'), 'utf8');
+      const versionText = fs.readFileSync(path.join(projectRoot, 'VERSION'), 'utf8');
+      const realLicenseText = fs.readFileSync(path.join(projectRoot, 'LICENSE'), 'utf8');
 
       if (pkgVersion !== undefined) pkg.version = pkgVersion;
       if (pkgLicense !== undefined) pkg.license = pkgLicense;
 
       fs.writeFileSync(path.join(fixtureRoot, 'VERSION'), versionText);
-      fs.writeFileSync(path.join(fixtureRoot, 'LICENSE'), licenseText);
+      if (licenseText !== null) {
+        fs.writeFileSync(
+          path.join(fixtureRoot, 'LICENSE'),
+          licenseText === undefined ? realLicenseText : licenseText,
+        );
+      }
+      for (const [name, text] of Object.entries(extraFiles)) {
+        fs.writeFileSync(path.join(fixtureRoot, name), text);
+      }
       fs.writeFileSync(path.join(fixtureRoot, 'package.json'), JSON.stringify(pkg, null, 2));
       fs.writeFileSync(
         path.join(fixtureRoot, '.claude-plugin', 'plugin.json'),
@@ -781,14 +796,71 @@ describe('release artifact is the single source of truth', () => {
       assert.strictEqual(verdict.values.packageJson, null);
     });
 
-    test('a reverted license (Apache-2.0) fails the license match', () => {
+    const verdictFor = (root) =>
+      licenseDeclarationVerdict(readLicenseSources(root), {
+        expectedValue: LICENSE_VALUE,
+        expectedTitle: AGREEMENT_TITLE,
+      });
+    const namedFiles = (root) => verdictFor(root).problems.map((p) => p.file);
+    // The real LICENSE with its first non-empty line replaced by `line`.
+    const licenseWithFirstLine = (line) => {
+      const lines = fs
+        .readFileSync(path.join(projectRoot, 'LICENSE'), 'utf8')
+        .split(/\r?\n/);
+      lines[lines.findIndex((l) => l.trim().length > 0)] = line;
+      return lines.join('\n');
+    };
+
+    test('an unchanged copy of the tree passes', () => {
+      assert.deepStrictEqual(namedFiles(writeFixture({})), []);
+    });
+
+    test('SEE LICENSE IN LICENSE.txt fails, naming package.json', () => {
+      const root = writeFixture({
+        pkgLicense: 'SEE LICENSE IN LICENSE.txt',
+        extraFiles: {
+          'LICENSE.txt': fs.readFileSync(path.join(projectRoot, 'LICENSE'), 'utf8'),
+        },
+      });
+      assert.deepStrictEqual(namedFiles(root), ['package.json']);
+    });
+
+    test('the old PolyForm-Shield-1.0.0 value in package.json fails, naming package.json', () => {
+      const root = writeFixture({ pkgLicense: 'PolyForm-Shield-1.0.0' });
+      assert.deepStrictEqual(namedFiles(root), ['package.json']);
+    });
+
+    test('a reverted license (Apache-2.0) fails, naming package.json', () => {
       const root = writeFixture({ pkgLicense: 'Apache-2.0' });
-      const lic = readLicenseSources(root);
-      assert.notStrictEqual(
-        lic.declared,
-        lic.actual,
-        'Apache-2.0 must not match the PolyForm LICENSE file',
-      );
+      assert.deepStrictEqual(namedFiles(root), ['package.json']);
+    });
+
+    test('no LICENSE file fails, naming LICENSE as missing', () => {
+      const root = writeFixture({ licenseText: null });
+      const { problems } = verdictFor(root);
+      assert.deepStrictEqual(problems.map((p) => p.file), ['LICENSE']);
+      assert.match(problems[0].message, /missing/);
+    });
+
+    test('a LICENSE that is a folder fails, naming LICENSE as not a file', () => {
+      const root = writeFixture({ licenseText: null });
+      fs.mkdirSync(path.join(root, 'LICENSE'));
+      const { problems } = verdictFor(root);
+      assert.deepStrictEqual(problems.map((p) => p.file), ['LICENSE']);
+      assert.match(problems[0].message, /not a file/);
+      assert.doesNotMatch(problems[0].message, /missing/);
+    });
+
+    test('a LICENSE that opens with the PolyForm Shield title fails, naming LICENSE', () => {
+      const root = writeFixture({ licenseText: licenseWithFirstLine(OLD_TITLE) });
+      assert.deepStrictEqual(namedFiles(root), ['LICENSE']);
+    });
+
+    test('a stat error other than a missing file is re-thrown', () => {
+      // Node rejects a path holding a NUL character before it touches the disk.
+      // package.json goes through safeReadJson, which swallows that error, so the
+      // throw comes from the LICENSE stat and proves the re-throw.
+      assert.throws(() => readLicenseSources('bad\0root'), { code: 'ERR_INVALID_ARG_VALUE' });
     });
   });
 });

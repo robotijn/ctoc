@@ -5,8 +5,8 @@
 
 <p align="center">
   <a href="https://github.com/robotijn/ctoc"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-robotijn%2Fctoc-blue"></a>
-  <a href="LICENSE"><img alt="License: PolyForm Shield" src="https://img.shields.io/badge/License-PolyForm%20Shield-brightgreen.svg"></a>
-  <img alt="Version" src="https://img.shields.io/badge/version-6.14.135-blue">
+  <a href="LICENSE"><img alt="License: CTO Chief (CTOC) End-User License Agreement" src="https://img.shields.io/badge/License-End--User%20License%20Agreement-blue.svg"></a>
+  <img alt="Version" src="https://img.shields.io/badge/version-6.14.136-blue">
   <img alt="Platform" src="https://img.shields.io/badge/platform-Claude%20Code-purple">
   <img alt="Agents" src="https://img.shields.io/badge/agents-125-orange">
   <img alt="Skills" src="https://img.shields.io/badge/skills-430-blue">
@@ -137,7 +137,7 @@ Answer them once; both choices are remembered. "Keep defaults, stop asking" and 
 **Worked example.** The classic pipeline overview (`Open the dashboard` on the first screen) of a busy project — this is a real capture of the CTO Chief repository itself:
 
 ```
-CTOC v6.14.135
+CTOC v6.14.136
 ────────────────────────────────────────────────────────────
 
 ▼ Business (2)
@@ -1109,7 +1109,7 @@ node --test tests/*.test.js   # fast pass only — does NOT enforce the floor
 ```javascript
 const { release, getVersion, syncAll, checkForUpdates } = require('./src/lib/version');
 
-getVersion()       // → '6.14.135'
+getVersion()       // → '6.14.136'
 release()          // → bumps patch, syncs all files
 release('minor')   // → bumps minor
 release('major')   // → bumps major
@@ -1167,19 +1167,21 @@ The structure follows the course-design literature rather than a feature invento
 
 ## License
 
-[PolyForm Shield 1.0.0](https://polyformproject.org/licenses/shield/1.0.0) — See [LICENSE](LICENSE)
+CTO Chief is licensed under the [CTO Chief (CTOC) End-User License Agreement](LICENSE).
 
-Use CTO Chief freely for any project. You may not offer CTO Chief itself or a derivative as a competing product or service without permission. For commercial licensing inquiries, contact the licensor.
+Personal use, non-commercial use and evaluation are free. Evaluation means trying CTO Chief to decide whether it suits a particular use, for less than 32 consecutive calendar days, once per company together with its affiliates, or once per individual who acts for no company. Any other business use needs a paid commercial license from Tijn van der Zant: ask at tijn@theaiguys.com. The [LICENSE](LICENSE) file holds the full terms, including what counts as business use and as non-commercial use.
+
+Every copy of CTO Chief from version 6.1.26 up to and including version 6.14.135 stays under the [PolyForm Shield License 1.0.0](https://polyformproject.org/licenses/shield/1.0.0), and earlier copies stay under the license they shipped with. Releases after version 6.14.135 are under the CTO Chief (CTOC) End-User License Agreement.
 
 ## Links
 
 [Repository](https://github.com/robotijn/ctoc) · [Issues](https://github.com/robotijn/ctoc/issues) · [Discussions](https://github.com/robotijn/ctoc/discussions)
 
 > [!NOTE]
-> CTO Chief is open source and actively developed. [Issues](https://github.com/robotijn/ctoc/issues), [PRs](https://github.com/robotijn/ctoc/pulls), and [skill improvement suggestions](https://github.com/robotijn/ctoc/issues/new?template=skill-improvement.yml) are welcome.
+> The source code of CTO Chief is public, and CTO Chief is actively developed. [Issues](https://github.com/robotijn/ctoc/issues) and [skill improvement suggestions](https://github.com/robotijn/ctoc/issues/new?template=skill-improvement.yml) are welcome. Outside pull requests are not accepted until a contributor license agreement exists.
 
 ---
 
-**6.14.135** · Built by [@robotijn](https://github.com/robotijn)
+**6.14.136** · Built by [@robotijn](https://github.com/robotijn)
 
 <p align="center"><i>"Excellence is not an act, but a habit."</i></p>

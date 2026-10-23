@@ -1,150 +1,200 @@
-PolyForm Shield License 1.0.0
+CTO Chief (CTOC) End-User License Agreement
 
-<https://polyformproject.org/licenses/shield/1.0.0>
+Copyright (c) 2025-2026 Tijn van der Zant
+https://github.com/robotijn/ctoc
 
-Copyright (c) 2025 Tijn van der Zant
+## 1. The parties and acceptance
 
-## Acceptance
+This agreement is between the licensor, Tijn van der Zant, and you.
+"You" is the individual or organisation that uses CTOC. If you use CTOC
+for or on behalf of a company or another organisation, you accept this
+agreement for that organisation too.
 
-To obtain any license under these terms, you must agree to them as
-strict obligations and conditions to all your licenses.
+Using CTOC means accepting this agreement. If you do not accept it, you
+may not use CTOC.
 
-## Copyright License
+Every license in this agreement is granted on condition that you keep
+its terms. They are binding obligations and conditions of each license.
 
-The licensor grants you a copyright license for the software to do
-everything you might do with the software that would otherwise infringe
-the licensor's copyright in it for any permitted purpose. However, you
-may only distribute the software according to Distribution License and
-make changes or new works based on the software according to Changes
-and New Works License.
+Questions about this agreement go to tijn@theaiguys.com.
 
-## Distribution License
+## 2. Definitions
 
-The licensor grants you an additional copyright license to distribute
-copies of the software. Your license to distribute covers distributing
-the software with changes and new works permitted by Changes and New
-Works License.
+CTOC is the software CTO Chief (CTOC) that the licensor makes available
+with this agreement: its source code, documentation, agents and skills,
+every part of it, and every copy of it.
 
-## Notices
+Use is anything you do with CTOC, including installing, running,
+copying, studying and changing it.
 
-You must ensure that anyone who gets a copy of any part of the software
-from you also gets a copy of these terms or the URL for them above, as
-well as copies of any plain-text lines beginning with "Required Notice:"
-that the licensor provided with the software.
+Your company is any company, partnership or other legal entity for or
+on behalf of which you use CTOC, together with its affiliates.
+Affiliates of an organisation are the organisations it controls, the
+organisations that control it, and the organisations under common
+control with it. Control is owning substantially all the assets of an
+organisation, or having the power to direct its management and policies
+by vote, by contract or in any other way, directly or indirectly.
 
-Required Notice: CTO Chief (CTOC) — https://github.com/robotijn/ctoc
+A consumer is a natural person who acts for purposes outside their
+trade, business, craft or profession.
 
-## Changes and New Works License
+Business use is:
 
-The licensor grants you an additional copyright license to make changes
-and new works based on the software for any permitted purpose.
+(a) any use by or on behalf of a company, partnership or other legal
+    entity; and
 
-## Patent License
+(b) any use by an individual in the course of paid work, a trade, a
+    business or a profession.
 
-The licensor grants you a patent license for the software that covers
-patent claims the licensor can license, or becomes able to license, that
-you would infringe by using the software.
+Non-commercial use is not business use. It is:
 
-## Noncompete
+(c) use by a charitable organisation, an educational institution, a
+    public research organisation, a public safety or health
+    organisation, an environmental protection organisation or a
+    government institution, for its non-commercial purposes,
+    regardless of its source of funding, and the work of an
+    individual on that organisation's behalf; and
 
-Any purpose is a permitted purpose, except for providing any product
-that competes with the software or any product the licensor or any of
-its affiliates provides using the software.
+(d) personal use: use by an individual outside paid work, a trade, a
+    business or a profession, and not for or on behalf of a company,
+    partnership or other legal entity, such as study, a hobby or an
+    unpaid project of their own.
 
-## Competition
+A use that falls under (c) is not business use, even where (a) or (b)
+also describes it.
 
-Goods and services compete even when they provide functionality through
-different kinds of interfaces or for different technical platforms.
-Applications can compete with services, libraries with plugins,
-frameworks with development tools, and so on, even if they're written
-in different programming languages or for different computer
-architectures. Goods and services compete even when provided free of
-charge. If you market a product as a practical substitute for the
-software or another product, it definitely competes.
+(e) Use for a commercial product or a paid service is business use.
+    That is a product or service that is sold, licensed or provided for
+    payment. It is business use also when an organisation listed in (c),
+    or an individual under (d), makes the product or provides the
+    service. Paragraph (e) overrides (c) and (d).
 
-## New Products
+    Payment means money or other value that you, or the organisation
+    you act for, receive in exchange for that product or service. Only
+    these are not payment under this paragraph: the wages of an
+    individual; tuition that an educational institution listed in (c)
+    receives for its teaching; fees that a public safety or health
+    organisation listed in (c) receives for its care; fees that a
+    government institution listed in (c) charges for its public tasks;
+    and grants, donations and public funding. Any other product or
+    service that an organisation listed in (c) sells, licenses or
+    provides for payment is business use, also when the money it brings
+    in supports a non-commercial purpose.
 
-If you are using the software to provide a product that does not
-compete, but the licensor or any of its affiliates brings your product
-into competition by providing a new version of the software or another
-product using the software, you may continue using versions of the
-software available under these terms beforehand to provide your
-competing product, but not any later versions.
+Evaluation is use to find out whether CTOC suits a particular use.
 
-## Discontinued Products
+## 3. Free use
 
-You may begin using the software to compete with a product or service
-that the licensor or any of its affiliates has stopped providing, unless
-the licensor includes a plain-text line beginning with "Licensor Line of
-Business:" with the software that mentions that line of business.
+The licensor grants you a non-exclusive, non-transferable, worldwide
+license, free of charge, to use CTOC for personal use and for
+non-commercial use. You may install and run CTOC, make the copies that
+this use needs, and change CTOC and use the changed copy for that same
+use. Changed copies stay private (section 6).
 
-Licensor Line of Business: AI-assisted software development methodology
-and planning tools provided as Claude Code plugins or standalone
-developer tools.
+## 4. Evaluation
 
-## Sales of Business
+Free of charge, and on the same conditions as section 3, apart from its
+limit to personal and non-commercial use, the licensor lets any person
+or company use CTOC for evaluation, business evaluation included, for
+less than 32 consecutive calendar days, counted from the first day of
+that evaluation.
 
-If the licensor or any of its affiliates sells a line of business
-developing the software or using the software to provide a product, the
-buyer can also enforce Noncompete for that product.
+The period runs once per company together with its affiliates, or once
+per individual who acts for no company. It does not start again for
+another person or for another use. If you use CTOC for your company,
+the period is your company's, and it covers everyone who uses CTOC for
+your company.
 
-## Fair Use
+Business use that goes on after the period needs a commercial license
+(section 5).
 
-You may have "fair use" rights for the software under the law. These
-terms do not limit them.
+## 5. Business use needs a commercial license
 
-## No Other Rights
+Any business use other than evaluation under section 4 needs a paid
+commercial license from the licensor. This agreement gives no right to
+business use beyond section 4.
 
-These terms do not allow you to sublicense or transfer any of your
-licenses to anyone else, or prevent the licensor from granting licenses
-to anyone else. These terms do not imply any other licenses.
+Ask for a commercial license at tijn@theaiguys.com. A commercial
+license is a separate agreement with the licensor. It is made in
+writing, or by electronic means that keep a durable record of it, and it
+sets its own terms.
 
-## Patent Defense
+## 6. What you may not do
 
-If you make any written claim that the software infringes or contributes
-to infringement of any patent, your patent license for the software
-granted under these terms ends immediately. If your company makes such a
-claim, your patent license ends immediately for work on behalf of your
-company.
+Unless a commercial license with the licensor expressly allows it, you
+may not:
 
-## Violations
+(a) distribute, publish, sell, rent, lend or otherwise make CTOC or any
+    part of it available to anyone else, except as section 7 states;
 
-The first time you are notified in writing that you have violated any of
-these terms, or done anything with the software not covered by your
-licenses, your licenses can nonetheless continue if you come into full
-compliance with these terms, and take practical steps to correct past
-violations, within 32 days of receiving notice. Otherwise, all your
-licenses end immediately.
+(b) sublicense, assign or transfer any right under this agreement;
 
-## No Liability
+(c) distribute or make available a changed copy of CTOC, or any work
+    based on CTOC;
 
-As far as the law allows, the software comes as is, without any warranty
-or condition, and the licensor will not be liable to you for any damages
-arising out of these terms or the use or nature of the software, under
-any kind of legal claim.
+(d) provide a product or service that competes with CTOC, or use CTOC
+    to provide one. A product competes with CTOC even if it offers the
+    same functionality through a different kind of interface, for a
+    different technical platform or in a different programming
+    language. It competes even if it is provided free of charge. A
+    product marketed as a practical substitute for CTOC competes with
+    it;
 
-## Definitions
+(e) remove, change or hide the copyright notice, this agreement, or any
+    copyright, license or attribution notice in CTOC.
 
-The **licensor** is the individual or entity offering these terms, and
-the **software** is the software the licensor makes available under
-these terms.
+## 7. Viewing and forking on GitHub
 
-A **product** can be a good or service, or a combination of them.
+Viewing and forking CTOC's repository within GitHub, under GitHub's
+terms of service, does not breach this agreement. This gives you no
+right outside GitHub beyond what this agreement grants. A fork that
+holds changes to CTOC is a changed copy under section 6(c).
 
-**You** refers to the individual or entity agreeing to these terms.
+## 8. Rights the law gives you
 
-**Your company** is any legal entity, sole proprietorship, or other kind
-of organization that you work for, plus all its affiliates.
+This agreement limits none of the rights that a lawful user of CTOC has
+under European Union and Dutch law on computer programs. These include
+loading and running the program and correcting its errors; making a
+back-up copy; observing, studying and testing how CTOC works; and
+decompiling it for interoperability (Directive 2009/24/EC, articles 5
+and 6; Dutch Copyright Act, articles 45j to 45m). Nor does it limit any
+other right the law gives you that a contract cannot take away.
 
-**Affiliates** means the other organizations than an organization has
-control over, is under the control of, or is under common control with.
+## 9. No warranty
 
-**Control** means ownership of substantially all the assets of an
-entity, or the power to direct its management and policies by vote,
-contract, or otherwise. Control can be direct or indirect.
+As far as the law allows, CTOC is provided as it is, without any
+warranty or condition of any kind, express or implied.
 
-**Your licenses** are all the licenses granted to you for the software
-under these terms.
+## 10. Liability
 
-**Use** means anything you do with the software requiring one of your
-licenses.
+Toward anyone who uses CTOC for business use, business evaluation
+included, and toward every other user who is not a consumer, the
+licensor's liability for any damage arising out of this agreement or out
+of the use of CTOC is excluded as far as the law allows. A commercial
+license may set different terms.
+
+Nothing in this agreement excludes or limits:
+
+- liability for intent or deliberate recklessness;
+- product liability toward natural persons for death, personal injury,
+  or damage to property or data not used for professional purposes;
+- a consumer's statutory rights;
+- any other liability that the law does not allow to be excluded or
+  limited.
+
+## 11. Governing law and courts
+
+Dutch law governs this agreement. If you are a consumer, this choice
+does not take away the protection of the mandatory provisions of the law
+of the country where you have your habitual residence.
+
+The competent court in the Netherlands has jurisdiction over any
+dispute arising out of this agreement. This is without prejudice to the
+courts that a consumer may use, or must be sued in, under European Union
+law.
+
+## 12. No other rights
+
+The licensor keeps every right that this agreement does not expressly
+grant. This agreement implies no other license, and it does not stop the
+licensor from granting licenses to anyone else.
