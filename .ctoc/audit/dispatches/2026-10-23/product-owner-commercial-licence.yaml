@@ -1,0 +1,16 @@
+request:
+  dispatch_id: product-owner-commercial-licence
+  agent: planning/product-owner
+  task_id: t466
+  plan: plans/functional/ctocs-new-releases-are-under-a-commercial-licence-agreement.md
+  effort: high
+  requested_by: cto-chief, for the owner's licence change ordered in the main session
+  dispatcher: cto-chief
+response:
+  agent_id: a068fd4d0ac91b48c
+  result: refined; 15 acceptance criteria, risk HIGH, 6 decisions added, no question
+outcome:
+  status: completed
+  reason: ""
+  graded_at: null
+  grade: null

@@ -1,0 +1,15 @@
+request:
+  dispatch_id: spec-integrator-r1-commercial-licence-s1
+  agent: iron-loop/iron-loop-integrator
+  step: 7 SPEC, round 1
+  plan: plans/implementation/ctocs-new-releases-are-under-a-commercial-licence-agreement-s1-the-agreement-its-checks-and-the-patch-release.md
+  effort: high
+  dispatcher: cto-chief
+response:
+  agent_id: a333606ce58b307e4
+  result: all 11 findings applied (9 as proposed, 2 changed in placement with recorded reasons)
+outcome:
+  status: completed
+  reason: ""
+  graded_at: null
+  grade: null

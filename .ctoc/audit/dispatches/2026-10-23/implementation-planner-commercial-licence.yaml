@@ -1,0 +1,15 @@
+request:
+  dispatch_id: implementation-planner-commercial-licence
+  agent: planning/implementation-planner
+  task_id: t468
+  plan: plans/implementation/ctocs-new-releases-are-under-a-commercial-licence-agreement.md
+  effort: high
+  dispatcher: cto-chief
+response:
+  agent_id: a0f5df8bf9a5aa05f
+  result: one slice planned (s1, the agreement, its checks and the patch release); questions file with 0 questions
+outcome:
+  status: completed
+  reason: ""
+  graded_at: null
+  grade: null

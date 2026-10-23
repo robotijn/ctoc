@@ -1,0 +1,16 @@
+request:
+  dispatch_id: gate-critic-classify-commercial-licence
+  agent: iron-loop/gate-critic
+  task_id: t467
+  plan: plans/functional/ctocs-new-releases-are-under-a-commercial-licence-agreement.md
+  effort: high
+  purpose: classify the author's (empty) question list
+  dispatcher: cto-chief
+response:
+  agent_id: a05f70a9722296dfe
+  result: classified file written; 1 critical question (when a lawyer reviews the agreement)
+outcome:
+  status: completed
+  reason: ""
+  graded_at: null
+  grade: null

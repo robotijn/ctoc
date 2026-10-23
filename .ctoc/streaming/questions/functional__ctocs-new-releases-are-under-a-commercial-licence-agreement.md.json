@@ -1,0 +1,39 @@
+{
+  "ref": "functional/ctocs-new-releases-are-under-a-commercial-licence-agreement.md",
+  "planMtimeMs": 1792749016684.339,
+  "questions": [
+    {
+      "id": "q10-lawyer-review-of-agreement-r1792749016684",
+      "prompt": "CTOC's agents draft the commercial licence agreement for CTOC's new releases, and the plan leaves to you whether a lawyer reviews it; a released copy keeps the terms it shipped with. When should a Dutch lawyer review the text?",
+      "critical": true,
+      "important": false,
+      "topic": "irreversible",
+      "options": [
+        {
+          "key": "1",
+          "label": "Release it as planned, and have a Dutch lawyer review it for a later release",
+          "recommended": true,
+          "pros": "Evidence: strong for the comparison that follows, which rests on the PolyForm Shield text and the owner's terms as the research and the plan quote them; the timing is a judgement. Every release under PolyForm Shield keeps free business use for any purpose that does not compete with CTOC for whoever holds it, and the new agreement grants no right PolyForm Shield does not, so releasing it now ends that free grant at once instead of extending it to every release made while a review runs. The plan has the text name the limits mandatory law sets rather than rest on the Dutch Civil Code articles the research could not read, and the lawyer's corrections then reach every release after the one they land in.",
+          "cons": "Every copy released before the lawyer's corrections land keeps the unreviewed text for whoever holds it: a gap in the definition of business use stays unpaid for those copies, and a clause a Dutch court finds unreasonably onerous is void against that party. The research never reached the official text of Dutch Civil Code articles 6:231 to 6:248, and found one first-instance judgment, none on payment duties, on whether a published licence binds a professional user. The review costs a fee this plan has not priced and is a separate piece of work for you to schedule.",
+          "description": "The choice is read at plans/functional/ctocs-new-releases-are-under-a-commercial-licence-agreement.md line 68, which leaves a lawyer's review out of the plan and to you, and line 251, the business risk of an agreement drafted without one, rated medium likelihood and high impact."
+        },
+        {
+          "key": "2",
+          "label": "Hold the first release under it until a Dutch lawyer has reviewed the text",
+          "pros": "The first commercial text anyone can hold is one a qualified person has checked against the primary sources the research could not reach: the Dutch Civil Code articles on general terms, the Supreme Court of the Netherlands' rule on intent and deliberate recklessness, and the Product Liability Directive's contested application date in December 2026. A gap in the definition of business use, or a doubt about whether a licence file and a README notice bind a business to pay, is closed before any copy ships, so no copy ever carries terms you later had to correct.",
+          "cons": "This release waits for a review of unknown length and a fee this plan has not priced, while you ordered the change before the build queue: either the queue waits with it, or any release made meanwhile ships under PolyForm Shield, whose free business use for any purpose that does not compete with CTOC can never be withdrawn from those copies."
+        },
+        {
+          "key": "3",
+          "label": "Release it as planned, with no lawyer's review",
+          "pros": "No fee and no wait. The definitions reuse published licence wording (the PolyForm Noncommercial list of non-commercial organisations and the PolyForm Free Trial evaluation period), the plan has the text name every limit mandatory law sets instead of claiming an exclusion a court would set aside, and it grants no right PolyForm Shield does not, while version 6.14.135 already stays free for business use that does not compete with CTOC for good, which bounds what any gap in the new text can give away.",
+          "cons": "Every future release carries a legal text no lawyer has read, drafted from secondary copies of the Dutch Civil Code; the plan itself rates a void clause or an unpaid gap in the definition of business use as medium likelihood and high impact, and only CTOC's own review against the plan's scenarios would look for either."
+        }
+      ]
+    }
+  ],
+  "classification": {
+    "by": "gate-critic",
+    "at": 1792749016684
+  }
+}

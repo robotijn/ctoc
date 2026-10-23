@@ -1,0 +1,33 @@
+{
+  "ref": "implementation/ctocs-new-releases-are-under-a-commercial-licence-agreement-s1-the-agreement-its-checks-and-the-patch-release.md",
+  "planMtimeMs": 1792755161379.5188,
+  "questions": [
+    {
+      "id": "q10-outside-contributions-invited-r1792755161379",
+      "prompt": "Under the new paid agreement, README keeps inviting outside pull requests while no contributor licence agreement exists. Under GitHub's terms an outside contribution comes in under the agreement itself, which gives you no right to sell it. Should README keep the invitation?",
+      "critical": false,
+      "important": true,
+      "topic": "irreversible",
+      "options": [
+        {
+          "key": "1",
+          "label": "Say outside pull requests are not accepted until a contributor licence agreement exists",
+          "recommended": true,
+          "pros": "README then tells contributors the truth about what you can take: under GitHub's terms, section D.6, a contribution comes in under the repository's own licence, and the research finds that the new agreement gives you no right to sell what comes in that way, so a merged outside change would sit in releases you license for money with no grant covering it. Issues and improvement suggestions stay welcome, so bug reports and ideas keep arriving, and the day a contributor licence agreement exists the sentence changes back in one line.",
+          "cons": "The slice allows only the first sentence of that README note to change, so its technical-planning decision 10 and the README diff check in its verification step must be amended before the build, and the new sentence is wording no review has read yet. Contributors who would have sent a fix send none until a contributor licence agreement exists, and that agreement is a separate piece of work for you to schedule.",
+          "description": "Read at plans/implementation/ctocs-new-releases-are-under-a-commercial-licence-agreement-s1-the-agreement-its-checks-and-the-patch-release.md line 319 (technical-planning decision 10), which keeps the note's invitation to pull requests and names the question as yours, and line 123, which changes only that note's first sentence; the research's advice is at plans/vision/deepthink/commercial-licence-for-ctoc.md line 268."
+        },
+        {
+          "key": "2",
+          "label": "Keep the invitation as the plan has it",
+          "pros": "No outside change reaches a release until you merge it, and every merge is yours, so the invitation alone puts nothing in a paid release: you can read each outside pull request and turn down any you cannot take without a grant, or ask its author for one first. The slice lands exactly as its review rounds converged, its README diff check stays as written, and the pull requests that do arrive show where outside interest lies before you decide whether a contributor licence agreement is worth building.",
+          "cons": "README invites changes you cannot safely ship, so each outside pull request becomes a refusal or a one-off rights negotiation with its author; one merged without a grant puts code you hold no right to sell into releases you license for money, and copies already shipped cannot be recalled."
+        }
+      ]
+    }
+  ],
+  "classification": {
+    "by": "gate-critic",
+    "at": 1792755161379
+  }
+}

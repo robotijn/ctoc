@@ -1,0 +1,10 @@
+{
+  "content_sha256": "f5075431c7cb4375b89b947e51d5e545f274935a5228ba8e3badddba1ffd4e47",
+  "hash_scope": "specification",
+  "stage_from": "implementation",
+  "stage_to": "todo",
+  "approved_at": "2026-10-23T11:43:22.031Z",
+  "advanced_by": "sufficiency",
+  "evidence": "sufficiency: implementation/ctocs-new-releases-are-under-a-commercial-licence-agreement-s1-the-agreement-its-checks-and-the-patch-release.md — 1 question(s) computed, 1 answered (q10-outside-contributions-invited-r1792755161379); 0 unanswered, 0 blocking; attested by: not recorded; enough (no unanswered fork)",
+  "plan_basename": "ctocs-new-releases-are-under-a-commercial-licence-agreement-s1-the-agreement-its-checks-and-the-patch-release"
+}

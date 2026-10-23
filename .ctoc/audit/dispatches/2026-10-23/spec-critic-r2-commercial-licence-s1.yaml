@@ -1,0 +1,15 @@
+request:
+  dispatch_id: spec-critic-r2-commercial-licence-s1
+  agent: iron-loop/iron-loop-critic
+  step: 7 SPEC, round 2
+  plan: plans/implementation/ctocs-new-releases-are-under-a-commercial-licence-agreement-s1-the-agreement-its-checks-and-the-patch-release.md
+  effort: high
+  dispatcher: cto-chief
+response:
+  agent_id: a5354db11ffb8a426
+  result: round-1 findings resolved (8 partly); 3 new findings, none blocking; 1 repeat
+outcome:
+  status: completed
+  reason: ""
+  graded_at: null
+  grade: null

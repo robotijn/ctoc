@@ -1,0 +1,16 @@
+request:
+  dispatch_id: gate-critic-classify-commercial-licence-s1
+  agent: iron-loop/gate-critic
+  task_id: t470
+  plan: plans/implementation/ctocs-new-releases-are-under-a-commercial-licence-agreement-s1-the-agreement-its-checks-and-the-patch-release.md
+  effort: high
+  purpose: classify the author's (empty) question list
+  dispatcher: cto-chief
+response:
+  agent_id: a8922e2e61e51bb2b
+  result: classified; 1 important, non-critical question (README pull-request invitation without a contributor licence agreement)
+outcome:
+  status: completed
+  reason: ""
+  graded_at: null
+  grade: null

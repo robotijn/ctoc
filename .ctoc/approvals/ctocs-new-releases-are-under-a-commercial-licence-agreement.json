@@ -1,0 +1,10 @@
+{
+  "content_sha256": "8d88fec474d943ce038f2d6fd85647879ccad631d5d36ba9b0ebbc44951b78db",
+  "hash_scope": "specification",
+  "stage_from": "functional",
+  "stage_to": "implementation",
+  "approved_at": "2026-10-23T10:51:24.994Z",
+  "advanced_by": "sufficiency",
+  "evidence": "sufficiency: functional/ctocs-new-releases-are-under-a-commercial-licence-agreement.md — 1 question(s) computed, 1 answered (q10-lawyer-review-of-agreement-r1792749016684); 0 unanswered, 0 blocking; attested by: not recorded; enough (no unanswered fork)",
+  "plan_basename": "ctocs-new-releases-are-under-a-commercial-licence-agreement"
+}

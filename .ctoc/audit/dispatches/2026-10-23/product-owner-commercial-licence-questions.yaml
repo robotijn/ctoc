@@ -1,0 +1,15 @@
+request:
+  dispatch_id: product-owner-commercial-licence-questions
+  agent: planning/product-owner
+  plan: plans/functional/ctocs-new-releases-are-under-a-commercial-licence-agreement.md
+  effort: medium
+  purpose: write the plan's questions file, the last act the first brief wrongly cancelled
+  dispatcher: cto-chief
+response:
+  agent_id: aedbc980c0879dc88
+  result: questions file written with 0 questions
+outcome:
+  status: completed
+  reason: ""
+  graded_at: null
+  grade: null
